@@ -1,11 +1,16 @@
-export type UserRole = 'student' | 'agent' | 'admin' | null;
+export type UserRole = 'student' | 'agent' | 'manager' | 'admin' | null;
+
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
 export interface User {
   id: string;
   email: string;
   role: UserRole;
   name: string;
+  phoneNumber: string;
   avatar?: string;
+  approvalStatus: ApprovalStatus;
+  assignedAgentId?: string; // For students
 }
 
 export interface JobApplication {
