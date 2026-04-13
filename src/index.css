@@ -87,3 +87,11 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-brand-blue/50;
 }
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
