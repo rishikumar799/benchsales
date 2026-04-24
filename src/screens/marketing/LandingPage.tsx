@@ -47,19 +47,19 @@ export default function LandingPage({ theme, toggleTheme }: { theme?: 'light' | 
   const premiumCapabilities = [
     {
       title: 'AI Resume Tailoring',
-      desc: 'Dynamically rewrites bullet points to match job descriptions perfectly using Gemini 1.5 Pro.',
+      desc: 'Auto-customize resumes to match JDs perfectly. Dynamically rewrites bullet points for maximum relevance.',
       icon: Sparkles,
       variant: 'resume' as const
     },
     {
-      title: 'Cover Letter Generation',
-      desc: 'Unique, persuasive letters for every application that bypass ATS filters with ease.',
+      title: 'AI Fit Scoring',
+      desc: 'Proprietary job matching that scores fit before you even apply, ensuring high-quality placement opportunities.',
       icon: Zap,
-      variant: 'letter' as const
+      variant: 'evaluating' as const
     },
     {
-      title: 'Live Application Dashboard',
-      desc: 'See exactly where you applied, when, and the current status in real-time.',
+      title: 'Automated Outreach',
+      desc: 'Strategic outreach to vendor lists and job boards, building intelligence directly into your workflow.',
       icon: Users,
       variant: 'dashboard' as const
     }
@@ -70,7 +70,7 @@ export default function LandingPage({ theme, toggleTheme }: { theme?: 'light' | 
       <Navbar theme={theme} toggleTheme={toggleTheme} />
       
       {/* Hero Section */}
-      <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-white dark:bg-app-bg pt-32 pb-24">
+      <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-white dark:bg-app-bg pt-40 pb-32">
         {/* Subtle Background Elements */}
         <div className="absolute top-0 left-0 right-0 h-full overflow-hidden pointer-events-none opacity-50">
           <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-blue/10 blur-[120px] rounded-full" />
@@ -239,13 +239,13 @@ export default function LandingPage({ theme, toggleTheme }: { theme?: 'light' | 
                 <h3 className="text-2xl font-display font-bold mb-4">{item.title}</h3>
                 <p className="text-app-muted text-sm leading-relaxed mb-8">{item.desc}</p>
               </div>
-              <div className="px-10 pb-10">
+              <div className="px-10 pb-12">
                 <div className="aspect-[16/10] rounded-3xl bg-app-surface/50 border border-app-border overflow-hidden relative group-hover:border-brand-blue/30 transition-colors">
-                  <div className="absolute inset-0 p-4">
+                  <div className="absolute inset-0 p-6">
                     <AbstractUI variant={item.variant} className="w-full h-full" />
                   </div>
                   {/* Onboarding Style Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-app-bg/20 to-transparent flex items-end p-6 pointer-events-none">
+                  <div className="absolute inset-0 bg-gradient-to-t from-app-bg/10 to-transparent flex items-end p-6 pointer-events-none">
                     <div className="w-full h-1 bg-brand-blue/10 rounded-full overflow-hidden">
                       <motion.div 
                         initial={{ width: 0 }}

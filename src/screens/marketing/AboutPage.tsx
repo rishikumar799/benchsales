@@ -55,30 +55,30 @@ export default function AboutPage({ theme, toggleTheme }: { theme?: 'light' | 'd
             </div>
           </div>
           <div className="relative">
-            <div className="absolute -inset-4 premium-gradient opacity-5 blur-3xl rounded-[64px]" />
-            <div className="relative glass border border-app-border rounded-[48px] p-10 card-shadow overflow-hidden bg-white/50 dark:bg-app-surface/50">
-              <div className="absolute -right-20 -bottom-20 w-80 h-80 opacity-[0.08] pointer-events-none">
+            <div className="absolute -inset-10 premium-gradient opacity-10 blur-3xl rounded-[64px] animate-pulse" />
+            <div className="relative glass border border-app-border rounded-[48px] p-12 card-shadow overflow-hidden bg-white/40 dark:bg-app-surface/40 backdrop-blur-xl">
+              <div className="absolute -right-20 -bottom-20 w-80 h-80 opacity-[0.15] pointer-events-none">
                 <AbstractUI variant="dashboard" className="w-full h-full rotate-12" />
               </div>
               
-              <div className="relative z-10 space-y-10">
-                <div className="flex gap-6 group">
-                  <div className="w-14 h-14 rounded-2xl bg-brand-blue/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                    <Eye className="w-7 h-7 text-brand-blue" />
+              <div className="relative z-10 space-y-12">
+                <div className="flex gap-8 group">
+                  <div className="w-16 h-16 rounded-2xl bg-brand-blue/10 flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:bg-brand-blue/20 transition-all duration-300">
+                    <Eye className="w-8 h-8 text-brand-blue" />
                   </div>
                   <div>
-                    <h4 className="text-2xl font-display font-bold mb-2">Transparency</h4>
-                    <p className="text-app-muted text-base leading-relaxed">Full visibility into every application and AI decision, ensuring you're always in control.</p>
+                    <h4 className="text-2xl font-display font-bold mb-3">Transparency</h4>
+                    <p className="text-app-muted text-base leading-relaxed font-medium">Full visibility into every application and AI decision, ensuring you're always in control of your journey.</p>
                   </div>
                 </div>
                 
-                <div className="flex gap-6 group">
-                  <div className="w-14 h-14 rounded-2xl bg-brand-violet/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                    <Sparkles className="w-7 h-7 text-brand-violet" />
+                <div className="flex gap-8 group">
+                  <div className="w-16 h-16 rounded-2xl bg-brand-violet/10 flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:bg-brand-violet/20 transition-all duration-300">
+                    <Sparkles className="w-8 h-8 text-brand-violet" />
                   </div>
                   <div>
-                    <h4 className="text-2xl font-display font-bold mb-2">Innovation</h4>
-                    <p className="text-app-muted text-base leading-relaxed">Constantly evolving AI models that learn from market trends to keep you ahead of the competition.</p>
+                    <h4 className="text-2xl font-display font-bold mb-3">Innovation</h4>
+                    <p className="text-app-muted text-base leading-relaxed font-medium">Constantly evolving AI models that learn from market trends to keep you ahead of the global competition.</p>
                   </div>
                 </div>
               </div>
@@ -115,9 +115,9 @@ export default function AboutPage({ theme, toggleTheme }: { theme?: 'light' | 'd
               variant: 'dashboard' as const
             },
           ].map((item, i) => (
-            <div key={i} className="p-8 rounded-[40px] glass border border-app-border card-shadow text-center group hover:bg-app-surface/50 transition-all overflow-hidden">
-              <div className="aspect-[16/10] rounded-3xl bg-app-surface/50 border border-app-border overflow-hidden mb-8 relative group-hover:border-brand-blue/30 transition-colors">
-                <div className="absolute inset-0 p-4">
+            <div key={i} className="p-10 rounded-[48px] glass border border-app-border card-shadow text-center group hover:bg-app-surface/50 transition-all overflow-hidden relative">
+              <div className="aspect-[16/10] rounded-[32px] bg-app-surface/50 border border-app-border overflow-hidden mb-10 relative group-hover:border-brand-blue/30 transition-colors">
+                <div className="absolute inset-0 p-8">
                   <AbstractUI variant={item.variant} className="w-full h-full" />
                 </div>
               </div>

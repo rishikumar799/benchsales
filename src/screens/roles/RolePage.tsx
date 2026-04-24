@@ -7,63 +7,74 @@ import CTAButton from '../../components/marketing/common/CTAButton';
 import Navbar from '../../components/marketing/common/Navbar';
 import Footer from '../../components/marketing/common/Footer';
 
-export default function RolePage() {
+interface RolePageProps {
+  theme?: 'light' | 'dark';
+  toggleTheme?: () => void;
+}
+
+export default function RolePage({ theme, toggleTheme }: RolePageProps) {
   const { role } = useParams<{ role: string }>();
   const navigate = useNavigate();
 
   const roleContent: Record<string, any> = {
     user: {
-      title: 'For Job Seekers',
+      title: 'For Job Seekers & Students',
       subtitle: 'Your personal AI career agent.',
-      description: 'Stop spending hours on job boards. Let our AI handle the search, matching, and applications while you focus on interview prep.',
+      description: 'Stop spending hours on job boards. Let our AI handle the search, matching, and applications. Focus on your skills while we focus on your placement.',
       icon: Users,
       gradient: 'from-blue-500 to-cyan-500',
       benefits: [
-        { title: 'Auto-Apply', desc: 'AI applies to 100+ relevant jobs daily.', icon: Zap },
-        { title: 'Resume Magic', desc: 'Auto-optimizes your resume for every job.', icon: Sparkles },
-        { title: 'Interview Prep', desc: 'AI-generated prep notes for every call.', icon: Target },
+        { title: 'Skills Gap Analyzer', desc: 'Get smart recommendations for certifications or training based on your target roles.', icon: Target },
+        { title: 'AI Interview Prep', desc: 'Mock interviews with AI feedback modules to sharpen your communication before the real call.', icon: Sparkles },
+        { title: 'Placement Dashboard', desc: 'Real-time tracking of applications sent, responses received, and your interview pipeline.', icon: BarChart3 },
       ],
       features: [
-        'Real-time market tracking',
-        'Automated follow-up emails',
-        'Salary negotiation insights',
-        'Skill gap analysis'
+        'AI Resume Tailoring',
+        'Document Management (Visa/Certs)',
+        'Skill Gap Analysis',
+        'Auto-Apply Automation',
+        'Interview Pipeline Tracking',
+        'Training Records Vault'
       ]
     },
     agent: {
       title: 'For Recruitment Agents',
       subtitle: 'Scale your placement pipeline.',
-      description: 'Empower your recruitment workflow with AI. Manage more candidates with less effort and higher success rates.',
+      description: 'Build intelligence into your agent workflow. Automate screening, matching, and outreach to scale your operations.',
       icon: Zap,
       gradient: 'from-violet-500 to-purple-500',
       benefits: [
-        { title: 'Bulk Management', desc: 'Handle 50+ candidates simultaneously.', icon: Users },
-        { title: 'Smart Matching', desc: 'Instant candidate-to-job fit analysis.', icon: BarChart3 },
-        { title: 'Automated Reporting', desc: 'Generate client reports in one click.', icon: Shield },
+        { title: 'Hot-Lead Scoring', desc: 'Vendor and client list management with AI-powered fit scoring before you even run a campaign.', icon: Trophy },
+        { title: 'Bulk Campaigns', desc: 'Run automated job application campaigns with tracking across vendor lists and job boards.', icon: Zap },
+        { title: 'Outreach Templates', desc: 'Seamless Email and SMS templates for automated vendor outreach and candidate engagement.', icon: Users },
       ],
       features: [
-        'Candidate tracking system',
-        'Automated outreach engine',
-        'Performance analytics',
-        'Client portal access'
+        'AI-Powered Fit Scoring',
+        'Bulk Outreach Engine',
+        'Email/SMS Automation',
+        'Performance Dashboards',
+        'Vendor List Management',
+        'Hot-Lead Analytics'
       ]
     },
     manager: {
       title: 'For Platform Managers',
-      subtitle: 'Global oversight & control.',
-      description: 'The command center for your Bench Sales ecosystem. Monitor performance, manage access, and scale operations.',
+      subtitle: 'Global oversight & bench control.',
+      description: 'The command center for staffing firms. Manage bench metrics, aging, and costs with surgical precision.',
       icon: Shield,
       gradient: 'from-emerald-500 to-teal-500',
       benefits: [
-        { title: 'Global Control', desc: 'Configure system-wide AI parameters.', icon: Settings },
-        { title: 'Revenue Tracking', desc: 'Real-time billing and revenue data.', icon: BarChart3 },
-        { title: 'Security First', desc: 'Advanced RBAC and audit logs.', icon: Shield },
+        { title: 'Key Bench Metrics', desc: 'Monitor headcount, bench cost, and time-to-placement—the numbers staffing firms live and die by.', icon: BarChart3 },
+        { title: 'Revenue Forecasting', desc: 'Scale with confidence using advanced revenue forecasting and automated commission tracking.', icon: Target },
+        { title: 'Operational Suite', desc: 'Integrated invoicing, timesheet management, and financial oversight in one place.', icon: Shield },
       ],
       features: [
-        'Team management',
-        'API configuration',
-        'System health monitoring',
-        'Custom AI fine-tuning'
+        'Bench Aging Distribution',
+        'Timesheet Management',
+        'Revenue Forecasting',
+        'Commission Tracking',
+        'Invoicing & Billing',
+        'Team Performance Metrics'
       ]
     }
   };
@@ -72,7 +83,7 @@ export default function RolePage() {
 
   return (
     <div className="min-h-screen bg-app-bg">
-      <Navbar />
+      <Navbar theme={theme} toggleTheme={toggleTheme} />
       
       <div className="pt-32 pb-20 px-4 text-center">
         <motion.div

@@ -52,18 +52,21 @@ export default function Footer() {
             </ul>
           </div>
 
-          <div>
-            <h4 className="text-sm font-bold uppercase tracking-widest text-app-text mb-6">Newsletter</h4>
-            <p className="text-app-muted text-sm mb-4">Get the latest AI job market insights.</p>
-            <div className="relative">
-              <input 
-                type="email" 
-                placeholder="Enter your email" 
-                className="w-full bg-app-surface border border-app-border rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-brand-blue"
-              />
-              <button className="absolute right-2 top-2 px-4 py-1.5 premium-gradient text-white text-xs font-bold rounded-lg">
-                Join
-              </button>
+          <div className="md:col-span-1">
+            <h4 className="text-sm font-bold uppercase tracking-widest text-app-text mb-6">Connect</h4>
+            <p className="text-app-muted text-sm leading-relaxed mb-6">
+              Stay updated with our latest features and community stories. Follow us on social media for the latest news.
+            </p>
+            <div className="p-6 rounded-2xl bg-brand-blue/5 border border-brand-blue/10">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 rounded-lg premium-gradient flex items-center justify-center shadow-lg shadow-brand-blue/20">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-sm font-bold">Innovation first</span>
+              </div>
+              <p className="text-xs text-app-muted leading-relaxed">
+                Join our platform and experience the future of recruitment automation. Built for the modern professional.
+              </p>
             </div>
           </div>
         </div>

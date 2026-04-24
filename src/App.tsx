@@ -4,13 +4,14 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Platform } from 'react-native';
 
 // Marketing Screens
 import LandingPage from './screens/marketing/LandingPage';
 import HowItWorksPage from './screens/marketing/HowItWorksPage';
 import CommunityPage from './screens/marketing/CommunityPage';
+import DiscussionsPage from './screens/marketing/DiscussionsPage';
 import AboutPage from './screens/marketing/AboutPage';
 import ServicesPage from './screens/marketing/ServicesPage';
 import ContactPage from './screens/marketing/ContactPage';
@@ -33,6 +34,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -124,10 +126,11 @@ export default function App() {
         <Route path="/" element={<LandingPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/how-it-works" element={<HowItWorksPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/community" element={<CommunityPage theme={theme} toggleTheme={toggleTheme} />} />
+      <Route path="/community/discussions" element={<DiscussionsPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/about" element={<AboutPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/services" element={<ServicesPage theme={theme} toggleTheme={toggleTheme} />} />
       <Route path="/contact" element={<ContactPage theme={theme} toggleTheme={toggleTheme} />} />
-      <Route path="/role/:role" element={<RolePage />} />
+      <Route path="/role/:role" element={<RolePage theme={theme} toggleTheme={toggleTheme} />} />
       
       <Route 
         path="/auth" 
@@ -136,7 +139,7 @@ export default function App() {
             <Navigate to="/dashboard" replace />
           ) : (
             <AuthPage 
-              onBack={() => {}} 
+              onBack={() => navigate('/')} 
               onLogin={handleLogin} 
               theme={theme}
               toggleTheme={toggleTheme}

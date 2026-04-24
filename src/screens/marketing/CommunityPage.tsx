@@ -12,6 +12,7 @@ import {
   Heart,
   Share2
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import SectionWrapper from '../../components/marketing/common/SectionWrapper';
 import Navbar from '../../components/marketing/common/Navbar';
 import Footer from '../../components/marketing/common/Footer';
@@ -138,9 +139,9 @@ export default function CommunityPage({ theme, toggleTheme }: CommunityPageProps
             <h2 className="text-4xl font-display font-bold mb-4 tracking-tight">Trending Discussions</h2>
             <p className="text-app-muted">The most active conversations in our community right now.</p>
           </div>
-          <button className="flex items-center gap-2 text-brand-blue font-bold hover:gap-3 transition-all">
+          <Link to="/community/discussions" className="flex items-center gap-2 text-brand-blue font-bold hover:gap-3 transition-all">
             View All Discussions <ArrowRight className="w-5 h-5" />
-          </button>
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

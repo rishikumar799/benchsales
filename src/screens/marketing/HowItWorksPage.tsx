@@ -10,7 +10,8 @@ import {
   CheckCircle2,
   ArrowRight,
   Sparkles,
-  Play
+  Play,
+  Check
 } from 'lucide-react';
 import SectionWrapper from '../../components/marketing/common/SectionWrapper';
 import Navbar from '../../components/marketing/common/Navbar';
@@ -48,8 +49,8 @@ export default function HowItWorksPage({ theme, toggleTheme }: { theme?: 'light'
     },
     {
       step: 'Step 2',
-      title: 'AI optimization & agent review',
-      description: 'Our AI optimizes your resume for ATS compatibility while a dedicated recruitment agent reviews your profile for quality assurance.',
+      title: 'AI Resume Tailoring',
+      description: 'Our AI auto-customizes your resume to match job descriptions perfectly, dynamically rewriting bullet points to ensure maximum relevance for every application.',
       icon: FileSearch,
       color: 'text-violet-500',
       bg: 'bg-violet-500/10',
@@ -57,15 +58,15 @@ export default function HowItWorksPage({ theme, toggleTheme }: { theme?: 'light'
         <div className="glass border border-app-border rounded-3xl p-6 card-shadow">
           <div className="flex justify-between items-center mb-6">
             <div className="text-xs font-bold text-app-muted uppercase tracking-widest">AI Analysis</div>
-            <div className="text-xs font-bold text-emerald-500">98% Match</div>
+            <div className="text-xs font-bold text-brand-blue">98% Match</div>
           </div>
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <CheckCircle2 className="w-4 h-4 text-brand-blue" />
               <div className="h-2 flex-1 bg-app-surface rounded-full" />
             </div>
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <CheckCircle2 className="w-4 h-4 text-brand-blue" />
               <div className="h-2 flex-1 bg-app-surface rounded-full" />
             </div>
             <div className="flex items-center gap-3 opacity-50">
@@ -78,11 +79,11 @@ export default function HowItWorksPage({ theme, toggleTheme }: { theme?: 'light'
     },
     {
       step: 'Step 3',
-      title: 'Automated applications',
-      description: 'Your AI agent sources relevant jobs and applies to 10-15 roles daily, tailoring every cover letter and application to the specific role.',
+      title: 'Automated Outreach',
+      description: 'Your AI agent sources relevant roles and executes automated outreach to vendor lists and job boards, applying to 10-15 roles daily with surgical precision.',
       icon: Zap,
-      color: 'text-amber-500',
-      bg: 'bg-amber-500/10',
+      color: 'text-brand-violet',
+      bg: 'bg-brand-violet/10',
       card: (
         <div className="glass border border-app-border rounded-3xl p-6 card-shadow">
           <div className="text-center mb-4">
@@ -93,7 +94,7 @@ export default function HowItWorksPage({ theme, toggleTheme }: { theme?: 'light'
             {[1, 2, 3].map(i => (
               <div key={i} className="p-2 rounded-lg bg-app-surface/50 border border-app-border flex items-center justify-between">
                 <div className="h-2 w-20 bg-app-border rounded-full" />
-                <div className="text-[8px] font-bold text-emerald-500">SENT</div>
+                <div className="text-[8px] font-bold text-brand-blue">SENT</div>
               </div>
             ))}
           </div>
@@ -105,8 +106,8 @@ export default function HowItWorksPage({ theme, toggleTheme }: { theme?: 'light'
       title: 'Interview scheduling',
       description: 'When recruiters respond, our system helps coordinate schedules and ensures you never miss a follow-up or an interview request.',
       icon: Calendar,
-      color: 'text-emerald-500',
-      bg: 'bg-emerald-500/10',
+      color: 'text-brand-blue',
+      bg: 'bg-brand-blue/10',
       card: (
         <div className="glass border border-app-border rounded-3xl p-6 card-shadow">
           <div className="flex items-center gap-3 mb-4">
@@ -124,8 +125,8 @@ export default function HowItWorksPage({ theme, toggleTheme }: { theme?: 'light'
     },
     {
       step: 'Step 5',
-      title: 'Interview preparation',
-      description: 'Receive AI-generated prep notes, common questions, and company insights for every interview scheduled through the platform.',
+      title: 'AI Interview Prep',
+      description: 'Access interview prep modules featuring mock interviews with AI feedback, ensuring you are ready to ace every call the platform secures for you.',
       icon: Target,
       color: 'text-rose-500',
       bg: 'bg-rose-500/10',
@@ -162,7 +163,7 @@ export default function HowItWorksPage({ theme, toggleTheme }: { theme?: 'light'
             <Trophy className="w-6 h-6 text-brand-violet" />
           </div>
           <div className="text-lg font-display font-bold text-app-text mb-1">Offer Received!</div>
-          <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Congratulations</div>
+          <div className="text-[10px] font-bold text-brand-violet uppercase tracking-widest">Congratulations</div>
         </div>
       )
     }
@@ -217,22 +218,122 @@ export default function HowItWorksPage({ theme, toggleTheme }: { theme?: 'light'
       </div>
 
       {/* Journey Section */}
-      <SectionWrapper className="bg-app-surface/30">
-        <div className="text-center mb-20">
-          <h2 className="text-4xl md:text-5xl font-display font-bold mb-12 tracking-tight">Your journey in 6 steps</h2>
-          
-          {/* Progress Line */}
-          <div className="hidden lg:flex max-w-5xl mx-auto justify-between relative mb-20">
-            <div className="absolute top-1/2 left-0 right-0 h-px bg-app-border -translate-y-1/2 -z-10" />
-            {steps.map((_, i) => (
-              <div key={i} className="flex flex-col items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shadow-lg shadow-emerald-500/20">
-                  {i + 1}
+      <SectionWrapper className="bg-app-surface/30 relative">
+        {/* Decorative Background for Journey */}
+        <div className="absolute top-0 left-0 right-0 h-full overflow-hidden pointer-events-none opacity-20">
+          <div className="absolute top-[10%] left-[5%] w-[40%] h-[40%] bg-brand-blue/10 blur-[120px] rounded-full" />
+          <div className="absolute bottom-[10%] right-[5%] w-[40%] h-[40%] bg-brand-violet/10 blur-[120px] rounded-full" />
+        </div>
+
+        <div className="text-center mb-24 relative z-10">
+          <div className="inline-block px-4 py-1.5 rounded-full bg-brand-blue/10 border border-brand-blue/20 text-brand-blue text-[10px] font-bold uppercase tracking-[0.2em] mb-6">
+            The Roadmap
+          </div>
+          <h2 className="text-4xl md:text-6xl font-display font-bold mb-6 tracking-tight">Your journey in <span className="text-gradient">6 steps</span></h2>
+          <p className="text-app-muted max-w-2xl mx-auto text-lg leading-relaxed">
+            A meticulously engineered path to your next role, powered by AI at every milestone.
+          </p>
+        </div>
+
+        {/* New Premium Timeline Display */}
+        <div className="max-w-6xl mx-auto relative mb-32 hidden lg:block">
+          {/* Main Connector Line with Glow */}
+          <div className="absolute top-[28px] left-[5%] right-[5%] h-[2px] bg-app-border">
+            <motion.div 
+              initial={{ width: 0 }}
+              whileInView={{ width: '100%' }}
+              viewport={{ once: true }}
+              transition={{ duration: 2, ease: "easeInOut" }}
+              className="h-full premium-gradient shadow-[0_0_15px_rgba(59,130,246,0.5)]" 
+            />
+          </div>
+
+          <div className="flex justify-between relative z-10">
+            {steps.map((item, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="flex flex-col items-center group"
+              >
+                {/* Step Node */}
+                <div className="relative mb-6">
+                  {/* Circular Border Loader */}
+                  <svg className="absolute -inset-[3px] w-[62px] h-[62px] -rotate-90 pointer-events-none">
+                    <circle
+                      cx="31"
+                      cy="31"
+                      r="29"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      fill="transparent"
+                      className="text-app-border/30"
+                    />
+                    <motion.circle
+                      cx="31"
+                      cy="31"
+                      r="29"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      fill="transparent"
+                      strokeDasharray="182.2"
+                      initial={{ pathLength: 0 }}
+                      whileInView={{ pathLength: 1 }}
+                      viewport={{ once: true }}
+                      transition={{ 
+                        duration: 0.8, 
+                        delay: (i * 0.4), 
+                        ease: "linear" 
+                      }}
+                      className="text-brand-blue"
+                    />
+                  </svg>
+
+                  <div className="w-14 h-14 rounded-full glass border-2 border-app-border flex items-center justify-center relative bg-app-bg group-hover:border-brand-blue transition-all duration-500 overflow-hidden">
+                    {/* Fill effect */}
+                    <motion.div 
+                      initial={{ scale: 0 }}
+                      whileInView={{ scale: 1 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: (i * 0.4) + 0.8, duration: 0.3, ease: "backOut" }}
+                      className="absolute inset-0 bg-brand-blue"
+                    />
+                    
+                    {/* Number fade out */}
+                    <motion.span 
+                      initial={{ opacity: 1 }}
+                      whileInView={{ opacity: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: (i * 0.4) + 0.8, duration: 0.2 }}
+                      className="text-lg font-display font-bold relative z-10"
+                    >
+                      {i + 1}
+                    </motion.span>
+
+                    {/* Tick fade in */}
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.5, rotate: -20 }}
+                      whileInView={{ opacity: 1, scale: 1, rotate: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: (i * 0.4) + 0.9, duration: 0.3, type: "spring" }}
+                      className="absolute inset-0 flex items-center justify-center z-20 text-white"
+                    >
+                      <Check className="w-6 h-6 stroke-[3px]" />
+                    </motion.div>
+
+                    <div className="absolute inset-0 bg-brand-blue opacity-0 group-hover:opacity-10 transition-opacity" />
+                  </div>
                 </div>
-                <div className="text-[10px] font-bold text-app-muted uppercase tracking-widest whitespace-nowrap">
-                  {_.title.split(' ')[0]}...
+
+                {/* Step Label (Fix truncation) */}
+                <div className="text-center px-2">
+                  <div className="text-[10px] font-bold text-app-muted uppercase tracking-[0.1em] mb-1 group-hover:text-brand-blue transition-colors whitespace-nowrap">
+                    {item.title.split(' ').slice(0, 2).join(' ')}
+                  </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -345,7 +446,7 @@ export default function HowItWorksPage({ theme, toggleTheme }: { theme?: 'light'
                 </div>
                 <div className="flex items-center gap-6">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <div className="w-2 h-2 rounded-full bg-brand-blue shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
                     <span className="text-xs font-bold text-app-muted uppercase tracking-widest">{project.status}</span>
                   </div>
                   <button className="px-6 py-2 bg-app-text text-app-bg text-xs font-bold rounded-full hover:bg-brand-blue hover:text-white transition-all">

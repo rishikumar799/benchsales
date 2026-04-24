@@ -1,14 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Sparkles, Zap, Shield, MousePointer2, FileText, CheckCircle2, BarChart3 } from 'lucide-react';
+import { Sparkles, Shield, FileText, CheckCircle2 } from 'lucide-react';
 
 interface AbstractUIProps {
   variant: 'creating' | 'evaluating' | 'refining' | 'resume' | 'letter' | 'dashboard';
   className?: string;
 }
 
-export default function AbstractUI({ variant, className = "" }: AbstractUIProps) {
-  const renderContent = () => {
+const AbstractUI: React.FC<AbstractUIProps> = React.memo(({ variant, className = "" }: AbstractUIProps) => {
+  const content = useMemo(() => {
     switch (variant) {
       case 'creating':
         return (
@@ -181,11 +181,13 @@ export default function AbstractUI({ variant, className = "" }: AbstractUIProps)
       default:
         return null;
     }
-  };
+  }, [variant]);
 
   return (
     <div className={`w-full h-full ${className}`}>
-      {renderContent()}
+      {content}
     </div>
   );
-}
+});
+
+export default AbstractUI;

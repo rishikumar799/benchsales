@@ -14,11 +14,11 @@ export default function ServicesPage({ theme, toggleTheme }: { theme?: 'light' |
       gradient: 'from-blue-500 to-cyan-500',
       variant: 'resume' as const,
       features: [
-        'Automated Job Applications',
-        'AI Resume Optimization',
-        'Interview Scheduling Assistant',
-        'Real-time Application Tracking',
-        'Market Salary Insights'
+        'Skills Gap Analyzer',
+        'AI Interview Prep Modules',
+        'Application Status Dashboard',
+        'Document Management (Visa/Certs)',
+        'Automated Resume Tailoring'
       ]
     },
     {
@@ -27,11 +27,11 @@ export default function ServicesPage({ theme, toggleTheme }: { theme?: 'light' |
       gradient: 'from-violet-500 to-purple-500',
       variant: 'dashboard' as const,
       features: [
-        'Candidate Pipeline Management',
-        'Automated Outreach Tools',
-        'Performance Analytics',
-        'Bulk Application Management',
-        'Client Reporting Dashboard'
+        'Vendor List & Hot-Lead Scoring',
+        'Bulk Job Application Campaigns',
+        'Email/SMS Outreach Templates',
+        'Performance Dashboards',
+        'AI Candidate Fit Scoring'
       ]
     },
     {
@@ -40,11 +40,11 @@ export default function ServicesPage({ theme, toggleTheme }: { theme?: 'light' |
       gradient: 'from-emerald-500 to-teal-500',
       variant: 'evaluating' as const,
       features: [
-        'Team Performance Oversight',
-        'Global System Configuration',
-        'Revenue & Billing Analytics',
-        'Security & Access Control',
-        'AI Model Fine-tuning'
+        'Bench Metrics (Headcount/Cost)',
+        'Bench Aging Analysis',
+        'Revenue & Commission Forecasting',
+        'Invoicing & Timesheet Management',
+        'Placement Velocity Tracking'
       ]
     }
   ];
