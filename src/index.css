@@ -52,15 +52,16 @@
 }
 
 .premium-gradient {
-  background: linear-gradient(135deg, #0066FF 0%, #6366F1 50%, #A855F7 100%);
+  background: linear-gradient(135deg, #0066FF 0%, #6366F1 40%, #A855F7 70%, #EC4899 100%);
+  background-size: 200% 200%;
 }
 
 .text-gradient {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-violet-600;
+  @apply bg-clip-text text-transparent bg-gradient-to-br from-blue-600 via-violet-600 to-fuchsia-600 font-extrabold;
 }
 
 .dark .text-gradient {
-  @apply from-blue-400 to-violet-400;
+  @apply from-blue-400 via-violet-400 to-fuchsia-400;
 }
 
 .card-shadow {

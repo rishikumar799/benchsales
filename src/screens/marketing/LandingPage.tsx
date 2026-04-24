@@ -71,22 +71,47 @@ export default function LandingPage({ theme, toggleTheme }: { theme?: 'light' | 
       
       {/* Hero Section */}
       <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-white dark:bg-app-bg pt-40 pb-32">
-        {/* Subtle Background Elements */}
-        <div className="absolute top-0 left-0 right-0 h-full overflow-hidden pointer-events-none opacity-50">
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-blue/10 blur-[120px] rounded-full" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-brand-violet/10 blur-[120px] rounded-full" />
+        {/* Advanced Premium Background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {/* Mesh Gradients */}
+          <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-blue-500/5 blur-[120px] rounded-full animate-pulse" />
+          <div className="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] bg-violet-500/5 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
+          
+          {/* Grid Pattern Overlay */}
+          <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" 
+               style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, #0066FF 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+          
+          {/* Noise effect */}
+          <div className="absolute inset-0 opacity-[0.02] mix-blend-overlay"
+               style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
         </div>
 
         <div className="relative z-20 max-w-7xl mx-auto px-4 text-center">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
           >
-            {/* Top Pill */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider mb-10">
-              <Sparkles className="w-3.5 h-3.5" /> The World's First Autonomous Job Agent
-            </div>
+            {/* Top Pill - Premium Redesign */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full glass border border-brand-blue/20 text-brand-blue text-[10px] md:text-xs font-bold uppercase tracking-[0.25em] mb-12 relative group overflow-hidden shadow-2xl shadow-brand-blue/5"
+            >
+              {/* Shine effect */}
+              <motion.div 
+                animate={{ x: ['-100%', '200%'] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", repeatDelay: 1 }}
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-12 pointer-events-none"
+              />
+              
+              <div className="relative flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-brand-blue animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                <Sparkles className="w-3.5 h-3.5" /> 
+                <span className="relative z-10">The World's First Autonomous Job Agent</span>
+              </div>
+            </motion.div>
 
             {/* Main Heading */}
             <h1 className="text-6xl md:text-8xl font-display font-bold text-app-text mb-8 tracking-tight leading-[1.05]">
@@ -100,16 +125,19 @@ export default function LandingPage({ theme, toggleTheme }: { theme?: 'light' | 
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
               <button 
                 onClick={() => navigate('/auth')}
-                className="px-10 py-4 premium-gradient text-white font-bold rounded-2xl shadow-xl shadow-brand-blue/20 hover:scale-[1.02] transition-all active:scale-95 flex items-center gap-2"
+                className="px-10 py-5 premium-gradient text-white font-bold rounded-2xl shadow-2xl shadow-brand-blue/30 hover:scale-[1.02] hover:-translate-y-1 transition-all active:scale-95 flex items-center gap-3 relative group overflow-hidden"
               >
-                Start Free Today <ArrowRight className="w-5 h-5" />
+                {/* Internal Glow */}
+                <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <span className="relative z-10">Start Free Today</span>
+                <ArrowRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
               </button>
-              <button className="px-10 py-4 bg-white dark:bg-app-surface border border-app-border text-app-text font-bold rounded-2xl hover:bg-app-surface transition-all flex items-center gap-2 group">
-                <div className="w-8 h-8 rounded-full bg-app-bg flex items-center justify-center group-hover:bg-app-border transition-colors">
-                  <Play className="w-4 h-4 fill-current" />
+              <button className="px-10 py-5 glass border border-app-border text-app-text font-bold rounded-2xl hover:bg-app-bg transition-all flex items-center gap-3 group">
+                <div className="w-10 h-10 rounded-full bg-brand-blue/10 flex items-center justify-center group-hover:bg-brand-blue/20 transition-colors">
+                  <Play className="w-4 h-4 fill-brand-blue text-brand-blue" />
                 </div>
                 Watch Demo
               </button>
@@ -174,12 +202,18 @@ export default function LandingPage({ theme, toggleTheme }: { theme?: 'light' | 
         </div>
       </div>
 
-      {/* Trusted By Section */}
-      <div className="py-12 border-b border-app-border bg-app-surface/20">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-24 opacity-50 grayscale hover:grayscale-0 transition-all">
+      {/* Trusted By Section - Refined */}
+      <div className="py-20 border-b border-app-border bg-app-surface/10 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.05]" 
+             style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)', backgroundSize: '30px 30px' }} />
+        
+        <div className="max-w-7xl mx-auto px-4 relative z-10">
+          <div className="text-center mb-10">
+            <span className="text-[10px] font-bold text-app-muted uppercase tracking-[0.3em]">Empowering candidates from top companies</span>
+          </div>
+          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-32 opacity-40 grayscale hover:grayscale-0 transition-all duration-700">
             {['Google', 'Meta', 'Stripe', 'Vercel', 'Netflix'].map(brand => (
-              <span key={brand} className="text-2xl font-display font-bold text-app-text tracking-tighter">{brand}</span>
+              <span key={brand} className="text-3xl font-display font-medium text-app-text tracking-tighter hover:text-brand-blue transition-colors cursor-default">{brand}</span>
             ))}
           </div>
         </div>
