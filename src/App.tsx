@@ -92,20 +92,10 @@ export default function App() {
                 theme={theme}
                 toggleTheme={toggleTheme}
               >
-                {role === 'student' && activeTab === 'dashboard' && <StudentDashboard />}
-                {role === 'agent' && activeTab === 'dashboard' && <AgentDashboard />}
-                {role === 'manager' && activeTab === 'dashboard' && <ManagerDashboard />}
-                {role === 'admin' && activeTab === 'dashboard' && <AdminDashboard />}
-                
-                {activeTab !== 'dashboard' && (
-                  <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-                    <div className="w-20 h-20 bg-app-surface rounded-full flex items-center justify-center mb-6 border border-app-border">
-                      <span className="text-4xl">🚧</span>
-                    </div>
-                    <h2 className="text-2xl font-bold mb-2 text-app-text">{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Section</h2>
-                    <p className="text-app-muted">This feature is currently under development.</p>
-                  </div>
-                )}
+                {role === 'student' && <StudentDashboard activeTab={activeTab} />}
+                {role === 'agent' && <AgentDashboard activeTab={activeTab} />}
+                {role === 'manager' && <ManagerDashboard activeTab={activeTab} />}
+                {role === 'admin' && <AdminDashboard activeTab={activeTab} />}
               </DashboardLayout>
             ) : (
               <Navigate to="/auth" replace />
@@ -160,22 +150,12 @@ export default function App() {
               theme={theme}
               toggleTheme={toggleTheme}
             >
-              {role === 'student' && activeTab === 'dashboard' && <StudentDashboard />}
-              {role === 'agent' && activeTab === 'dashboard' && <AgentDashboard />}
-              {role === 'manager' && activeTab === 'dashboard' && <ManagerDashboard />}
-              {role === 'admin' && activeTab === 'dashboard' && <AdminDashboard />}
-              
-              {activeTab !== 'dashboard' && (
-                <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-                  <div className="w-20 h-20 bg-app-surface rounded-full flex items-center justify-center mb-6 border border-app-border">
-                    <span className="text-4xl">🚧</span>
-                  </div>
-                  <h2 className="text-2xl font-bold mb-2 text-app-text">{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Section</h2>
-                  <p className="text-app-muted">This feature is currently under development.</p>
-                </div>
-              )}
-            </DashboardLayout>
-          ) : (
+            {role === 'student' && <StudentDashboard activeTab={activeTab} />}
+            {role === 'agent' && <AgentDashboard activeTab={activeTab} />}
+            {role === 'manager' && <ManagerDashboard activeTab={activeTab} />}
+            {role === 'admin' && <AdminDashboard activeTab={activeTab} />}
+          </DashboardLayout>
+        ) : (
             <Navigate to="/auth" replace />
           )
         } 
