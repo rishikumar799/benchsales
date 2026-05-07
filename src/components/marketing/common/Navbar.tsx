@@ -150,7 +150,7 @@ export default function Navbar({ theme, toggleTheme }: NavbarProps) {
             <div className="w-10 h-10 rounded-xl premium-gradient flex items-center justify-center shadow-lg shadow-brand-blue/20">
               <Zap className="text-white w-6 h-6" />
             </div>
-            <span className="text-2xl font-display font-bold tracking-tight hidden sm:block">Bench Sales <span className="text-brand-blue">AI</span></span>
+            <span className="text-2xl font-display font-bold tracking-tight hidden sm:block">Aryx <span className="text-gradient">AI</span></span>
           </div>
 
           {/* Desktop Nav */}

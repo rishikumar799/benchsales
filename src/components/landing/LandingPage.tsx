@@ -19,7 +19,7 @@ export default function LandingPage({ onGetStarted, onLogin, theme, toggleTheme 
             <div className="w-10 h-10 blue-gradient rounded-xl flex items-center justify-center shadow-lg shadow-brand-blue/20">
               <Zap className="text-white w-6 h-6" />
             </div>
-            <span className="text-2xl font-display font-bold tracking-tight">Bench Sales <span className="text-brand-blue">AI</span></span>
+            <span className="text-2xl font-display font-bold tracking-tight">Aryx <span className="text-gradient">AI</span></span>
           </div>
           
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-app-muted">
@@ -187,7 +187,7 @@ export default function LandingPage({ onGetStarted, onLogin, theme, toggleTheme 
           <div className="col-span-1 md:col-span-1">
             <div className="flex items-center gap-2 mb-8">
               <Zap className="text-brand-blue w-8 h-8" />
-              <span className="text-2xl font-display font-bold tracking-tight">Bench Sales</span>
+              <span className="text-2xl font-display font-bold tracking-tight">Aryx <span className="text-gradient">AI</span></span>
             </div>
             <p className="text-app-muted text-sm leading-relaxed mb-8">
               The world's first autonomous job search agent. Empowering candidates with AI-driven application velocity.
@@ -230,7 +230,7 @@ export default function LandingPage({ onGetStarted, onLogin, theme, toggleTheme 
         </div>
         
         <div className="max-w-7xl mx-auto mt-24 pt-8 border-t border-app-border flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-app-muted text-xs">© 2024 Bench Sales AI. All rights reserved.</p>
+          <p className="text-app-muted text-xs">© 2024 Aryx AI. All rights reserved.</p>
           <div className="flex items-center gap-8 text-xs text-app-muted">
             <a href="#" className="hover:text-app-text">Terms</a>
             <a href="#" className="hover:text-app-text">Privacy</a>

@@ -66,7 +66,7 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
           <div className="w-10 h-10 blue-gradient rounded-xl flex items-center justify-center">
             <Zap className="text-white w-6 h-6" />
           </div>
-          <span className="text-xl font-display font-bold">Bench Sales</span>
+          <span className="text-xl font-display font-bold">Aryx <span className="text-gradient">AI</span></span>
         </div>
 
         <nav className="flex-1 px-4 py-4 space-y-2">

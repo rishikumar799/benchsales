@@ -12,7 +12,7 @@ export default function Footer() {
               <div className="w-8 h-8 rounded-lg premium-gradient flex items-center justify-center">
                 <Sparkles className="text-white w-5 h-5" />
               </div>
-              <span className="text-xl font-display font-bold tracking-tight">Bench Sales</span>
+              <span className="text-xl font-display font-bold tracking-tight">Aryx <span className="text-gradient">AI</span></span>
             </div>
             <p className="text-app-muted text-sm leading-relaxed mb-6">
               Revolutionizing the job market with AI-powered automation. Connecting students, agents, and managers in a seamless ecosystem.
@@ -73,7 +73,7 @@ export default function Footer() {
 
         <div className="pt-8 border-t border-app-border flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-app-muted text-xs font-medium">
-            © 2024 Bench Sales AI. All rights reserved.
+            © 2024 Aryx AI. All rights reserved.
           </p>
           <div className="flex gap-8">
             <a href="#" className="text-app-muted text-xs hover:text-brand-blue transition-colors">Privacy Policy</a>

@@ -40,7 +40,7 @@ export default function ContactPage({ theme, toggleTheme }: { theme?: 'light' | 
               <h2 className="text-3xl font-display font-bold mb-8 tracking-tight">Contact Information</h2>
               <div className="space-y-8">
                 {[
-                  { icon: Mail, label: 'Email Us', value: 'support@benchsales.ai', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+                  { icon: Mail, label: 'Email Us', value: 'support@AryxAI.com', color: 'text-blue-500', bg: 'bg-blue-500/10' },
                   { icon: Phone, label: 'Call Us', value: '+1 (555) 000-0000', color: 'text-violet-500', bg: 'bg-violet-500/10' },
                   { icon: MapPin, label: 'Visit Us', value: '123 AI Way, Silicon Valley, CA', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
                 ].map((item, i) => (

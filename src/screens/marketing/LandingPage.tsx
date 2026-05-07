@@ -356,7 +356,7 @@ export default function LandingPage({ theme, toggleTheme }: { theme?: 'light' | 
           <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
           <h2 className="text-4xl md:text-5xl font-display font-bold mb-8 relative z-10">Ready to Automate Your Success?</h2>
           <p className="text-white/80 text-lg mb-12 max-w-2xl mx-auto relative z-10">
-            Join thousands of professionals who have transformed their job search with Bench Sales AI.
+            Join thousands of professionals who have transformed their job search with Aryx AI.
           </p>
           <CTAButton variant="secondary" className="relative z-10" onClick={() => navigate('/auth')}>Get Started For Free</CTAButton>
         </div>

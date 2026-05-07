@@ -20,9 +20,9 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const SECRET_SUBADMIN_CODE = "BENCH_ADMIN_2024"; 
+  const SECRET_SUBADMIN_CODE = "ARYX_ADMIN_2024"; 
   
-  const ADMIN_EMAIL = "admin@benchsales.ai";
+  const ADMIN_EMAIL = "admin@AryxAI.com";
   const ADMIN_PASS = "admin123";
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -158,7 +158,7 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
           <div className="lg:hidden flex items-center justify-between mb-12">
             <div className="flex items-center gap-2">
               <Zap className="text-brand-blue w-8 h-8" />
-              <span className="text-2xl font-display font-bold tracking-tight">Bench Sales</span>
+              <span className="text-2xl font-display font-bold tracking-tight">Aryx <span className="text-gradient">AI</span></span>
             </div>
             <div className="flex items-center gap-4">
               <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
@@ -289,7 +289,7 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
           </form>
 
           <p className="mt-10 text-center text-app-muted font-medium">
-            {isLogin ? "New to Bench Sales?" : "Already have an account?"}{' '}
+            {isLogin ? "New to Aryx AI?" : "Already have an account?"}{' '}
             <button 
               onClick={() => { setIsLogin(!isLogin); setError(''); }}
               className="text-brand-blue font-bold hover:underline transition-all"
