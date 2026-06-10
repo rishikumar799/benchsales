@@ -21,10 +21,7 @@ import RolePage from './screens/roles/RolePage';
 import AuthPage from './components/auth/AuthPage';
 import DashboardLayout from './components/DashboardLayout';
 import ScrollToTop from './components/marketing/common/ScrollToTop';
-import StudentDashboard from './components/roles/student/StudentDashboard';
-import AgentDashboard from './components/roles/agent/AgentDashboard';
-import ManagerDashboard from './components/roles/manager/ManagerDashboard';
-import AdminDashboard from './components/roles/admin/AdminDashboard';
+import EcosystemRouter from './components/roles/EcosystemRouter';
 import { UserRole } from './types';
 
 const isAppMode = import.meta.env.VITE_APP_MODE === 'true';
@@ -32,7 +29,9 @@ const isAppMode = import.meta.env.VITE_APP_MODE === 'true';
 export default function App() {
   const [role, setRole] = useState<UserRole>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
+  });
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -43,7 +42,11 @@ export default function App() {
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    setTheme(prev => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      localStorage.setItem('theme', next);
+      return next;
+    });
   };
 
   const handleLogin = (selectedRole: UserRole, isApproved: boolean) => {
@@ -92,10 +95,7 @@ export default function App() {
                 theme={theme}
                 toggleTheme={toggleTheme}
               >
-                {role === 'student' && <StudentDashboard activeTab={activeTab} />}
-                {role === 'agent' && <AgentDashboard activeTab={activeTab} />}
-                {role === 'manager' && <ManagerDashboard activeTab={activeTab} />}
-                {role === 'admin' && <AdminDashboard activeTab={activeTab} />}
+                <EcosystemRouter role={role} activeTab={activeTab} setActiveTab={setActiveTab} />
               </DashboardLayout>
             ) : (
               <Navigate to="/auth" replace />
@@ -150,11 +150,8 @@ export default function App() {
               theme={theme}
               toggleTheme={toggleTheme}
             >
-            {role === 'student' && <StudentDashboard activeTab={activeTab} />}
-            {role === 'agent' && <AgentDashboard activeTab={activeTab} />}
-            {role === 'manager' && <ManagerDashboard activeTab={activeTab} />}
-            {role === 'admin' && <AdminDashboard activeTab={activeTab} />}
-          </DashboardLayout>
+              <EcosystemRouter role={role} activeTab={activeTab} setActiveTab={setActiveTab} />
+            </DashboardLayout>
         ) : (
             <Navigate to="/auth" replace />
           )

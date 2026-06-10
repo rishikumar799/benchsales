@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2500/svg" viewBox="0 0 1000 800" width="100%" height="100%" fill="none">
+  <defs>
+    <!-- Soft Glow Filter for eyes -->
+    <filter id="eyeGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Intense glow filter representing stars and lighting -->
+    <filter id="starGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Browser Window Gradient -->
+    <linearGradient id="browserBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#EEF2F6" stop-opacity="0.90" />
+    </linearGradient>
+
+    <!-- Web Mockup Profile Photo Gradient -->
+    <linearGradient id="profileImgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E40AF" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+
+    <!-- Robot Face Screen Gradient -->
+    <linearGradient id="robotScreen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0B132B" />
+      <stop offset="100%" stop-color="#1C2541" />
+    </linearGradient>
+
+    <!-- Dark shadow gradients for organic backdrop waves -->
+    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#021E73" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#0F172A" stop-opacity="0.95" />
+    </linearGradient>
+
+    <!-- Sparkle/Star shape template -->
+    <g id="sparkleStar">
+      <path d="M 0,-24 Q 0,0 24,0 Q 0,0 0,24 Q 0,0 -24,0 Q 0,0 0,-24 Z" fill="#FFFFFF" filter="url(#starGlow)" />
+    </g>
+  </defs>
+
+  <!-- ==================== BACKGROUND GRAPHICS (TRANSPARENT OUTSIDE) ==================== -->
+  <!-- Left Side Crescent Wave (Soft Accent) -->
+  <path d="M 60,350 C 60,250 140,200 240,200 C 200,300 130,420 180,500 C 130,500 60,450 60,350 Z" fill="#2563EB" opacity="0.15" />
+
+  <!-- Main Dark Blue Backing Plate Wave (Matches second image's curved swoosh) -->
+  <path d="M 400,640 C 580,640 940,650 940,490 C 940,320 740,200 640,240 C 540,280 350,480 400,640 Z" fill="#061B6D" opacity="0.9" />
+  <path d="M 420,620 C 560,620 910,630 910,480 C 910,340 730,220 630,250 C 530,280 370,480 420,620 Z" fill="#0035D0" opacity="0.85" />
+
+  <!-- Stars / Sparkles over/around the illustration -->
+  <!-- Sparkle Top-Right of Robot -->
+  <use href="#sparkleStar" x="815" y="325" transform="scale(1.1)" />
+  <!-- Sparkle Mid-Right of Robot -->
+  <use href="#sparkleStar" x="925" y="630" transform="scale(0.85)" />
+  <!-- Sparkle Far-Left of Mockup -->
+  <use href="#sparkleStar" x="115" y="650" transform="scale(0.9)" />
+  
+  <!-- Tiny glowing dot on the bottom-left -->
+  <circle cx="140" cy="800" r="6" fill="#60A5FA" filter="url(#eyeGlow)" />
+
+  <!-- ==================== WEB SYSTEM WINDOW (LEFT SIDE) ==================== -->
+  <g transform="translate(196, 240)">
+    <!-- High-end 3D drop shadow for window container -->
+    <rect x="5" y="15" width="510" height="440" rx="28" fill="#020922" opacity="0.32" />
+    
+    <!-- Main Window Plate -->
+    <rect width="518" height="448" rx="28" fill="url(#browserBg)" stroke="#FFFFFF" stroke-width="5" />
+    
+    <!-- Header Separation Bar -->
+    <path d="M 2,48 L 516,48" stroke="#E2E8F0" stroke-width="2.5" />
+    
+    <!-- Window Controls (Grey/Blue metallic circles) -->
+    <circle cx="48" cy="24" r="8.5" fill="#CBD5E1" />
+    <circle cx="78" cy="24" r="8.5" fill="#CBD5E1" />
+    <circle cx="108" cy="24" r="8.5" fill="#CBD5E1" />
+
+    <!-- Mock search placeholder bar on the right -->
+    <rect x="410" y="14" width="70" height="20" rx="10" fill="#E2E8F0" />
+
+    <!-- Content Row 1: Profile image & placeholder lines -->
+    <!-- Profile avatar box in modern bright blue -->
+    <rect x="48" y="85" width="100" height="100" rx="22" fill="url(#profileImgGrad)" />
+    
+    <!-- Soft accent inner shape inside avatar box to simulate design -->
+    <circle cx="98" cy="135" r="30" fill="#FFFFFF" fill-opacity="0.15" />
+    <rect x="73" y="105" width="50" height="15" rx="5" fill="#FFFFFF" fill-opacity="0.2" />
+
+    <!-- Dynamic text placeholder bars -->
+    <rect x="180" y="100" width="260" height="18" rx="9" fill="#94A3B8" opacity="0.5" />
+    <rect x="180" y="140" width="180" height="14" rx="7" fill="#CBD5E1" />
+
+    <!-- Content Row 2: Selected Item Row / Checked Block -->
+    <rect x="48" y="240" width="422" height="120" rx="24" fill="#60A5FA" fill-opacity="0.12" stroke="#60A5FA" stroke-width="2.5" />
+    
+    <!-- Check Circle Badge -->
+    <circle cx="98" cy="300" r="26" fill="#3B82F6" />
+    <path d="M 86,300 L 94,308 L 110,290" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Text line placements next to the checkbox -->
+    <rect x="156" y="275" width="200" height="18" rx="9" fill="#3B82F6" opacity="0.85" />
+    <rect x="156" y="312" width="130" height="14" rx="7" fill="#94A3B8" opacity="0.45" />
+  </g>
+
+  <!-- ==================== CUTE ROBOT MASCOT (RIGHT SIDE) ==================== -->
+  <g transform="translate(565, 400)">
+    <!-- Shadow beneath robot -->
+    <ellipse cx="150" cy="285" rx="120" ry="20" fill="#01071A" opacity="0.5" />
+
+    <!-- Robot Left Arm (Waving towards screen in picture - Robot's right) -->
+    <!-- White hand joint with smooth bezier curve -->
+    <path d="M 40,160 C -15,150 -45,110 -20,80 C -8,65 14,75 24,92 C 38,114 42,140 40,160 Z" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="2.5" />
+    <!-- Blue glove waving friendly -->
+    <rect x="-38" y="65" width="46" height="46" rx="23" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2" />
+    <circle cx="-15" cy="88" r="8" fill="#FFFFFF" opacity="0.1" />
+
+    <!-- Robot Right Arm (Resting downwards) -->
+    <path d="M 245,170 C 290,185 315,225 310,260 C 305,295 265,305 245,275 C 235,255 235,200 245,170 Z" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="2.5" />
+
+    <!-- Robot Body (Polished white gradient with soft lighting) -->
+    <rect x="60" y="145" width="180" height="145" rx="72.5" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="4" />
+    <rect x="60" y="145" width="180" height="145" rx="72.5" fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-dasharray="100 200" />
+
+    <!-- Cute blue lightning badge on chest (Aryx brand reference!) -->
+    <path d="M 152,175 L 132,212 L 150,212 L 144,248 L 170,205 L 152,205 Z" fill="#2563EB" filter="url(#eyeGlow)" />
+
+    <!-- Neck connector -->
+    <rect x="125" y="125" width="50" height="25" rx="10" fill="#D1D5DB" />
+
+    <!-- Blue Earpieces / Headset attachments -->
+    <ellipse cx="46" cy="65" rx="14" ry="26" fill="#1D4ED8" />
+    <ellipse cx="254" cy="65" rx="14" ry="26" fill="#1D4ED8" />
+
+    <!-- Head Core (Friendly rounded rectangle) -->
+    <rect x="50" y="-20" width="200" height="160" rx="80" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="4.5" />
+    <rect x="52" y="-18" width="196" height="156" rx="78" fill="none" stroke="#FFFFFF" stroke-width="1.5" />
+
+    <!-- Dark face visor screen -->
+    <rect x="68" y="2" width="164" height="116" rx="58" fill="url(#robotScreen)" />
+
+    <!-- Friendly bright cyan glowing eyes (pill shapes) -->
+    <rect x="98" y="44" width="28" height="20" rx="10" fill="#00E5FF" filter="url(#eyeGlow)" />
+    <rect x="174" y="44" width="28" height="20" rx="10" fill="#00E5FF" filter="url(#eyeGlow)" />
+
+    <!-- Visa highlight reflex spark -->
+    <path d="M 85,12 C 125,-2 175,-2 215,12" stroke="#FFFFFF" stroke-opacity="0.15" stroke-width="7" fill="none" stroke-linecap="round" />
+
+    <!-- Antenna stem -->
+    <rect x="146" y="-55" width="8" height="40" fill="#94A3B8" />
+    
+    <!-- Blue glowing receiver bead on the top -->
+    <circle cx="150" cy="-60" r="11" fill="#1D4ED8" filter="url(#eyeGlow)" />
+    <circle cx="150" cy="-60" r="5" fill="#FFFFFF" />
+  </g>
+</svg>

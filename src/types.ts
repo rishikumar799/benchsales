@@ -1,4 +1,9 @@
-export type UserRole = 'student' | 'agent' | 'manager' | 'admin' | null;
+export type UserRole = 
+  | 'm_candidate' | 'm_recruiter' | 'm_manager'
+  | 'u_admin' | 'u_officer' | 'u_student'
+  | 'c_admin' | 'c_manager' | 'c_recruiter' | 'c_employee'
+  | 'platform_admin'
+  | null;
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
