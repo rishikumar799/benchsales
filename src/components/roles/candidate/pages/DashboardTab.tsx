@@ -14,6 +14,7 @@ import {
   Link as LinkIcon,
   ChevronRight
 } from 'lucide-react';
+import RecruiterHandshakeGateway from '../components/RecruiterHandshakeGateway';
 
 interface DashboardTabProps {
   onNavigate: (tabId: string) => void;
@@ -128,6 +129,9 @@ export default function DashboardTab({ onNavigate }: DashboardTabProps) {
           </motion.div>
         ))}
       </div>
+
+      {/* Recruiter Handshake & Pick Gateway */}
+      <RecruiterHandshakeGateway />
 
       {/* 3. Column Layout split into Left, Middle, Right Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

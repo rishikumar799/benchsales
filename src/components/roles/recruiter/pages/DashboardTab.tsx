@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { 
   Briefcase, 
   Users, 
@@ -13,6 +14,7 @@ import {
   HelpCircle,
   Plus
 } from 'lucide-react';
+import BdmProfilePopup from '../components/BdmProfilePopup';
 
 interface DashboardTabProps {
   onNavigate: (tab: string) => void;
@@ -30,6 +32,8 @@ export default function DashboardTab({
   selectedCount 
 }: DashboardTabProps) {
   
+  const [selectedBdmName, setSelectedBdmName] = useState<string | null>(null);
+
   // Simulated candidate list matching image #1
   const candidatePoolSample = [
     { id: 'c1', name: 'Ravi Kumar', exp: '4 Years Experience', skills: ['React', 'Node.js', 'MongoDB'] },
@@ -142,7 +146,11 @@ export default function DashboardTab({
                       <h4 className="font-extrabold text-sm text-app-text">{req.role}</h4>
                       <p className="text-xs font-bold text-app-muted mt-0.5">{req.company} • {req.exp}</p>
                     </div>
-                    <span className="text-[9px] font-extrabold uppercase bg-brand-blue/10 text-brand-blue px-2 py-0.5 rounded">
+                    <span 
+                      onClick={() => setSelectedBdmName(req.bdm)}
+                      title={`Click to view BDM ${req.bdm} profile`} 
+                      className="text-[9px] font-extrabold uppercase bg-brand-blue/10 text-brand-blue hover:bg-brand-blue hover:text-white px-2 py-0.5 rounded cursor-pointer transition-all"
+                    >
                       BDM: {req.bdm.split(' ')[0]}
                     </span>
                   </div>
@@ -368,6 +376,11 @@ export default function DashboardTab({
         </div>
 
       </div>
+
+      <BdmProfilePopup 
+        bdmNameOrId={selectedBdmName} 
+        onClose={() => setSelectedBdmName(null)} 
+      />
 
     </div>
   );

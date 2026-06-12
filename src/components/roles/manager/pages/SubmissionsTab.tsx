@@ -82,8 +82,8 @@ export default function SubmissionsTab() {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-app-text">Submissions</h1>
-          <p className="text-app-muted mt-1">Track all active candidate submissions across workspace requirements.</p>
+          <h1 className="text-3xl font-display font-bold text-app-text">Marketplace Candidates</h1>
+          <p className="text-app-muted mt-1">Track all active candidate profiles and submittals across active workspace requirements.</p>
         </div>
         <button 
           onClick={handleExport}
@@ -226,7 +226,7 @@ export default function SubmissionsTab() {
 
       {/* Pagination component */}
       <div className="flex items-center justify-between text-xs font-semibold text-app-muted mt-4">
-        <span>Showing 1 to {filteredSubmissions.length} of 247 submissions</span>
+        <span>Showing 1 to {filteredSubmissions.length} of 247 candidates</span>
         <div className="flex items-center gap-1">
           <button className="p-2 border border-app-border rounded-xl bg-app-surface text-xs hover:text-app-text select-none">
             {'<'}

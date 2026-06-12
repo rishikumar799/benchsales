@@ -65,7 +65,7 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'jobs', label: 'Jobs', icon: Briefcase },
       { id: 'recruiters', label: 'Recruiters', icon: Users },
-      { id: 'submissions', label: 'Submissions', icon: FileText },
+      { id: 'submissions', label: 'Candidates', icon: Users },
       { id: 'analytics', label: 'Analytics', icon: BarChart3 },
       { id: 'profile', label: 'Profile', icon: User },
     ],

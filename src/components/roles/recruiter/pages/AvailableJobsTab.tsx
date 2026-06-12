@@ -10,6 +10,7 @@ import {
   SlidersHorizontal,
   Briefcase
 } from 'lucide-react';
+import BdmProfilePopup from '../components/BdmProfilePopup';
 
 interface AvailableJobsTabProps {
   onNavigate: (tab: string) => void;
@@ -107,6 +108,7 @@ export default function AvailableJobsTab({ onNavigate, onRequestAccess }: Availa
   const [selectedExp, setSelectedExp] = useState('All');
   const [selectedLoc, setSelectedLoc] = useState('All');
   const [selectedPrior, setSelectedPrior] = useState('All');
+  const [selectedBdmName, setSelectedBdmName] = useState<string | null>(null);
 
   // Trigger simulated request access action
   const handleRequestAccess = (jobId: string) => {
@@ -289,7 +291,7 @@ export default function AvailableJobsTab({ onNavigate, onRequestAccess }: Availa
                   <span>{job.posted}</span>
                 </div>
                 <div className="text-xs font-bold text-app-text">
-                  BDM: <span className="text-brand-blue">{job.bdm}</span>
+                  BDM: <span onClick={() => setSelectedBdmName(job.bdm)} className="text-brand-blue hover:underline hover:text-brand-violet cursor-pointer transition-all">{job.bdm}</span>
                 </div>
 
                 {job.status === 'Request Access' && (
@@ -347,6 +349,11 @@ export default function AvailableJobsTab({ onNavigate, onRequestAccess }: Availa
           {'>'}
         </button>
       </div>
+
+      <BdmProfilePopup 
+        bdmNameOrId={selectedBdmName} 
+        onClose={() => setSelectedBdmName(null)} 
+      />
 
     </div>
   );
