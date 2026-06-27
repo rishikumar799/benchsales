@@ -23,7 +23,7 @@ export default function CompanyAdminDashboard({ onNavigate, onAddManagerClick }:
     { label: 'Total Employees', value: '4,826', trend: '↑ 139 this month', color: 'text-blue-500', bg: 'bg-blue-500/5', icon: Users, tab: 'employees' },
     { label: 'Managers', value: '24', trend: '↑ 3 this month', color: 'text-violet-500', bg: 'bg-violet-500/5', icon: Users, tab: 'managers' },
     { label: 'Recruiters', value: '38', trend: '↑ 5 this month', color: 'text-emerald-500', bg: 'bg-emerald-500/5', icon: Users, tab: 'recruiters' },
-    { label: 'Active Jobs', value: '67', trend: '↑ 12 this month', color: 'text-amber-500', bg: 'bg-amber-500/5', icon: Briefcase, tab: 'jobs' },
+    { label: 'Pending Assignments', value: '12', description: 'Jobs awaiting manager or recruiter assignment', color: 'text-amber-500', bg: 'bg-amber-500/5', icon: Briefcase, tab: 'jobs' },
   ];
 
   const workforceData = [
@@ -35,11 +35,11 @@ export default function CompanyAdminDashboard({ onNavigate, onAddManagerClick }:
   ];
 
   const managerPerformance = [
-    { name: 'Amit Verma', jobs: 24, applications: '1,246', hires: 28, avatar: 'https://picsum.photos/seed/amitverma/100/100' },
-    { name: 'Priya Sharma', jobs: 18, applications: '982', hires: 22, avatar: 'https://picsum.photos/seed/priyasharma/100/100' },
-    { name: 'Rahul Verma', jobs: 14, applications: '746', hires: 17, avatar: 'https://picsum.photos/seed/rahulv/100/100' },
-    { name: 'Neha Patel', jobs: 10, applications: '508', hires: 12, avatar: 'https://picsum.photos/seed/nehap/100/100' },
-    { name: 'Sandeep Iyer', jobs: 8, applications: '312', hires: 9, avatar: 'https://picsum.photos/seed/sandeep/100/100' },
+    { name: 'Amit Verma', jobs: 24, submissions: '1,246', hires: 28, avatar: 'https://picsum.photos/seed/amitverma/100/100' },
+    { name: 'Priya Sharma', jobs: 18, submissions: '982', hires: 22, avatar: 'https://picsum.photos/seed/priyasharma/100/100' },
+    { name: 'Rahul Verma', jobs: 14, submissions: '746', hires: 17, avatar: 'https://picsum.photos/seed/rahulv/100/100' },
+    { name: 'Neha Patel', jobs: 10, submissions: '508', hires: 12, avatar: 'https://picsum.photos/seed/nehap/100/100' },
+    { name: 'Sandeep Iyer', jobs: 8, submissions: '312', hires: 9, avatar: 'https://picsum.photos/seed/sandeep/100/100' },
   ];
 
   const recentActivities = [
@@ -84,8 +84,12 @@ export default function CompanyAdminDashboard({ onNavigate, onAddManagerClick }:
               </div>
             </div>
             <div className="text-3xl font-display font-black text-app-text mt-3">{st.value}</div>
-            <div className="text-xs font-bold text-emerald-500 mt-2 flex items-center gap-1">
-              <span>{st.trend}</span>
+            <div className="text-xs font-bold mt-2 flex items-center gap-1">
+              {st.description ? (
+                <span className="text-app-muted font-normal leading-relaxed">{st.description}</span>
+              ) : (
+                <span className="text-emerald-500">{st.trend}</span>
+              )}
             </div>
           </div>
         ))}
@@ -169,7 +173,7 @@ export default function CompanyAdminDashboard({ onNavigate, onAddManagerClick }:
 
           <div className="grid grid-cols-2 gap-4 my-6">
             {[
-              { label: 'Applications', count: '3,482', trend: '+18% vs last month', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+              { label: 'Submissions', count: '3,482', trend: '+18% vs last month', color: 'text-blue-500', bg: 'bg-blue-500/10' },
               { label: 'Interviews', count: '642', trend: '+14% vs last month', color: 'text-amber-500', bg: 'bg-amber-500/10' },
               { label: 'Offers', count: '148', trend: '+12% vs last month', color: 'text-violet-500', bg: 'bg-violet-500/10' },
               { label: 'Hires', count: '96', trend: '+20% vs last month', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
@@ -210,7 +214,7 @@ export default function CompanyAdminDashboard({ onNavigate, onAddManagerClick }:
               <div className="grid grid-cols-4 text-[10px] font-extrabold uppercase tracking-wider text-app-muted border-b border-app-border pb-2.5">
                 <span className="col-span-2">Manager</span>
                 <span className="text-center">Jobs</span>
-                <span className="text-center">Applications</span>
+                <span className="text-center">Submissions</span>
                 <span className="text-center">Hires</span>
               </div>
 
@@ -221,7 +225,7 @@ export default function CompanyAdminDashboard({ onNavigate, onAddManagerClick }:
                     <span className="text-xs font-bold text-app-text truncate">{mgr.name}</span>
                   </div>
                   <span className="text-center text-xs font-semibold text-app-muted">{mgr.jobs}</span>
-                  <span className="text-center text-xs font-semibold text-app-muted">{mgr.applications}</span>
+                  <span className="text-center text-xs font-semibold text-app-muted">{mgr.submissions}</span>
                   <span className="text-center text-xs font-bold text-emerald-500">{mgr.hires}</span>
                 </div>
               ))}

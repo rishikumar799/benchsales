@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 
 interface RecruiterJobsTabProps {
-  onNavigate: (tab: string) => void;
+  onNavigate: (tab: string, jobFilter?: string) => void;
   jobs: Array<{
     id: string;
     title: string;
@@ -33,18 +33,31 @@ interface RecruiterJobsTabProps {
     type: string;
     status: 'Active' | 'Draft' | 'Closed';
   }) => void;
+  onUpdateJob?: (job: {
+    id: string;
+    title: string;
+    dept: string;
+    location: string;
+    experience: string;
+    openings: number;
+    type: string;
+    status: 'Active' | 'Draft' | 'Closed';
+    applicationsCount: number;
+  }) => void;
 }
 
 export default function RecruiterJobsTab({
   onNavigate,
   jobs,
-  onAddJob
+  onAddJob,
+  onUpdateJob
 }: RecruiterJobsTabProps) {
   const [search, setSearch] = useState('');
   const [selectedDept, setSelectedDept] = useState('All Departments');
   const [selectedLoc, setSelectedLoc] = useState('All Locations');
   const [selectedStatus, setSelectedStatus] = useState('All Status');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingJob, setEditingJob] = useState<any | null>(null);
 
   // Form states
   const [title, setTitle] = useState('');
@@ -64,20 +77,53 @@ export default function RecruiterJobsTab({
     return matchesSearch && matchesDept && matchesLoc && matchesStatus;
   });
 
+  const handleStartEdit = (job: any) => {
+    setEditingJob(job);
+    setTitle(job.title);
+    setDept(job.dept);
+    setLocation(job.location);
+    setExperience(job.experience);
+    setOpenings(job.openings);
+    setType(job.type);
+    setStatusVal(job.status);
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCancel = () => {
+    setTitle('');
+    setEditingJob(null);
+    setIsCreateModalOpen(false);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title) return;
-    onAddJob({
-      title,
-      dept,
-      location,
-      experience,
-      openings: Number(openings),
-      type,
-      status: statusVal
-    });
+
+    if (editingJob && onUpdateJob) {
+      onUpdateJob({
+        ...editingJob,
+        title,
+        dept,
+        location,
+        experience,
+        openings: Number(openings),
+        type,
+        status: statusVal
+      });
+    } else {
+      onAddJob({
+        title,
+        dept,
+        location,
+        experience,
+        openings: Number(openings),
+        type,
+        status: statusVal
+      });
+    }
     // Reset
     setTitle('');
+    setEditingJob(null);
     setIsCreateModalOpen(false);
   };
 
@@ -218,11 +264,45 @@ export default function RecruiterJobsTab({
                 View Candidates
               </button>
               <button 
-                onClick={() => onNavigate('pipeline')}
+                onClick={() => onNavigate('pipeline', job.title)}
                 className="py-2.5 px-3 bg-brand-blue text-white text-xs font-extrabold rounded-xl hover:bg-opacity-95 shadow-sm transform active:scale-[0.98] transition-all cursor-pointer text-center"
               >
                 Manage Pipeline
               </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-app-border/40 text-[11px] font-bold">
+              <button 
+                onClick={() => handleStartEdit(job)}
+                className="text-brand-blue hover:underline cursor-pointer"
+              >
+                Edit Job
+              </button>
+              <div className="flex items-center gap-3">
+                {job.status === 'Active' ? (
+                  <button 
+                    onClick={() => onUpdateJob && onUpdateJob({ ...job, status: 'Draft' })}
+                    className="text-amber-500 hover:underline cursor-pointer animate-fade-in"
+                  >
+                    Pause Job
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => onUpdateJob && onUpdateJob({ ...job, status: 'Active' })}
+                    className="text-emerald-500 hover:underline cursor-pointer animate-fade-in"
+                  >
+                    Reopen Job
+                  </button>
+                )}
+                {job.status !== 'Closed' && (
+                  <button 
+                    onClick={() => onUpdateJob && onUpdateJob({ ...job, status: 'Closed' })}
+                    className="text-rose-500 hover:underline cursor-pointer animate-fade-in"
+                  >
+                    Close Job
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -242,10 +322,12 @@ export default function RecruiterJobsTab({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Sparkles className="text-brand-blue w-5 h-5" />
-                  <h3 className="text-lg font-display font-black text-app-text">Create Job Opening</h3>
+                  <h3 className="text-lg font-display font-black text-app-text">
+                    {editingJob ? 'Edit Job Opening' : 'Create Job Opening'}
+                  </h3>
                 </div>
                 <button 
-                  onClick={() => setIsCreateModalOpen(false)}
+                  onClick={handleCancel}
                   className="p-1.5 rounded-lg hover:bg-app-bg text-app-muted hover:text-app-text cursor-pointer"
                 >
                   <X className="w-5 h-5" />
@@ -347,7 +429,7 @@ export default function RecruiterJobsTab({
                 <div className="pt-4 flex justify-end gap-3">
                   <button 
                     type="button"
-                    onClick={() => setIsCreateModalOpen(false)}
+                    onClick={handleCancel}
                     className="px-5 py-3 border border-app-border hover:bg-app-bg text-xs font-extrabold text-app-text rounded-xl focus:outline-none transition-all cursor-pointer"
                   >
                     Cancel
@@ -356,7 +438,7 @@ export default function RecruiterJobsTab({
                     type="submit"
                     className="px-6 py-3 bg-brand-blue text-white hover:bg-opacity-95 text-xs font-extrabold rounded-xl focus:outline-none transition-all shadow-md active:scale-95 cursor-pointer"
                   >
-                    Create Job
+                    {editingJob ? 'Save Changes' : 'Create Job'}
                   </button>
                 </div>
               </form>

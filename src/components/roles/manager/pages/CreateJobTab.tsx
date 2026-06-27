@@ -12,7 +12,8 @@ import {
   Sparkles,
   Briefcase,
   Layers,
-  HelpCircle
+  HelpCircle,
+  Search
 } from 'lucide-react';
 
 interface JobType {
@@ -28,10 +29,25 @@ interface JobType {
   status: 'Active' | 'Paused';
 }
 
+const AVAILABLE_RECRUITERS = [
+  { id: "rec-1", name: "Rahul Singh", activeJobs: 4, submissions: 18, successRate: "82%", status: "Active", img: "https://picsum.photos/seed/rahul/100/100" },
+  { id: "rec-2", name: "Priya Sharma", activeJobs: 3, submissions: 12, successRate: "75%", status: "Active", img: "https://picsum.photos/seed/priya/100/100" },
+  { id: "rec-3", name: "Akash Verma", activeJobs: 5, submissions: 22, successRate: "88%", status: "Active", img: "https://picsum.photos/seed/akash/100/100" },
+  { id: "rec-4", name: "Neha Patel", activeJobs: 2, submissions: 8, successRate: "70%", status: "Active", img: "https://picsum.photos/seed/neha/100/100" },
+  { id: "rec-5", name: "Karthik Nair", activeJobs: 3, submissions: 14, successRate: "80%", status: "Active", img: "https://picsum.photos/seed/karthik/100/100" },
+  { id: "rec-6", name: "Vikas Mehta", activeJobs: 2, submissions: 6, successRate: "60%", status: "Inactive", img: "https://picsum.photos/seed/vikas/100/100" },
+  { id: "rec-7", name: "Simran Kaur", activeJobs: 1, submissions: 3, successRate: "90%", status: "Active", img: "https://picsum.photos/seed/simran/100/100" }
+];
+
+interface JobTypeExtended extends JobType {
+  assignmentMode?: 'open' | 'restricted';
+  assignedRecruiters?: string[];
+}
+
 interface CreateJobTabProps {
-  editJob?: JobType | null;
+  editJob?: JobTypeExtended | null;
   onBackToJobs: () => void;
-  onSubmitJob: (jobData: Omit<JobType, 'id' | 'recruitersCount' | 'submissionsCount'> & { id?: string }) => void;
+  onSubmitJob: (jobData: Omit<JobTypeExtended, 'id' | 'recruitersCount' | 'submissionsCount'> & { id?: string }) => void;
 }
 
 export default function CreateJobTab({ editJob, onBackToJobs, onSubmitJob }: CreateJobTabProps) {
@@ -47,6 +63,11 @@ export default function CreateJobTab({ editJob, onBackToJobs, onSubmitJob }: Cre
   const [description, setDescription] = useState('');
   const [responsibilities, setResponsibilities] = useState('');
   const [saveAsDraft, setSaveAsDraft] = useState(false);
+
+  // Recruiter Assignment Fields
+  const [assignmentMode, setAssignmentMode] = useState<'open' | 'restricted'>('open');
+  const [assignedRecruiters, setAssignedRecruiters] = useState<string[]>([]);
+  const [recruiterSearch, setRecruiterSearch] = useState('');
 
   // Skill tags state
   const [skillsList, setSkillsList] = useState<string[]>(['React', 'Node.js', 'TypeScript']);
@@ -66,6 +87,8 @@ export default function CreateJobTab({ editJob, onBackToJobs, onSubmitJob }: Cre
       setDescription(`We are looking for a skilled developer with strong expertise in ${editJob.skills} and web optimization.`);
       setResponsibilities(`• Architect modular structures supporting fluid interactions.\n• Support performance tuning cycles and production compilation.\n• Team collaboration with BDMs and internal recruiters.`);
       setSaveAsDraft(editJob.status === 'Paused');
+      setAssignmentMode(editJob.assignmentMode || 'open');
+      setAssignedRecruiters(editJob.assignedRecruiters || []);
     } else {
       // Defaults for Create New matching Image 3 pre-fill exactly
       setTitle('Frontend Developer');
@@ -79,6 +102,8 @@ export default function CreateJobTab({ editJob, onBackToJobs, onSubmitJob }: Cre
       setDescription('We are looking for a skilled Frontend Developer with strong experience in React, TypeScript and modern UI development.');
       setResponsibilities('• Build responsive and scalable web applications\n• Collaborate with backend developers\n• Write clean and maintainable code');
       setSaveAsDraft(false);
+      setAssignmentMode('open');
+      setAssignedRecruiters([]);
     }
   }, [editJob]);
 
@@ -115,7 +140,9 @@ export default function CreateJobTab({ editJob, onBackToJobs, onSubmitJob }: Cre
       skills: skillsList.join(', '),
       location,
       openings: `${openings} Positions`,
-      status: saveAsDraft ? 'Paused' : 'Active'
+      status: saveAsDraft ? 'Paused' : 'Active',
+      assignmentMode,
+      assignedRecruiters: assignmentMode === 'restricted' ? assignedRecruiters : []
     });
   };
 
@@ -281,6 +308,136 @@ export default function CreateJobTab({ editJob, onBackToJobs, onSubmitJob }: Cre
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Recruiter Assignment Mode Section */}
+          <div className="space-y-4 pt-4 border-t border-app-border/40">
+            <div>
+              <label className="block text-xs font-bold text-app-muted uppercase tracking-wider mb-2">
+                Recruiter Assignment Mode *
+              </label>
+              <div className="flex gap-6 mt-2">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none text-xs font-semibold text-app-text">
+                  <input 
+                    type="radio" 
+                    name="assignmentMode" 
+                    value="open"
+                    checked={assignmentMode === 'open'}
+                    onChange={() => setAssignmentMode('open')}
+                    className="text-brand-blue focus:ring-brand-blue w-4 h-4 bg-app-surface cursor-pointer border-app-border"
+                  />
+                  <span>Open To All Recruiters</span>
+                </label>
+                <label className="flex items-center gap-2.5 cursor-pointer select-none text-xs font-semibold text-app-text">
+                  <input 
+                    type="radio" 
+                    name="assignmentMode" 
+                    value="restricted"
+                    checked={assignmentMode === 'restricted'}
+                    onChange={() => setAssignmentMode('restricted')}
+                    className="text-brand-blue focus:ring-brand-blue w-4 h-4 bg-app-surface cursor-pointer border-app-border"
+                  />
+                  <span>Selected Recruiters Only</span>
+                </label>
+              </div>
+            </div>
+
+            {assignmentMode === 'restricted' && (
+              <div className="space-y-4 pt-2 animate-fade-in">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-app-muted" />
+                  <input 
+                    type="text"
+                    placeholder="Search available marketplace recruiters..."
+                    value={recruiterSearch}
+                    onChange={(e) => setRecruiterSearch(e.target.value)}
+                    className="w-full bg-app-surface border border-app-border rounded-xl py-2.5 pl-10 pr-4 text-xs font-semibold text-app-text focus:outline-none focus:border-brand-blue"
+                  />
+                </div>
+
+                {/* Grid list of matched available recruiters */}
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {AVAILABLE_RECRUITERS.filter(r => 
+                    r.name.toLowerCase().includes(recruiterSearch.toLowerCase())
+                  ).map(rec => {
+                    const isSelected = assignedRecruiters.includes(rec.id);
+                    return (
+                      <div 
+                        key={rec.id} 
+                        className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${
+                          isSelected 
+                            ? 'bg-brand-blue/5 border-brand-blue/30' 
+                            : 'bg-app-surface/40 border-app-border/60 hover:bg-app-surface'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src={rec.img} 
+                            alt={rec.name} 
+                            className="w-9 h-9 rounded-full object-cover border border-app-border"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div>
+                            <div className="text-xs font-bold text-app-text">{rec.name}</div>
+                            <div className="text-[10px] text-app-muted mt-0.5">
+                              Active Jobs: <span className="font-semibold text-app-text">{rec.activeJobs}</span> • Submissions: <span className="font-semibold text-app-text">{rec.submissions}</span> • Success Rate: <span className="font-semibold text-emerald-500">{rec.successRate}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setAssignedRecruiters(assignedRecruiters.filter(id => id !== rec.id));
+                            } else {
+                              setAssignedRecruiters([...assignedRecruiters, rec.id]);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-[10px] font-extrabold transition-all ${
+                            isSelected 
+                              ? 'bg-red-500/10 text-red-500 border border-red-500/25 hover:bg-red-500 hover:text-white' 
+                              : 'bg-brand-blue text-white hover:bg-brand-blue/90 shadow-md shadow-brand-blue/15'
+                          }`}
+                        >
+                          {isSelected ? 'Remove' : 'Assign'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Display selected recruiters */}
+                {assignedRecruiters.length > 0 && (
+                  <div className="pt-2">
+                    <span className="text-[10px] font-extrabold text-app-muted uppercase tracking-wider block mb-2">
+                      Selected Recruiters ({assignedRecruiters.length})
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {assignedRecruiters.map(id => {
+                        const rec = AVAILABLE_RECRUITERS.find(r => r.id === id);
+                        if (!rec) return null;
+                        return (
+                          <span 
+                            key={id} 
+                            className="flex items-center gap-1.5 text-xs font-bold bg-brand-blue/10 border border-brand-blue/20 text-brand-blue px-2.5 py-1 rounded-xl"
+                          >
+                            <img src={rec.img} className="w-4 h-4 rounded-full object-cover" referrerPolicy="no-referrer" />
+                            <span>{rec.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => setAssignedRecruiters(assignedRecruiters.filter(rid => rid !== id))}
+                              className="text-brand-blue hover:bg-brand-blue/20 rounded-full p-0.5"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
         </div>

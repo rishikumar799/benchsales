@@ -13,7 +13,11 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-export default function AiMatchingTab() {
+interface AiMatchingTabProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export default function AiMatchingTab({ onNavigate }: AiMatchingTabProps) {
   const skillsMatch = [
     { skill: 'React', pct: 95 },
     { skill: 'Node.js', pct: 91 },
@@ -131,7 +135,10 @@ export default function AiMatchingTab() {
 
           {/* Skills You Should Improve */}
           <div className="p-6 rounded-[28px] bg-app-surface border border-app-border card-shadow space-y-4">
-            <h3 className="text-base font-bold text-app-text">Skills You Should Improve</h3>
+            <div>
+              <h3 className="text-base font-bold text-app-text">Skills You Should Improve</h3>
+              <p className="text-xs text-app-muted mt-0.5">Personalized AI learning recommendations will be available soon.</p>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {suggestedImprovements.map((imp, idx) => (
                 <div key={idx} className={`p-4 border rounded-2xl flex flex-col justify-between h-32 ${imp.color}`}>
@@ -139,8 +146,8 @@ export default function AiMatchingTab() {
                     <span className="text-app-text text-sm font-extrabold block">{imp.skill}</span>
                     <span className="text-[10px] font-bold block mt-1 opacity-80">{imp.matchValue}</span>
                   </div>
-                  <button className="w-full py-1.5 bg-white text-app-bg text-[10px] uppercase tracking-wider font-extrabold rounded-xl shadow-sm hover:scale-105 active:scale-95 transition-all">
-                    {imp.action}
+                  <button disabled className="w-full py-1.5 bg-slate-950/40 text-app-muted text-[10px] uppercase tracking-wider font-extrabold rounded-xl cursor-not-allowed">
+                    Coming Soon
                   </button>
                 </div>
               ))}
@@ -160,7 +167,10 @@ export default function AiMatchingTab() {
                     <div className="text-xs font-bold text-app-text">{role.role}</div>
                     <div className="text-[10px] text-emerald-500 font-bold mt-0.5">{role.match}% Score Match</div>
                   </div>
-                  <button className="px-3 py-1.5 bg-brand-blue text-white rounded-lg text-[9px] font-bold uppercase transition-all">
+                  <button 
+                    onClick={() => onNavigate?.('jobs')}
+                    className="px-3 py-1.5 bg-brand-blue text-white rounded-lg text-[9px] font-bold uppercase transition-all cursor-pointer hover:bg-brand-blue/90"
+                  >
                     View Jobs
                   </button>
                 </div>
@@ -172,7 +182,7 @@ export default function AiMatchingTab() {
           <div className="p-6 rounded-[28px] bg-app-surface border border-app-border card-shadow space-y-4">
             <h3 className="text-base font-bold text-app-text flex items-center justify-between">
               AI Learning Recommendations
-              <span className="text-xs text-brand-blue font-bold cursor-pointer hover:underline">View All</span>
+              <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/15 px-2.5 py-1 rounded-lg">Coming Soon</span>
             </h3>
             <div className="space-y-3">
               {courses.map((crs, id) => (
@@ -185,8 +195,8 @@ export default function AiMatchingTab() {
                       <span>{crs.duration}</span>
                     </div>
                   </div>
-                  <button className="px-3.5 py-1.5 bg-brand-blue/10 hover:bg-brand-blue text-brand-blue hover:text-white rounded-lg text-[10px] font-bold transition-all shrink-0">
-                    Start
+                  <button disabled className="px-3.5 py-1.5 bg-app-bg border border-app-border text-app-muted rounded-lg text-[10px] font-bold cursor-not-allowed">
+                    Coming Soon
                   </button>
                 </div>
               ))}

@@ -32,6 +32,9 @@ interface RecruiterCandidatesTabProps {
     about: string;
     status: 'Applied' | 'Under Review' | 'Shortlisted' | 'Interview' | 'Selected' | 'Rejected';
     appliedDate: string;
+    assignedByAdmin?: string;
+    assignedDate?: string;
+    assignedJobs?: string[];
   }>;
   selectedCandidateId: string;
   onSelectCandidate: (id: string) => void;
@@ -279,6 +282,40 @@ export default function RecruiterCandidatesTab({
                     >
                       View All Skills Details →
                     </button>
+                  </div>
+
+                  {/* Assignment Information panel */}
+                  <div className="md:col-span-2 p-5 rounded-2xl bg-gradient-to-r from-brand-blue/5 to-indigo-500/5 border border-brand-blue/20 space-y-4">
+                    <h3 className="font-display font-bold text-xs uppercase tracking-wide text-brand-blue flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4" /> Assignment Information
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs font-bold text-app-text">
+                      <div className="p-3 bg-app-surface border border-app-border rounded-xl space-y-1">
+                        <span className="text-[10px] text-app-muted font-normal block uppercase">Assigned By</span>
+                        <span>{activeCandidate.assignedByAdmin || 'Amit Sen (Company Admin)'}</span>
+                      </div>
+                      <div className="p-3 bg-app-surface border border-app-border rounded-xl space-y-1">
+                        <span className="text-[10px] text-app-muted font-normal block uppercase">Assigned Date</span>
+                        <span>{activeCandidate.assignedDate || '24 May 25'}</span>
+                      </div>
+                      <div className="p-3 bg-app-surface border border-app-border rounded-xl space-y-1">
+                        <span className="text-[10px] text-app-muted font-normal block uppercase">Assigned For Jobs</span>
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {(activeCandidate.assignedJobs || [activeCandidate.role]).map((job, jIdx) => (
+                            <span key={jIdx} className="bg-brand-blue/10 text-brand-blue px-1.5 py-0.5 rounded text-[10px] font-extrabold">{job}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="p-3 bg-app-surface border border-app-border rounded-xl space-y-1">
+                        <span className="text-[10px] text-app-muted font-normal block uppercase">Current Pipeline Status</span>
+                        <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded mt-0.5 ${
+                          activeCandidate.status === 'Selected' ? 'bg-emerald-500/10 text-emerald-500' :
+                          activeCandidate.status === 'Rejected' ? 'bg-rose-500/10 text-rose-500' :
+                          activeCandidate.status === 'Interview' ? 'bg-amber-500/10 text-amber-500' :
+                          'bg-brand-blue/10 text-brand-blue'
+                        }`}>{activeCandidate.status}</span>
+                      </div>
+                    </div>
                   </div>
 
                   {/* About panel (span 2 if space matches) */}

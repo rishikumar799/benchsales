@@ -10,7 +10,10 @@ import {
   Eye,
   SlidersHorizontal,
   Mail,
-  Sliders
+  Sliders,
+  Clock,
+  TrendingUp,
+  Award
 } from 'lucide-react';
 
 interface RecruiterType {
@@ -18,30 +21,43 @@ interface RecruiterType {
   name: string;
   email: string;
   activeJobs: number;
-  applications: number;
+  submissions: number;
+  shortlisted: number;
   interviews: number;
-  selections: number;
+  hires: number;
   avatar: string;
+  lastActive: string;
+  isSelected: boolean;
+  isAssigned: boolean;
 }
 
 export default function CompanyManagerRecruiters() {
   
-  // Entire recruiters list from the screenshot (bottom-left)
-  const [recruitersList, setRecruitersList] = useState<RecruiterType[]>([
-    { id: 'r-1', name: 'Priya Sharma', email: 'priya.sharma@company.com', activeJobs: 4, applications: 248, interviews: 26, selections: 8, avatar: 'https://picsum.photos/seed/priya/100/100' },
-    { id: 'r-2', name: 'Rahul Verma', email: 'rahul.verma@company.com', activeJobs: 3, applications: 186, interviews: 18, selections: 6, avatar: 'https://picsum.photos/seed/rahulv/100/100' },
-    { id: 'r-3', name: 'Neha Patel', email: 'neha.patel@company.com', activeJobs: 5, applications: 310, interviews: 30, selections: 9, avatar: 'https://picsum.photos/seed/nehap/100/100' },
-    { id: 'r-4', name: 'Amit Singh', email: 'amit.singh@company.com', activeJobs: 2, applications: 142, interviews: 12, selections: 3, avatar: 'https://picsum.photos/seed/amits/100/100' },
-    { id: 'r-5', name: 'Kavya Reddy', email: 'kavya.reddy@company.com', activeJobs: 3, applications: 167, interviews: 14, selections: 2, avatar: 'https://picsum.photos/seed/kavyar/100/100' },
-    { id: 'r-6', name: 'Sandeep Joshi', email: 'sandeep.joshi@company.com', activeJobs: 2, applications: 128, interviews: 10, selections: 2, avatar: 'https://picsum.photos/seed/sandeep/100/100' },
-    { id: 'r-7', name: 'Meera Iyer', email: 'meera.iyer@company.com', activeJobs: 1, applications: 65, interviews: 6, selections: 1, avatar: 'https://picsum.photos/seed/meera/100/100' },
-    { id: 'r-8', name: 'Vikram Mehta', email: 'vikram.mehta@company.com', activeJobs: 2, applications: 124, interviews: 8, selections: 1, avatar: 'https://picsum.photos/seed/vikramm/100/100' },
+  // Entire recruiters list split by Selected, Assigned and All Available with requested metrics
+  const [recruitersList] = useState<RecruiterType[]>([
+    { id: 'r-1', name: 'Priya Sharma', email: 'priya.sharma@company.com', activeJobs: 4, submissions: 248, shortlisted: 54, interviews: 26, hires: 8, avatar: 'https://picsum.photos/seed/priya/100/100', lastActive: '2 hrs ago', isSelected: true, isAssigned: true },
+    { id: 'r-2', name: 'Rahul Verma', email: 'rahul.verma@company.com', activeJobs: 3, submissions: 186, shortlisted: 36, interviews: 18, hires: 6, avatar: 'https://picsum.photos/seed/rahulv/100/100', lastActive: '4 hrs ago', isSelected: true, isAssigned: true },
+    { id: 'r-3', name: 'Neha Patel', email: 'neha.patel@company.com', activeJobs: 5, submissions: 310, shortlisted: 68, interviews: 30, hires: 9, avatar: 'https://picsum.photos/seed/nehap/100/100', lastActive: 'Just now', isSelected: true, isAssigned: true },
+    { id: 'r-4', name: 'Amit Singh', email: 'amit.singh@company.com', activeJobs: 2, submissions: 142, shortlisted: 22, interviews: 12, hires: 3, avatar: 'https://picsum.photos/seed/amits/100/100', lastActive: '1 day ago', isSelected: true, isAssigned: true },
+    { id: 'r-5', name: 'Kavya Reddy', email: 'kavya.reddy@company.com', activeJobs: 0, submissions: 167, shortlisted: 31, interviews: 14, hires: 2, avatar: 'https://picsum.photos/seed/kavyar/100/100', lastActive: '3 days ago', isSelected: false, isAssigned: false },
+    { id: 'r-6', name: 'Sandeep Joshi', email: 'sandeep.joshi@company.com', activeJobs: 0, submissions: 128, shortlisted: 20, interviews: 10, hires: 2, avatar: 'https://picsum.photos/seed/sandeep/100/100', lastActive: '5 days ago', isSelected: false, isAssigned: false },
+    { id: 'r-7', name: 'Meera Iyer', email: 'meera.iyer@company.com', activeJobs: 0, submissions: 65, shortlisted: 11, interviews: 6, hires: 1, avatar: 'https://picsum.photos/seed/meera/100/100', lastActive: '1 week ago', isSelected: false, isAssigned: false },
+    { id: 'r-8', name: 'Vikram Mehta', email: 'vikram.mehta@company.com', activeJobs: 0, submissions: 124, shortlisted: 18, interviews: 8, hires: 1, avatar: 'https://picsum.photos/seed/vikramm/100/100', lastActive: '2 weeks ago', isSelected: false, isAssigned: false },
   ]);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeSegment, setActiveSegment] = useState<'selected' | 'assigned' | 'all'>('selected');
   const [selectedRecruiter, setSelectedRecruiter] = useState<RecruiterType | null>(null);
 
-  const filteredRecruiters = recruitersList.filter(rec => 
+  // Segment filter first
+  const segmentedRecruiters = recruitersList.filter(rec => {
+    if (activeSegment === 'selected') return rec.isSelected;
+    if (activeSegment === 'assigned') return rec.isAssigned;
+    return true; // all
+  });
+
+  // Search filter
+  const filteredRecruiters = segmentedRecruiters.filter(rec => 
     rec.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     rec.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -53,11 +69,45 @@ export default function CompanyManagerRecruiters() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-display font-black text-app-text tracking-tight">Recruiters</h1>
-          <p className="text-app-muted text-sm font-medium mt-1">View and manage recruiters working under your direct lineage.</p>
+          <p className="text-app-muted text-sm font-medium mt-1">Monitor recruitment performance and track sourcing channels across your ecosystem.</p>
         </div>
       </div>
 
-      {/* Modern filters bar */}
+      {/* Segment tabs */}
+      <div className="flex border-b border-app-border/40 gap-6">
+        <button
+          onClick={() => setActiveSegment('selected')}
+          className={`pb-3 text-sm font-extrabold transition-all border-b-2 cursor-pointer ${
+            activeSegment === 'selected' 
+              ? 'border-brand-blue text-brand-blue' 
+              : 'border-transparent text-app-muted hover:text-app-text'
+          }`}
+        >
+          Selected Recruiters ({recruitersList.filter(r => r.isSelected).length})
+        </button>
+        <button
+          onClick={() => setActiveSegment('assigned')}
+          className={`pb-3 text-sm font-extrabold transition-all border-b-2 cursor-pointer ${
+            activeSegment === 'assigned' 
+              ? 'border-brand-violet text-brand-violet' 
+              : 'border-transparent text-app-muted hover:text-app-text'
+          }`}
+        >
+          Assigned Recruiters ({recruitersList.filter(r => r.isAssigned).length})
+        </button>
+        <button
+          onClick={() => setActiveSegment('all')}
+          className={`pb-3 text-sm font-extrabold transition-all border-b-2 cursor-pointer ${
+            activeSegment === 'all' 
+              ? 'border-brand-blue text-brand-blue' 
+              : 'border-transparent text-app-muted hover:text-app-text'
+          }`}
+        >
+          All Available Recruiters ({recruitersList.length})
+        </button>
+      </div>
+
+      {/* Modern search bar */}
       <div className="p-4 rounded-3xl bg-app-surface/40 border border-app-border">
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-app-muted" />
@@ -73,15 +123,17 @@ export default function CompanyManagerRecruiters() {
 
       {/* Grid Recruiters Table */}
       <div className="p-6 rounded-[32px] glass border border-app-border card-shadow overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[700px]">
+        <table className="w-full text-left border-collapse min-w-[850px]">
           <thead>
             <tr className="border-b border-app-border/60 text-app-muted text-[11px] font-extrabold uppercase tracking-wider">
               <th className="pb-3 pl-4">Recruiter</th>
               <th className="pb-3">Email Address</th>
+              <th className="pb-3 text-center">Last Active</th>
               <th className="pb-3 text-center">Active Jobs</th>
-              <th className="pb-3 text-center">Applications</th>
-              <th className="pb-3 text-center">Interviews Initiated</th>
-              <th className="pb-3 text-center">Confirmed Selections</th>
+              <th className="pb-3 text-center">Total Submissions</th>
+              <th className="pb-3 text-center">Shortlisted</th>
+              <th className="pb-3 text-center">Interviews Created</th>
+              <th className="pb-3 text-center">Confirmed Hires</th>
               <th className="pb-3 text-right pr-4">Action</th>
             </tr>
           </thead>
@@ -104,19 +156,25 @@ export default function CompanyManagerRecruiters() {
                 {/* Email */}
                 <td className="py-4 text-sm font-semibold text-app-muted font-mono">{rec.email}</td>
                 
+                {/* Last Active */}
+                <td className="py-4 text-xs font-semibold text-center text-app-muted">{rec.lastActive}</td>
+
                 {/* Active Jobs */}
                 <td className="py-4 text-sm font-extrabold text-center text-app-text">{rec.activeJobs}</td>
                 
-                {/* Applications */}
-                <td className="py-4 text-sm font-extrabold text-center text-brand-blue">{rec.applications}</td>
+                {/* Submissions */}
+                <td className="py-4 text-sm font-extrabold text-center text-brand-blue">{rec.submissions}</td>
                 
+                {/* Shortlisted */}
+                <td className="py-4 text-sm font-extrabold text-center text-violet-500">{rec.shortlisted}</td>
+
                 {/* Interviews */}
                 <td className="py-4 text-sm font-extrabold text-center text-brand-violet">{rec.interviews}</td>
                 
-                {/* Selections */}
+                {/* Hires */}
                 <td className="py-4 text-sm font-black text-center text-emerald-500">
                   <span className="bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg">
-                    {rec.selections} Hires
+                    {rec.hires} Hires
                   </span>
                 </td>
 
@@ -124,7 +182,7 @@ export default function CompanyManagerRecruiters() {
                 <td className="py-4 text-right pr-4">
                   <button 
                     onClick={() => setSelectedRecruiter(rec)}
-                    className="px-4 py-1.5 bg-app-surface border border-app-border hover:bg-app-surface/80 text-app-text font-bold text-xs rounded-xl transition-all"
+                    className="px-4 py-1.5 bg-app-surface border border-app-border hover:bg-app-surface/80 text-app-text font-bold text-xs rounded-xl transition-all cursor-pointer"
                   >
                     View Activity
                   </button>
@@ -152,28 +210,28 @@ export default function CompanyManagerRecruiters() {
               </div>
               <button 
                 onClick={() => setSelectedRecruiter(null)}
-                className="p-1.5 border border-app-border hover:bg-app-surface rounded-lg text-app-muted"
+                className="p-1.5 border border-app-border hover:bg-app-surface rounded-lg text-app-muted cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <XIcon className="w-4 h-4" />
               </button>
             </div>
             
             <div className="grid grid-cols-4 gap-4 text-center">
               <div className="p-3 bg-blue-500/5 rounded-xl border border-blue-500/10">
-                <div className="text-xs font-bold text-app-muted">Jobs</div>
+                <div className="text-[10px] font-bold text-app-muted uppercase">Jobs</div>
                 <div className="text-lg font-black text-blue-500 mt-1">{selectedRecruiter.activeJobs}</div>
               </div>
               <div className="p-3 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
-                <div className="text-xs font-bold text-app-muted">Sourced</div>
-                <div className="text-lg font-black text-emerald-500 mt-1">{selectedRecruiter.applications}</div>
+                <div className="text-[10px] font-bold text-app-muted uppercase">Submissions</div>
+                <div className="text-lg font-black text-emerald-500 mt-1">{selectedRecruiter.submissions}</div>
               </div>
               <div className="p-3 bg-violet-500/5 rounded-xl border border-violet-500/10">
-                <div className="text-xs font-bold text-app-muted">Interviews</div>
+                <div className="text-[10px] font-bold text-app-muted uppercase">Interviews</div>
                 <div className="text-lg font-black text-violet-500 mt-1">{selectedRecruiter.interviews}</div>
               </div>
               <div className="p-3 bg-amber-500/5 rounded-xl border border-amber-500/10">
-                <div className="text-xs font-bold text-app-muted">Hires</div>
-                <div className="text-lg font-black text-amber-500 mt-1">{selectedRecruiter.selections}</div>
+                <div className="text-[10px] font-bold text-app-muted uppercase">Hires</div>
+                <div className="text-lg font-black text-amber-500 mt-1">{selectedRecruiter.hires}</div>
               </div>
             </div>
 
@@ -199,7 +257,7 @@ export default function CompanyManagerRecruiters() {
 
             <button 
               onClick={() => setSelectedRecruiter(null)}
-              className="w-full py-3 bg-app-surface border border-app-border hover:bg-app-surface/80 rounded-xl text-xs font-extrabold text-app-text"
+              className="w-full py-3 bg-app-surface border border-app-border hover:bg-app-surface/80 rounded-xl text-xs font-extrabold text-app-text cursor-pointer"
             >
               Close Ledger
             </button>
@@ -212,7 +270,7 @@ export default function CompanyManagerRecruiters() {
 }
 
 // Help utility for closing modal
-function X(props: React.SVGProps<SVGSVGElement>) {
+function XIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

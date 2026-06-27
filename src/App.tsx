@@ -23,10 +23,13 @@ import DashboardLayout from './components/DashboardLayout';
 import ScrollToTop from './components/marketing/common/ScrollToTop';
 import EcosystemRouter from './components/roles/EcosystemRouter';
 import { UserRole } from './types';
+import { useAuth, dbRoleToAppRole } from './context/AuthContext';
+import ProtectedRoute from './routes/ProtectedRoute';
 
 const isAppMode = import.meta.env.VITE_APP_MODE === 'true';
 
 export default function App() {
+  const { userProfile, logout } = useAuth();
   const [role, setRole] = useState<UserRole>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -34,6 +37,15 @@ export default function App() {
   });
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Synchronize state user role with the logged-in Firebase user profile role
+  useEffect(() => {
+    if (userProfile) {
+      setRole(dbRoleToAppRole(userProfile.role));
+    } else {
+      setRole(null);
+    }
+  }, [userProfile]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -54,9 +66,11 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logout();
     setRole(null);
   };
+
 
   // If in Native App Mode, we skip marketing and go straight to Auth/Dashboard
   if (isAppMode) {
@@ -86,20 +100,18 @@ export default function App() {
         <Route 
           path="/dashboard" 
           element={
-            role ? (
+            <ProtectedRoute>
               <DashboardLayout 
-                role={role} 
+                role={role!} 
                 onLogout={handleLogout} 
                 activeTab={activeTab} 
                 setActiveTab={setActiveTab}
                 theme={theme}
                 toggleTheme={toggleTheme}
               >
-                <EcosystemRouter role={role} activeTab={activeTab} setActiveTab={setActiveTab} />
+                <EcosystemRouter role={role!} activeTab={activeTab} setActiveTab={setActiveTab} />
               </DashboardLayout>
-            ) : (
-              <Navigate to="/auth" replace />
-            )
+            </ProtectedRoute>
           } 
         />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -141,20 +153,18 @@ export default function App() {
       <Route 
         path="/dashboard" 
         element={
-          role ? (
+          <ProtectedRoute>
             <DashboardLayout 
-              role={role} 
+              role={role!} 
               onLogout={handleLogout} 
               activeTab={activeTab} 
               setActiveTab={setActiveTab}
               theme={theme}
               toggleTheme={toggleTheme}
             >
-              <EcosystemRouter role={role} activeTab={activeTab} setActiveTab={setActiveTab} />
+              <EcosystemRouter role={role!} activeTab={activeTab} setActiveTab={setActiveTab} />
             </DashboardLayout>
-        ) : (
-            <Navigate to="/auth" replace />
-          )
+          </ProtectedRoute>
         } 
       />
       <Route path="*" element={<Navigate to="/" replace />} />

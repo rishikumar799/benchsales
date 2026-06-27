@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 
 interface RecruiterApplicationsTabProps {
-  onNavigate: (tab: string) => void;
+  onNavigate: (tab: string, jobFilter?: string) => void;
   applications: Array<{
     id: string;
     candidateName: string;
@@ -71,15 +71,15 @@ export default function RecruiterApplicationsTab({
       
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-display font-bold text-app-text">Applications</h1>
-        <p className="text-app-muted text-sm mt-1">Track all database applications across your job openings.</p>
+        <h1 className="text-3xl font-display font-bold text-app-text">Submissions</h1>
+        <p className="text-app-muted text-sm mt-1">Track all database submissions across your job openings.</p>
       </div>
 
       {/* Status Filter Tabs bar */}
       <div className="flex flex-wrap items-center gap-1.5 border-b border-app-border pb-4 overflow-x-auto">
         {[
           { id: 'All', label: 'All', count: counts.All },
-          { id: 'Applied', label: 'Applied', count: counts.Applied || hiringProgress.applied },
+          { id: 'Applied', label: 'Submitted', count: counts.Applied || hiringProgress.applied },
           { id: 'Under Review', label: 'Under Review', count: counts.UnderReview || hiringProgress.underReview },
           { id: 'Shortlisted', label: 'Shortlisted', count: counts.Shortlisted || hiringProgress.shortlisted },
           { id: 'Interview', label: 'Interview', count: counts.Interview || hiringProgress.interview },
@@ -163,7 +163,8 @@ export default function RecruiterApplicationsTab({
               <tr className="border-b border-app-border/60 bg-app-surface text-xs font-bold text-app-muted uppercase tracking-wider">
                 <th className="py-4 px-6">Candidate</th>
                 <th className="py-4 px-6">Job</th>
-                <th className="py-4 px-6">Applied Date</th>
+                <th className="py-4 px-6">Submission Date</th>
+                <th className="py-4 px-6">Submitted By</th>
                 <th className="py-4 px-6">Status</th>
                 <th className="py-4 px-6 text-center">Actions</th>
               </tr>
@@ -191,6 +192,9 @@ export default function RecruiterApplicationsTab({
                   <td className="py-4 px-6 text-app-muted font-semibold">
                     {app.date}
                   </td>
+                  <td className="py-4 px-6 text-app-muted font-semibold">
+                    Priya Sharma
+                  </td>
                   <td className="py-4 px-6">
                     <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full border uppercase tracking-wider ${
                       app.status === 'Selected' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' :
@@ -200,7 +204,7 @@ export default function RecruiterApplicationsTab({
                       app.status === 'Shortlisted' ? 'bg-pink-500/10 border-pink-500/20 text-pink-500' :
                       'bg-brand-blue/10 border-brand-blue/20 text-brand-blue'
                     }`}>
-                      {app.status}
+                      {app.status === 'Applied' ? 'Submitted' : app.status}
                     </span>
                   </td>
                   <td className="py-4 px-6 text-center">

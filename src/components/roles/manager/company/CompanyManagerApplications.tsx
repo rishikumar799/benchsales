@@ -86,8 +86,8 @@ export default function CompanyManagerApplications({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-display font-black text-app-text tracking-tight">Applications</h1>
-          <p className="text-app-muted text-sm font-medium mt-1">Sift and screen candidate applications across your company portfolios.</p>
+          <h1 className="text-2xl font-display font-black text-app-text tracking-tight">Submissions</h1>
+          <p className="text-app-muted text-sm font-medium mt-1">Sift and screen candidate submissions across your company portfolios.</p>
         </div>
       </div>
 

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { UserRole } from '../../types';
 import ThemeToggle from '../common/ThemeToggle';
+import { useAuth, dbRoleToAppRole } from '../../context/AuthContext';
 
 interface AuthPageProps {
   onBack: () => void;
@@ -28,6 +29,8 @@ interface AuthPageProps {
 }
 
 export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPageProps) {
+  const { login, signupIndividual, signupOrganization, bypassLogin } = useAuth();
+
   const [isLogin, setIsLogin] = useState(true);
   const [signupStep, setSignupStep] = useState<1 | '2A' | '2B'>(1);
   const [showPassword, setShowPassword] = useState(false);
@@ -88,29 +91,44 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
     }
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    
     if (loginRole === 'platform_admin' && email === ADMIN_EMAIL && password === ADMIN_PASS) {
+      bypassLogin('platform_admin');
       onLogin('platform_admin', true);
       return;
     }
-    // Simple direct login for user checkability
-    onLogin(loginRole, true);
-  };
-
-  const handleSignupSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (accountType === 'individual') {
-      let targetRole: UserRole = 'm_candidate';
-      if (individualRole === 'candidate') targetRole = 'm_candidate';
-      else if (individualRole === 'recruiter') targetRole = 'm_recruiter';
-      else if (individualRole === 'manager') targetRole = 'm_manager';
+    
+    try {
+      const profile = await login(email, password);
+      const targetRole = dbRoleToAppRole(profile.role);
       onLogin(targetRole, true);
-    } else {
-      let targetRole: UserRole = orgType === 'university' ? 'u_admin' : 'c_admin';
-      onLogin(targetRole, true);
+    } catch (err: any) {
+      setError(err?.message || 'Invalid credentials. Please try again.');
     }
   };
+
+  const handleSignupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    try {
+      if (accountType === 'individual') {
+        const profile = await signupIndividual(fullName, email, phone, password, individualRole);
+        const targetRole = dbRoleToAppRole(profile.role);
+        onLogin(targetRole, true);
+      } else {
+        const profile = await signupOrganization(orgName, adminName, email, phone, password, orgType);
+        const targetRole = dbRoleToAppRole(profile.role);
+        onLogin(targetRole, true);
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Registration failed. Please try again.');
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between selection-none relative font-sans overflow-x-hidden">
@@ -1087,6 +1105,7 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
                   key={role.id}
                   onClick={() => {
                     setLoginRole(role.id as UserRole);
+                    bypassLogin(role.id as UserRole);
                     onLogin(role.id as UserRole, true);
                     setSuccessMsg(`Bypassed login directly on ${role.label} profile!`);
                     setTimeout(() => setSuccessMsg(''), 4000);

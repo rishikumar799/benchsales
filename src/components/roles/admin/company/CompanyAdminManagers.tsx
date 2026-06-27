@@ -8,8 +8,26 @@ import {
   Eye, 
   Filter,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  X
 } from 'lucide-react';
+
+const ASSIGNED_RECRUITERS_MAP: Record<string, string[]> = {
+  'Amit Verma': ['Priya Sharma', 'Rahul Verma', 'Neha Patel', 'Kavya Reddy', 'Sandeep Joshi'],
+  'Priya Sharma': ['Rahul Verma', 'Neha Patel', 'Kavya Reddy', 'Sandeep Joshi'],
+  'Rahul Verma': ['Neha Patel', 'Kavya Reddy', 'Sandeep Joshi'],
+  'Neha Patel': ['Priya Sharma', 'Sandeep Joshi'],
+  'Sandeep Iyer': ['Neha Patel', 'Priya Sharma']
+};
+
+const RECRUITER_META: Record<string, { avatar: string; role: string; email: string }> = {
+  'Priya Sharma': { avatar: 'https://picsum.photos/seed/priya/100/100', role: 'Technical Recruiter', email: 'priya.sharma@company.com' },
+  'Rahul Verma': { avatar: 'https://picsum.photos/seed/rahulv/100/100', role: 'Senior Sourcing Specialist', email: 'rahul.verma@company.com' },
+  'Neha Patel': { avatar: 'https://picsum.photos/seed/nehap/100/100', role: 'Talent Acquisition Partner', email: 'neha.patel@company.com' },
+  'Kavya Reddy': { avatar: 'https://picsum.photos/seed/kavyar/100/100', role: 'Sourcing Recruiter', email: 'kavya.reddy@company.com' },
+  'Sandeep Joshi': { avatar: 'https://picsum.photos/seed/sandeep/100/100', role: 'Ecosystem Sourcing Lead', email: 'sandeep.joshi@company.com' },
+  'Amit Singh': { avatar: 'https://picsum.photos/seed/amits/100/100', role: 'Engineering Recruiter', email: 'amit.singh@company.com' }
+};
 
 interface Manager {
   id: string;
@@ -36,6 +54,8 @@ export default function CompanyAdminManagers({ managersList, onAddManager, onEdi
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedManager, setSelectedManager] = useState<Manager | null>(null);
+  const [showRecruitersModal, setShowRecruitersModal] = useState(false);
+  const [activeManagerName, setActiveManagerName] = useState<string | null>(null);
 
   // Form states
   const [formName, setFormName] = useState('');
@@ -159,9 +179,10 @@ export default function CompanyAdminManagers({ managersList, onAddManager, onEdi
               <tr className="border-b border-app-border text-[10px] font-extrabold uppercase tracking-widest text-app-muted bg-app-surface/40">
                 <th className="py-4.5 px-6">Manager profile</th>
                 <th className="py-4.5 px-6">Department</th>
+                <th className="py-4.5 px-6 text-center">Recruiters</th>
                 <th className="py-4.5 px-6 text-center">Active Jobs</th>
-                <th className="py-4.5 px-6 text-center">Applications</th>
-                <th className="py-4.5 px-6 text-center">Direct Hires</th>
+                <th className="py-4.5 px-6 text-center">Submissions</th>
+                <th className="py-4.5 px-6 text-center">Hired</th>
                 <th className="py-4.5 px-6 text-center">Status</th>
                 <th className="py-4.5 px-6 text-right">Actions</th>
               </tr>
@@ -173,9 +194,9 @@ export default function CompanyAdminManagers({ managersList, onAddManager, onEdi
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
                         <img 
-                          src={mgr.avatar} 
-                          alt={mgr.name} 
-                          className="w-10 h-10 rounded-full object-cover border-2 border-app-bg" 
+                           src={mgr.avatar} 
+                           alt={mgr.name} 
+                           className="w-10 h-10 rounded-full object-cover border-2 border-app-bg" 
                         />
                         <div>
                           <p className="font-extrabold text-sm text-app-text">{mgr.name}</p>
@@ -187,6 +208,17 @@ export default function CompanyAdminManagers({ managersList, onAddManager, onEdi
                       <span className="font-bold text-app-text bg-app-surface border border-app-border px-2.5 py-1 rounded-lg">
                         {mgr.dept}
                       </span>
+                    </td>
+                    <td className="py-4 px-6 text-center">
+                      <button 
+                        onClick={() => {
+                          setActiveManagerName(mgr.name);
+                          setShowRecruitersModal(true);
+                        }}
+                        className="font-bold text-brand-blue hover:underline cursor-pointer bg-brand-blue/5 border border-brand-blue/10 px-2.5 py-1.5 rounded-2xl text-xs hover:bg-brand-blue/10 transition-all whitespace-nowrap"
+                      >
+                        {ASSIGNED_RECRUITERS_MAP[mgr.name]?.length || 2} Recruiters
+                      </button>
                     </td>
                     <td className="py-4 px-6 text-center text-sm font-bold text-app-text">{mgr.jobs}</td>
                     <td className="py-4 px-6 text-center text-sm font-semibold text-app-text">{mgr.applications}</td>
@@ -223,7 +255,7 @@ export default function CompanyAdminManagers({ managersList, onAddManager, onEdi
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-app-muted text-sm font-medium">
+                  <td colSpan={8} className="py-12 text-center text-app-muted text-sm font-medium">
                     <Users className="w-10 h-10 mx-auto text-app-border mb-3" />
                     No managers found matching your search.
                   </td>
@@ -316,6 +348,63 @@ export default function CompanyAdminManagers({ managersList, onAddManager, onEdi
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Assigned Recruiters Modal */}
+      {showRecruitersModal && activeManagerName && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-app-bg border border-app-border w-full max-w-md rounded-[32px] card-shadow overflow-hidden p-6 md:p-8 space-y-5 animate-scale-in">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-display font-black text-app-text">
+                  Assigned Recruiters
+                </h3>
+                <p className="text-xs text-app-muted font-semibold mt-1">
+                  Reporting hierarchy under manager <span className="text-brand-blue font-bold">{activeManagerName}</span>
+                </p>
+              </div>
+              <button 
+                onClick={() => { setShowRecruitersModal(false); setActiveManagerName(null); }}
+                className="p-2 hover:bg-app-surface border border-app-border rounded-xl text-app-muted hover:text-app-text transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
+              {(ASSIGNED_RECRUITERS_MAP[activeManagerName] || ['Priya Sharma', 'Rahul Verma']).map((name) => {
+                const meta = RECRUITER_META[name] || {
+                  avatar: `https://picsum.photos/seed/${name.replace(/\s+/g, '')}/100/100`,
+                  role: 'Recruitment Partner',
+                  email: `${name.toLowerCase().replace(/\s+/g, '.')}@company.com`
+                };
+                return (
+                  <div key={name} className="flex items-center gap-3 p-3 bg-app-surface/50 border border-app-border rounded-2xl">
+                    <img 
+                      src={meta.avatar} 
+                      alt={name} 
+                      className="w-10 h-10 rounded-full object-cover border-2 border-app-bg" 
+                    />
+                    <div className="truncate flex-1">
+                      <p className="font-extrabold text-sm text-app-text">{name}</p>
+                      <p className="text-xs text-app-muted font-medium">{meta.role}</p>
+                      <p className="text-[10px] text-app-muted font-mono font-bold mt-0.5">{meta.email}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button 
+                onClick={() => { setShowRecruitersModal(false); setActiveManagerName(null); }}
+                className="px-5 py-2.5 bg-brand-blue text-white rounded-xl hover:bg-brand-blue/90 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Close View
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -25,9 +25,9 @@ export default function DashboardTab({ onNavigate, onCreateJobClick }: Dashboard
   // Simulated stats matching image 1
   const stats = [
     { label: 'Active Jobs', value: '24', desc: 'View all jobs', color: 'text-blue-500', target: 'jobs' },
-    { label: 'Open Positions', value: '138', desc: 'Across all jobs', color: 'text-violet-500', target: 'jobs' },
     { label: 'Recruiters Working', value: '16', desc: 'On active jobs', color: 'text-emerald-500', target: 'recruiters' },
     { label: 'Candidate Submissions', value: '247', desc: 'Total submissions', color: 'text-amber-500', target: 'submissions' },
+    { label: 'Total Jobs Posted', value: '138', desc: 'Across all jobs', color: 'text-violet-500', target: 'jobs' },
   ];
 
   // Recent jobs matching image 1
@@ -113,7 +113,7 @@ export default function DashboardTab({ onNavigate, onCreateJobClick }: Dashboard
         ))}
       </div>
 
-      {/* 4. Middle Layout: Recent Jobs & Recruiter Activity */}
+      {/* 4. Middle Layout: Recent Jobs & Recent Submissions */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* Left column: Recent Jobs */}
@@ -160,8 +160,50 @@ export default function DashboardTab({ onNavigate, onCreateJobClick }: Dashboard
           </button>
         </div>
 
-        {/* Right column: Recruiter Activity */}
+        {/* Right column: Recent Submissions */}
         <div className="lg:col-span-7 p-6 rounded-[32px] glass border border-app-border card-shadow flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-display font-bold text-lg text-app-text">Recent Submissions</h3>
+              <button 
+                onClick={() => onNavigate('submissions')} 
+                className="text-xs font-semibold text-brand-blue hover:underline"
+              >
+                View All Submissions
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-app-border text-xs font-extrabold text-app-muted uppercase tracking-wider">
+                    <th className="py-3 px-2">Candidate</th>
+                    <th className="py-3 px-2">Recruiter</th>
+                    <th className="py-3 px-2">Job</th>
+                    <th className="py-3 px-2 text-right">Submitted On</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-app-border/40 text-xs">
+                  {recentSubmissions.map((sub) => (
+                    <tr key={sub.id} className="hover:bg-app-surface/30 transition-colors">
+                      <td className="py-4.5 px-2 font-bold text-app-text">{sub.candidate}</td>
+                      <td className="py-4.5 px-2 font-semibold text-app-muted">{sub.recruiter}</td>
+                      <td className="py-4.5 px-2 font-mono font-bold text-brand-purple">{sub.job}</td>
+                      <td className="py-4.5 px-2 text-right font-semibold text-app-muted font-mono">{sub.date}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* 5. Bottom Rows Layout: Recruiter Activity & Insights */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* Left: Recruiter Activity */}
+        <div className="lg:col-span-8 p-6 rounded-[32px] glass border border-app-border card-shadow flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-display font-bold text-lg text-app-text">Recruiter Activity</h3>
@@ -209,48 +251,6 @@ export default function DashboardTab({ onNavigate, onCreateJobClick }: Dashboard
           >
             Review Marketplace Sourcing Partners
           </button>
-        </div>
-
-      </div>
-
-      {/* 5. Bottom Rows Layout: Recent Submissions & Insights */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Left: Recent Submissions */}
-        <div className="lg:col-span-8 p-6 rounded-[32px] glass border border-app-border card-shadow flex flex-col justify-between">
-          <div>
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-display font-bold text-lg text-app-text">Recent Submissions</h3>
-              <button 
-                onClick={() => onNavigate('submissions')} 
-                className="text-xs font-semibold text-brand-blue hover:underline"
-              >
-                View All Submissions
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-app-border text-xs font-extrabold text-app-muted uppercase tracking-wider">
-                    <th className="py-3 px-2">Candidate</th>
-                    <th className="py-3 px-2">Recruiter</th>
-                    <th className="py-3 px-2">Job</th>
-                    <th className="py-3 px-2 text-right">Submitted On</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-app-border/40 text-xs">
-                  {recentSubmissions.map((sub) => (
-                    <tr key={sub.id} className="hover:bg-app-surface/30 transition-colors">
-                      <td className="py-4.5 px-2 font-bold text-app-text">{sub.candidate}</td>
-                      <td className="py-4.5 px-2 font-semibold text-app-muted">{sub.recruiter}</td>
-                      <td className="py-4.5 px-2 font-mono font-bold text-brand-purple">{sub.job}</td>
-                      <td className="py-4.5 px-2 text-right font-semibold text-app-muted font-mono">{sub.date}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
 
         {/* Right: Marketplace Insights */}

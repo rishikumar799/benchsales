@@ -21,12 +21,12 @@ export default function CompanyAdminReports() {
   const [activeReportSubTab, setActiveReportSubTab] = useState('Overview');
 
   const trendData = [
-    { month: 'Dec', applications: 480 },
-    { month: 'Jan', applications: 610 },
-    { month: 'Feb', applications: 580 },
-    { month: 'Mar', applications: 760 },
-    { month: 'Apr', applications: 710 },
-    { month: 'May', applications: 840 },
+    { month: 'Dec', submissions: 480 },
+    { month: 'Jan', submissions: 610 },
+    { month: 'Feb', submissions: 580 },
+    { month: 'Mar', submissions: 760 },
+    { month: 'Apr', submissions: 710 },
+    { month: 'May', submissions: 840 },
   ];
 
   const reportButtons = [
@@ -92,7 +92,7 @@ export default function CompanyAdminReports() {
                 <span className="font-extrabold text-app-text">67</span>
               </div>
               <div className="flex justify-between items-center p-3 rounded-xl bg-app-surface/40 border border-app-border/50">
-                <span className="text-app-muted">Applications</span>
+                <span className="text-app-muted">Submissions</span>
                 <span className="font-extrabold text-app-text">3,482</span>
               </div>
               <div className="flex justify-between items-center p-3 rounded-xl bg-app-surface/40 border border-app-border/50">
@@ -140,7 +140,7 @@ export default function CompanyAdminReports() {
 
       </div>
 
-      {/* Row 2: Hiring Pipeline & Applications Trend */}
+      {/* Row 2: Hiring Pipeline & Submissions Trend */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
         
         {/* Hiring pipeline Funnel */}
@@ -148,11 +148,11 @@ export default function CompanyAdminReports() {
           <div>
             <h3 className="text-base font-bold text-app-text font-display">Hiring Pipeline Overview</h3>
             <p className="text-xs text-app-muted font-semibold mt-1">Acquisition conversions from candidates to roster assignments</p>
-
+ 
             {/* Simulated funnel graphics aligning values */}
             <div className="mt-8 space-y-3 font-bold select-none">
               {[
-                { stage: 'Applied', raw: '3,482', pct: '100%', width: 'w-full', bg: 'bg-blue-500' },
+                { stage: 'Submitted', raw: '3,482', pct: '100%', width: 'w-full', bg: 'bg-blue-500' },
                 { stage: 'Under Review', raw: '1,246', pct: '36%', width: 'w-[80%]', bg: 'bg-indigo-500' },
                 { stage: 'Shortlisted', raw: '382', pct: '11%', width: 'w-[60%]', bg: 'bg-violet-500' },
                 { stage: 'Interview', raw: '94', pct: '3%', width: 'w-[40%]', bg: 'bg-amber-500' },
@@ -173,18 +173,18 @@ export default function CompanyAdminReports() {
             </div>
           </div>
         </div>
-
-        {/* Applications Trend charts */}
+ 
+        {/* Submissions Trend charts */}
         <div className="col-span-1 xl:col-span-6 p-6 md:p-8 rounded-[32px] glass border border-app-border/80 card-shadow flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-center select-all">
               <div>
-                <h3 className="text-base font-bold text-app-text font-display">Applications Trend</h3>
+                <h3 className="text-base font-bold text-app-text font-display">Submissions Trend</h3>
                 <p className="text-xs text-app-muted font-semibold mt-1">Telemetry log of submissions parsed by volume</p>
               </div>
               <span className="text-[10px] font-bold text-app-muted uppercase bg-app-surface border border-app-border px-2.5 py-1 rounded-lg">Last 6 Months</span>
             </div>
-
+ 
             <div className="h-48 w-full mt-6">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={trendData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
@@ -199,7 +199,7 @@ export default function CompanyAdminReports() {
                       color: 'var(--color-app-text, #ffffff)' 
                     }} 
                   />
-                  <Line type="monotone" dataKey="applications" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="submissions" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

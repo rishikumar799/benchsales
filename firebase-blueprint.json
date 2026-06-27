@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Core system user document in the users master collection",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique Firebase Auth UID" },
+        "fullName": { "type": "string", "description": "The full name of the user" },
+        "email": { "type": "string", "description": "The email address of the user" },
+        "phoneNumber": { "type": "string", "description": "The contact phone number of the user" },
+        "role": { "type": "string", "description": "The role identifier mapping to UI screens" },
+        "accountType": { "type": "string", "description": "individual or organization" },
+        "organizationType": { "type": "string", "description": "university or company (optional)" },
+        "organizationId": { "type": "string", "description": "ID of associated organization (optional)" },
+        "status": { "type": "string", "description": "Status of account (approved/active)" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "fullName", "email", "role", "accountType", "status"]
+    },
+    "Organization": {
+      "title": "Organization",
+      "description": "An organization entity (university or company)",
+      "type": "object",
+      "properties": {
+        "organizationId": { "type": "string" },
+        "organizationName": { "type": "string" },
+        "organizationType": { "type": "string", "enum": ["university", "company"] },
+        "adminUid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["organizationId", "organizationName", "organizationType", "adminUid", "createdAt"]
+    },
+    "MarketplaceStudent": {
+      "title": "Marketplace Student",
+      "description": "Specific student candidate profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "fullName", "email"]
+    },
+    "MarketplaceRecruiter": {
+      "title": "Marketplace Recruiter",
+      "description": "Specific recruiter profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "fullName", "email"]
+    }
+  },
+  "firestore": {
+    "users/{uid}": {
+      "schema": "User",
+      "description": "Master users collection"
+    },
+    "organizations/{organizationId}": {
+      "schema": "Organization",
+      "description": "Organizations directory collection"
+    },
+    "marketplace_students/{uid}": {
+      "schema": "MarketplaceStudent",
+      "description": "Marketplace Students directory"
+    },
+    "marketplace_recruiters/{uid}": {
+      "schema": "MarketplaceRecruiter",
+      "description": "Marketplace Recruiters directory"
+    }
+  }
+}

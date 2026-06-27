@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Briefcase, 
   Users, 
@@ -6,19 +6,17 @@ import {
   FileText, 
   ArrowRight, 
   Sparkles,
-  Zap,
-  TrendingDown,
-  TrendingUp,
   Clock,
   ChevronRight,
-  HelpCircle,
-  Plus
+  TrendingUp,
+  Percent
 } from 'lucide-react';
 import BdmProfilePopup from '../components/BdmProfilePopup';
+import { recruiterStorage } from '../utils/recruiterStorage';
 
 interface DashboardTabProps {
   onNavigate: (tab: string) => void;
-  onRequestMore: () => void;
+  onRequestMore?: () => void;
   onPreviewCandidate: (candidateId: string) => void;
   onSelectCandidate: (candidateId: string) => void;
   selectedCount: number;
@@ -26,13 +24,27 @@ interface DashboardTabProps {
 
 export default function DashboardTab({ 
   onNavigate, 
-  onRequestMore, 
   onPreviewCandidate, 
   onSelectCandidate,
   selectedCount 
 }: DashboardTabProps) {
   
   const [selectedBdmName, setSelectedBdmName] = useState<string | null>(null);
+  const [stats, setStats] = useState(recruiterStorage.getDashboardStats());
+  const [submissions, setSubmissions] = useState(recruiterStorage.getSubmissions());
+  const [selections, setSelections] = useState(recruiterStorage.getSelections());
+
+  // Reload stats whenever component mounts or updates
+  useEffect(() => {
+    const loadData = () => {
+      setStats(recruiterStorage.getDashboardStats());
+      setSubmissions(recruiterStorage.getSubmissions());
+      setSelections(recruiterStorage.getSelections());
+    };
+    loadData();
+    window.addEventListener('storage', loadData);
+    return () => window.removeEventListener('storage', loadData);
+  }, [selectedCount]);
 
   // Simulated candidate list matching image #1
   const candidatePoolSample = [
@@ -57,15 +69,6 @@ export default function DashboardTab({
     { id: 4, type: 'status', title: 'Status Updated', desc: 'Akash Reddy status updated to Shortlisted', time: '2 days ago' },
   ];
 
-  // Submissions sample list matching image #1
-  const submissionsSample = [
-    { name: 'Ravi Kumar', job: 'Frontend Developer', date: '10 Jun 2026', status: 'Submitted', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
-    { name: 'Akash Reddy', job: 'DevOps Engineer', date: '09 Jun 2026', status: 'Shortlisted', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' },
-    { name: 'Sneha Iyer', job: 'Backend Developer', date: '09 Jun 2026', status: 'In Progress', color: 'bg-amber-500/10 text-amber-500 border-amber-500/20' },
-    { name: 'Priya Sharma', job: 'Java Developer', date: '09 Jun 2026', status: 'Submitted', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
-    { name: 'Karthik Nair', job: 'QA Engineer', date: '06 Jun 2026', status: 'Rejected', color: 'bg-red-500/10 text-red-500 border-red-500/20' },
-  ];
-
   return (
     <div className="space-y-8 animate-fade-in">
       
@@ -77,56 +80,134 @@ export default function DashboardTab({
         </div>
       </div>
 
-      {/* 2. Hero Interactive Banner */}
-      <div className="p-6 md:p-8 rounded-[32px] premium-gradient text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden shadow-2xl">
-        <div className="relative z-10 max-w-2xl">
-          <span className="bg-white/20 text-white font-mono text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-            Marketplace Engine Active
-          </span>
-          <h2 className="text-2xl md:text-3xl font-display font-bold mt-3 mb-2">Recruitment Workspace Active</h2>
-          <p className="text-white/80 text-sm leading-relaxed">
-            Browse open requirements, select the best candidates from your pool and submit profiles to move forward.
-          </p>
+      {/* 2. Top Grid: Hero Interactive Banner + Selection Overview Donut (Top-Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* Hero Interactive Banner (Span 8) */}
+        <div className="lg:col-span-8 p-6 md:p-8 rounded-[32px] premium-gradient text-white flex flex-col justify-between min-h-[280px] relative overflow-hidden shadow-2xl">
+          <div className="relative z-10">
+            <span className="bg-white/20 text-white font-mono text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+              Marketplace Engine Active
+            </span>
+            <h2 className="text-2xl md:text-3xl font-display font-bold mt-3 mb-2">Recruitment Workspace Active</h2>
+            <p className="text-white/80 text-sm leading-relaxed max-w-xl">
+              Browse open requirements, select the best candidates from your pool, allocate to your accessible jobs and submit profiles seamlessly.
+            </p>
+          </div>
+          <div className="relative z-10 mt-6 flex flex-wrap gap-4">
+            <button 
+              onClick={() => onNavigate('jobs')} 
+              className="px-6 py-3.5 bg-white text-brand-blue font-bold rounded-2xl flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all text-sm shadow-xl"
+            >
+              Browse Jobs <ArrowRight className="w-4 h-4 text-brand-blue" />
+            </button>
+            <button 
+              onClick={() => onNavigate('candidates')} 
+              className="px-6 py-3.5 bg-brand-violet text-white font-bold rounded-2xl flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all text-sm shadow-xl border border-brand-violet/20"
+            >
+              View Candidates Pool
+            </button>
+          </div>
+          {/* Subtle background glow */}
+          <div className="absolute right-0 bottom-0 w-80 h-80 bg-brand-violet/20 blur-3xl rounded-full" />
         </div>
-        <button 
-          onClick={() => onNavigate('jobs')} 
-          className="relative z-10 px-6 py-3.5 bg-white text-brand-blue font-bold rounded-2xl flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all text-sm shadow-xl shrink-0"
-        >
-          Browse Jobs <ArrowRight className="w-4 h-4 text-brand-blue" />
-        </button>
-        {/* Subtle background glow */}
-        <div className="absolute right-0 bottom-0 w-80 h-80 bg-brand-violet/20 blur-3xl rounded-full" />
+
+        {/* Selection Overview Donut (Span 4) - Moved to top-right area of the dashboard as a primary summary card */}
+        <div className="lg:col-span-4 p-6 rounded-[32px] glass border border-app-border card-shadow flex flex-col justify-between">
+          <div>
+            <h3 className="font-display font-bold text-lg text-app-text mb-2">Selection Overview</h3>
+            <p className="text-xs text-app-muted mb-4">Real-time breakdown of queued selections</p>
+            <div className="flex flex-col items-center justify-center py-2">
+              <div className="relative w-36 h-36 flex items-center justify-center mb-4">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  {/* Background Track */}
+                  <circle cx="50" cy="50" r="38" fill="transparent" stroke="rgba(120, 120, 120, 0.1)" strokeWidth="8" />
+                  
+                  {/* Segment: Submitted */}
+                  <circle cx="50" cy="50" r="38" fill="transparent" stroke="#3b82f6" strokeWidth="8" strokeDasharray="238.7" strokeDashoffset="119.3" />
+                  
+                  {/* Segment: In Progress */}
+                  <circle cx="50" cy="50" r="38" fill="transparent" stroke="#f59e0b" strokeWidth="8" strokeDasharray="238.7" strokeDashoffset="198.1" />
+
+                  {/* Segment: Shortlisted */}
+                  <circle cx="50" cy="50" r="38" fill="transparent" stroke="#10b981" strokeWidth="8" strokeDasharray="238.7" strokeDashoffset="224.3" />
+
+                  {/* Segment: Rejected */}
+                  <circle cx="50" cy="50" r="38" fill="transparent" stroke="#ef4444" strokeWidth="8" strokeDasharray="238.7" strokeDashoffset="237.5" />
+                </svg>
+                {/* Center text */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <span className="text-2xl font-display font-extrabold text-app-text">{stats.selections}</span>
+                  <span className="text-[10px] font-bold text-app-muted uppercase tracking-wider">Queue Size</span>
+                </div>
+              </div>
+
+              {/* Chart Legend */}
+              <div className="w-full grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+                  <span className="text-app-muted text-[11px] truncate">Submitted</span>
+                  <span className="font-bold text-app-text ml-auto">{submissions.filter(s => s.status === 'Submitted').length}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+                  <span className="text-app-muted text-[11px] truncate">In Review</span>
+                  <span className="font-bold text-app-text ml-auto">{submissions.filter(s => s.status === 'In Review').length}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span className="text-app-muted text-[11px] truncate">Shortlisted</span>
+                  <span className="font-bold text-app-text ml-auto">{submissions.filter(s => s.status === 'Shortlisted').length}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                  <span className="text-app-muted text-[11px] truncate">Rejected</span>
+                  <span className="font-bold text-app-text ml-auto">{submissions.filter(s => s.status === 'Rejected').length}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button 
+            onClick={() => onNavigate('selections')}
+            className="w-full text-center py-2.5 bg-brand-blue/5 hover:bg-brand-blue/10 text-xs font-bold text-brand-blue rounded-xl mt-3 transition-all border border-brand-blue/10"
+          >
+            Open Selections Queue →
+          </button>
+        </div>
+
       </div>
 
-      {/* 3. Main Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* 3. Updated Main Metrics Grid (6 columns to represent the 6 key statistics exactly) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-6">
         {[
-          { icon: Briefcase, label: 'Available Jobs', count: '24', desc: 'Open requirements', target: 'jobs' },
-          { icon: Users, label: 'Candidate Pool', count: '30', desc: 'Allocated by BDM', target: 'candidates' },
-          { icon: CheckSquare, label: 'Selected Candidates', count: selectedCount.toString(), desc: 'From your pool', target: 'selections' },
-          { icon: FileText, label: 'Submitted Profiles', count: '42', desc: 'Across all jobs', target: 'submissions' }
+          { icon: Briefcase, label: 'Open Jobs', count: stats.openJobs.toString(), desc: 'Accessible immediately', color: 'text-blue-500', target: 'jobs' },
+          { icon: Briefcase, label: 'Assigned Jobs', count: stats.assignedJobs.toString(), desc: 'Requires access code', color: 'text-amber-500', target: 'jobs' },
+          { icon: Users, label: 'Available Candidates', count: stats.availableCandidates.toString(), desc: 'Live candidate pool', color: 'text-indigo-500', target: 'candidates' },
+          { icon: FileText, label: 'Submitted Candidates', count: stats.submittedCandidates.toString(), desc: 'Profiles with BDM', color: 'text-emerald-500', target: 'submissions' },
+          { icon: CheckSquare, label: 'Selections', count: stats.selections.toString(), desc: 'Awaiting submission', color: 'text-pink-500', target: 'selections' },
+          { icon: Percent, label: 'Success Rate', count: stats.successRate, desc: 'Interview selection', color: 'text-violet-500', target: 'submissions' }
         ].map((item, idx) => (
           <button 
             key={idx} 
             onClick={() => onNavigate(item.target)}
-            className="p-6 rounded-[28px] glass border border-app-border text-left hover:border-brand-blue/30 hover:scale-[1.01] transition-all group relative card-shadow cursor-pointer flex flex-col justify-between"
+            className="p-5 rounded-2xl glass border border-app-border text-left hover:border-brand-blue/30 hover:scale-[1.01] transition-all group relative card-shadow cursor-pointer flex flex-col justify-between"
           >
             <div className="flex justify-between items-start w-full">
-              <div className="p-3 bg-brand-blue/10 rounded-xl group-hover:bg-brand-blue/20 transition-all text-brand-blue">
-                <item.icon className="w-6 h-6" />
+              <div className={`p-2 bg-app-surface border border-app-border rounded-lg group-hover:bg-brand-blue/5 transition-all ${item.color}`}>
+                <item.icon className="w-5 h-5" />
               </div>
-              <ChevronRight className="w-4 h-4 text-app-muted group-hover:text-brand-blue transition-all" />
+              <ChevronRight className="w-3.5 h-3.5 text-app-muted group-hover:text-brand-blue transition-all" />
             </div>
-            <div className="mt-5">
-              <span className="text-xs font-bold uppercase tracking-wider text-app-muted">{item.label}</span>
-              <div className="text-3xl font-display font-extrabold text-app-text mt-1">{item.count}</div>
-              <div className="text-[11px] font-semibold text-app-muted mt-1">{item.desc}</div>
+            <div className="mt-4">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-app-muted block">{item.label}</span>
+              <div className="text-2xl font-display font-extrabold text-app-text mt-1">{item.count}</div>
+              <p className="text-[9px] font-semibold text-app-muted/80 mt-1 leading-snug">{item.desc}</p>
             </div>
           </button>
         ))}
       </div>
 
-      {/* 4. Three-Column Middle View (Open Requirements, My Candidate Pool, Selection Overview) */}
+      {/* 4. Middle Rows: Open Requirements (4 cols) & My Candidate Pool (8 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* Column A: Open Requirements (Span 4) */}
@@ -169,20 +250,20 @@ export default function DashboardTab({
             onClick={() => onNavigate('jobs')} 
             className="w-full text-center py-3 border border-dashed border-app-border text-xs font-bold text-app-muted hover:text-brand-blue hover:border-brand-blue/30 rounded-2xl mt-6 transition-all"
           >
-            Explore 21 more open roles
+            Explore all open roles
           </button>
         </div>
 
-        {/* Column B: My Candidate Pool (Span 5) */}
-        <div className="lg:col-span-5 p-6 rounded-[32px] glass border border-app-border card-shadow flex flex-col justify-between">
+        {/* Column B: My Candidate Pool (Span 8) */}
+        <div className="lg:col-span-8 p-6 rounded-[32px] glass border border-app-border card-shadow flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-display font-bold text-lg text-app-text">My Candidate Pool (30)</h3>
               <button onClick={() => onNavigate('candidates')} className="text-xs font-semibold text-brand-blue hover:underline">
-                View All
+                View All Pool Candidates
               </button>
             </div>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {candidatePoolSample.map((cand) => (
                 <div key={cand.id} className="p-4 rounded-2xl bg-app-surface/60 border border-app-border flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -204,7 +285,7 @@ export default function DashboardTab({
                       Preview
                     </button>
                     <button 
-                      onClick={() => onSelectCandidate(cand.id)} 
+                      onClick={() => onNavigate('candidates')} 
                       className="px-3 py-1.5 bg-brand-blue text-white rounded-lg text-[10px] font-bold shadow-sm"
                     >
                       Select
@@ -222,72 +303,9 @@ export default function DashboardTab({
           </button>
         </div>
 
-        {/* Column C: Selection Overview Donut (Span 3) */}
-        <div className="lg:col-span-3 p-6 rounded-[32px] glass border border-app-border card-shadow flex flex-col justify-between">
-          <div>
-            <h3 className="font-display font-bold text-lg text-app-text mb-6">Selection Overview</h3>
-            <div className="flex flex-col items-center justify-center py-4">
-              {/* Custom SVG Donut Chart Matching the original mockup exactly */}
-              <div className="relative w-40 h-40 flex items-center justify-center mb-6">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                  {/* Background Track */}
-                  <circle cx="50" cy="50" r="38" fill="transparent" stroke="var(--color-app-surface, rgba(120,120,120,0.1))" strokeWidth="8" />
-                  
-                  {/* Segment: Submitted (9 / 18 -> 50%) */}
-                  <circle cx="50" cy="50" r="38" fill="transparent" stroke="#3b82f6" strokeWidth="8" strokeDasharray="238.7" strokeDashoffset="119.3" />
-                  
-                  {/* Segment: In Progress (6 / 18 -> 33%) */}
-                  <circle cx="50" cy="50" r="38" fill="transparent" stroke="#f59e0b" strokeWidth="8" strokeDasharray="238.7" strokeDashoffset="198.1" />
-
-                  {/* Segment: Shortlisted (2 / 18 -> 11%) */}
-                  <circle cx="50" cy="50" r="38" fill="transparent" stroke="#10b981" strokeWidth="8" strokeDasharray="238.7" strokeDashoffset="224.3" />
-
-                  {/* Segment: Rejected (1 / 18 -> 5.5%) */}
-                  <circle cx="50" cy="50" r="38" fill="transparent" stroke="#ef4444" strokeWidth="8" strokeDasharray="238.7" strokeDashoffset="237.5" />
-                </svg>
-                {/* Center text */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-2xl font-display font-extrabold text-app-text">{selectedCount}</span>
-                  <span className="text-[10px] font-bold text-app-muted uppercase tracking-wider">Selected</span>
-                </div>
-              </div>
-
-              {/* Chart Legend */}
-              <div className="w-full grid grid-cols-2 gap-3 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
-                  <span className="text-app-muted truncate">Submitted</span>
-                  <span className="font-bold text-app-text ml-auto">9</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                  <span className="text-app-muted truncate">In Progress</span>
-                  <span className="font-bold text-app-text ml-auto">6</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                  <span className="text-app-muted truncate">Shortlisted</span>
-                  <span className="font-bold text-app-text ml-auto">2</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
-                  <span className="text-app-muted truncate">Rejected</span>
-                  <span className="font-bold text-app-text ml-auto">1</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <button 
-            onClick={() => onNavigate('selections')}
-            className="w-full text-center py-3 bg-brand-blue/5 hover:bg-brand-blue/10 text-xs font-bold text-brand-blue rounded-2xl mt-4 transition-all"
-          >
-            View My Selections →
-          </button>
-        </div>
-
       </div>
 
-      {/* 5. Bottom Rows: Recent Activity, Recent Submissions & Need More Candidates Side Promo */}
+      {/* 5. Bottom Rows: Recent Activity, Recent Submissions & Available Candidate Pool Promo Card */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* Row A: Recent Activity (Span 4) */}
@@ -319,59 +337,93 @@ export default function DashboardTab({
         </div>
 
         {/* Row B: Recent Submissions (Span 5) */}
-        <div className="lg:col-span-5 p-6 rounded-[32px] glass border border-app-border card-shadow">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-display font-bold text-lg text-app-text">Recent Submissions</h3>
-            <button onClick={() => onNavigate('submissions')} className="text-xs font-semibold text-brand-blue hover:underline">
-              View All Submissions
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-app-border text-xs font-extrabold text-app-muted uppercase tracking-wider">
-                  <th className="py-3 px-2">Candidate</th>
-                  <th className="py-3 px-2">Job</th>
-                  <th className="py-3 px-2 hidden sm:table-cell">Selected On</th>
-                  <th className="py-3 px-2 text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-app-border/40 text-sm">
-                {submissionsSample.map((sub, sIdx) => (
-                  <tr key={sIdx} className="hover:bg-app-surface/30 transition-colors">
-                    <td className="py-3 px-2 font-bold text-app-text">{sub.name}</td>
-                    <td className="py-3 px-2 text-xs text-app-muted">{sub.job}</td>
-                    <td className="py-3 px-2 text-xs text-app-muted hidden sm:table-cell">{sub.date}</td>
-                    <td className="py-3 px-2 text-right">
-                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${sub.color}`}>
-                        {sub.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Row C: BDM Callout Promo Card (Span 3) */}
-        <div className="lg:col-span-3 p-6 rounded-[32px] bg-gradient-to-br from-brand-violet/10 to-brand-blue/10 border border-brand-violet/20 card-shadow flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-md shadow-brand-violet/10">
-              <Sparkles className="w-6 h-6 text-brand-violet" />
+        <div className="lg:col-span-5 p-6 rounded-[32px] glass border border-app-border card-shadow flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-display font-bold text-lg text-app-text">Recent Submissions</h3>
+              <button onClick={() => onNavigate('submissions')} className="text-xs font-semibold text-brand-blue hover:underline">
+                View All
+              </button>
             </div>
-            <div>
-              <h4 className="font-display font-bold text-base text-app-text">Need more candidates?</h4>
-              <p className="text-xs text-app-muted mt-2 leading-relaxed">
-                Request an additional candidate pool from your Business Development Manager (BDM) to fulfill your criteria.
-              </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-app-border text-xs font-extrabold text-app-muted uppercase tracking-wider">
+                    <th className="py-3 px-2">Candidate</th>
+                    <th className="py-3 px-2">Job</th>
+                    <th className="py-3 px-2 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-app-border/40 text-sm">
+                  {submissions.slice(0, 4).map((sub, sIdx) => {
+                    let color = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+                    if (sub.status === 'Shortlisted') color = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+                    if (sub.status === 'In Review') color = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+                    if (sub.status === 'Rejected') color = 'bg-red-500/10 text-red-500 border-red-500/20';
+
+                    return (
+                      <tr key={sIdx} className="hover:bg-app-surface/30 transition-colors">
+                        <td className="py-3 px-2 font-bold text-app-text">{sub.candidateName}</td>
+                        <td className="py-3 px-2 text-xs text-app-muted truncate max-w-[120px]">{sub.jobTitle}</td>
+                        <td className="py-3 px-2 text-right">
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${color}`}>
+                            {sub.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
           <button 
-            onClick={onRequestMore}
+            onClick={() => onNavigate('submissions')}
+            className="w-full text-center py-2.5 bg-app-surface hover:bg-app-bg text-xs font-bold text-app-text rounded-xl mt-4 transition-all border border-app-border"
+          >
+            Track All Submissions
+          </button>
+        </div>
+
+        {/* Row C: Available Candidate Pool Card (Span 3) - Replaced the Request More card */}
+        <div className="lg:col-span-3 p-6 rounded-[32px] bg-gradient-to-br from-brand-violet/10 to-brand-blue/10 border border-brand-violet/20 card-shadow flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-md shadow-brand-violet/10">
+              <Users className="w-6 h-6 text-brand-violet" />
+            </div>
+            <div>
+              <h4 className="font-display font-bold text-base text-app-text">Available Candidate Pool</h4>
+              <p className="text-[11px] text-app-muted mt-1 leading-relaxed">
+                Review available talent pools assigned to your accessible workspace and pipeline them for jobs.
+              </p>
+            </div>
+            
+            {/* Pool Statistics */}
+            <div className="pt-4 border-t border-brand-violet/20 space-y-2 text-xs font-semibold">
+              <div className="flex justify-between">
+                <span className="text-app-muted text-[11px]">• Total Available Candidates</span>
+                <span className="text-app-text">{stats.availableCandidates}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-app-muted text-[11px]">• Assigned Candidates</span>
+                <span className="text-app-text">18</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-app-muted text-[11px]">• Selected Candidates</span>
+                <span className="text-brand-blue font-extrabold">{stats.selections}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-app-muted text-[11px]">• Submitted Candidates</span>
+                <span className="text-emerald-500 font-extrabold">{stats.submittedCandidates}</span>
+              </div>
+            </div>
+          </div>
+          
+          <button 
+            onClick={() => onNavigate('candidates')}
             className="w-full mt-6 py-3.5 bg-brand-violet text-white text-xs font-bold rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-brand-violet/20 flex items-center justify-center gap-1.5"
           >
-            <Plus className="w-4 h-4" /> Request Now
+            View Candidate Pool
           </button>
         </div>
 

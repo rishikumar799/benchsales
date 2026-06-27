@@ -65,8 +65,14 @@ export default function CompanyManagerCreateJob({
     editJob ? editJob.reach : 'Internal - My Company'
   );
   
+  const [assignmentMode, setAssignmentMode] = useState<'selected' | 'open'>(
+    editJob && editJob.recruitersAssigned.length === 0 ? 'open' : 'selected'
+  );
+
   const [selectedRecruiters, setSelectedRecruiters] = useState<string[]>(
-    editJob ? editJob.recruitersAssigned : recruiters.slice(0, 2).map(r => r.name)
+    editJob && editJob.recruitersAssigned.length > 0 
+      ? editJob.recruitersAssigned 
+      : recruiters.slice(0, 2).map(r => r.name)
   );
 
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>(['Aryx AI', 'Miners Ltd', 'Cloudy Corp']);
@@ -84,16 +90,24 @@ export default function CompanyManagerCreateJob({
       experience,
       type,
       reach,
-      recruitersAssigned: selectedRecruiters
+      recruitersAssigned: assignmentMode === 'open' ? [] : selectedRecruiters
     });
   };
 
   const toggleRecruiter = (recName: string) => {
+    if (assignmentMode === 'open') return;
     if (selectedRecruiters.includes(recName)) {
       setSelectedRecruiters(selectedRecruiters.filter(r => r !== recName));
     } else {
       setSelectedRecruiters([...selectedRecruiters, recName]);
     }
+  };
+
+  const RECRUITER_META: Record<string, { avatar: string, role: string }> = {
+    'Priya Sharma': { avatar: 'https://picsum.photos/seed/priya/100/100', role: 'Technical Recruiter' },
+    'Rahul Verma': { avatar: 'https://picsum.photos/seed/rahulv/100/100', role: 'Senior Sourcing Specialist' },
+    'Neha Patel': { avatar: 'https://picsum.photos/seed/nehap/100/100', role: 'Talent Acquisition Partner' },
+    'Amit Singh': { avatar: 'https://picsum.photos/seed/amits/100/100', role: 'Engineering Recruiter' },
   };
 
   return (
@@ -102,8 +116,9 @@ export default function CompanyManagerCreateJob({
       {/* Header with Navigation Link */}
       <div className="flex items-center gap-3">
         <button 
+          type="button"
           onClick={onBack}
-          className="p-2 border border-app-border hover:bg-app-surface/80 rounded-xl transition-all"
+          className="p-2 border border-app-border hover:bg-app-surface/80 rounded-xl transition-all cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5 text-app-text" />
         </button>
@@ -273,30 +288,115 @@ export default function CompanyManagerCreateJob({
           </div>
 
           {/* Assign recruiters */}
-          <div className="space-y-3 pt-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-app-muted block">Assign Recruiters To Sourcing</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {recruiters.map((rec) => {
-                const isSelected = selectedRecruiters.includes(rec.name);
-                return (
-                  <button
-                    type="button"
-                    key={rec.id}
-                    onClick={() => toggleRecruiter(rec.name)}
-                    className={`p-3.5 rounded-2xl text-left border flex items-center justify-between text-xs font-bold transition-all ${
-                      isSelected 
-                        ? 'border-brand-blue bg-brand-blue/5 text-brand-blue'
-                        : 'border-app-border bg-app-surface/40 text-app-text hover:bg-app-surface'
-                    }`}
-                  >
-                    <span>{rec.name}</span>
-                    {isSelected && (
-                      <span className="w-2.5 h-2.5 bg-brand-blue rounded-full" />
-                    )}
-                  </button>
-                );
-              })}
+          <div className="space-y-4 pt-4 border-t border-app-border/40">
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-app-muted block">Recruiter Assignment Policy</label>
+              <p className="text-[11px] text-app-muted mt-1">Specify whether specific recruiters will work on sourcing for this job, or open it up for all.</p>
             </div>
+
+            {/* Radio / Tab selectors */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => setAssignmentMode('selected')}
+                className={`p-4 rounded-2xl text-left border flex flex-col gap-1 transition-all cursor-pointer ${
+                  assignmentMode === 'selected'
+                    ? 'border-brand-blue bg-brand-blue/5 text-app-text'
+                    : 'border-app-border bg-app-surface/20 text-app-text hover:bg-app-surface/40'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    checked={assignmentMode === 'selected'}
+                    onChange={() => setAssignmentMode('selected')}
+                    className="accent-brand-blue"
+                  />
+                  <span className="text-xs font-extrabold">Option A: Selected Recruiters</span>
+                </div>
+                <span className="text-[10px] text-app-muted leading-relaxed pl-5 font-medium">
+                  Assign specific talent acquisition team members to manage and submit candidates for this requirement.
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAssignmentMode('open')}
+                className={`p-4 rounded-2xl text-left border flex flex-col gap-1 transition-all cursor-pointer ${
+                  assignmentMode === 'open'
+                    ? 'border-brand-violet bg-brand-violet/5 text-app-text'
+                    : 'border-app-border bg-app-surface/20 text-app-text hover:bg-app-surface/40'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    checked={assignmentMode === 'open'}
+                    onChange={() => setAssignmentMode('open')}
+                    className="accent-brand-violet"
+                  />
+                  <span className="text-xs font-extrabold">Option B: Open For All Recruiters</span>
+                </div>
+                <span className="text-[10px] text-app-muted leading-relaxed pl-5 font-medium">
+                  Any recruiter in your corporate workspace can submit candidates and work on active briefs.
+                </span>
+              </button>
+            </div>
+
+            {/* Recruiter selection list (only enabled if Selected Recruiters mode) */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-app-muted">
+                  Designated Recruiters {assignmentMode === 'selected' ? `(${selectedRecruiters.length} selected)` : '(All Sourcing Enabled)'}
+                </span>
+              </div>
+
+              {assignmentMode === 'open' ? (
+                <div className="p-4 rounded-2xl bg-brand-violet/5 border border-brand-violet/20 text-xs font-bold text-brand-violet flex items-center gap-3 animate-fade-in">
+                  <span className="text-lg">📢</span>
+                  <div>
+                    <p className="font-extrabold text-[12px]">Open Recruiter Pool Mode Active</p>
+                    <p className="text-[10px] text-app-muted font-medium mt-0.5">Specific recruitment selection is disabled. This job is visible to all internal and ecosystem recruiters.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fade-in">
+                  {recruiters.map((rec) => {
+                    const isSelected = selectedRecruiters.includes(rec.name);
+                    const meta = RECRUITER_META[rec.name] || {
+                      avatar: `https://picsum.photos/seed/${rec.name.replace(' ', '')}/100/100`,
+                      role: 'Sourcing Recruiter'
+                    };
+                    return (
+                      <button
+                        type="button"
+                        key={rec.id}
+                        onClick={() => toggleRecruiter(rec.name)}
+                        className={`p-3 rounded-2xl text-left border flex items-center justify-between text-xs font-bold transition-all cursor-pointer ${
+                          isSelected 
+                            ? 'border-brand-blue bg-brand-blue/5 text-brand-blue'
+                            : 'border-app-border bg-app-surface/40 text-app-text hover:bg-app-surface'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <img src={meta.avatar} alt={rec.name} className="w-8 h-8 rounded-full border border-app-border object-cover" />
+                          <div>
+                            <div className="font-bold text-sm text-app-text">{rec.name}</div>
+                            <div className="text-[10px] text-app-muted font-normal mt-0.5">{meta.role}</div>
+                          </div>
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                          isSelected ? 'border-brand-blue bg-brand-blue' : 'border-app-muted/40'
+                        }`}>
+                          {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
           </div>
 
         </div>

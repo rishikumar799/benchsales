@@ -178,7 +178,7 @@ export default function CompanyAdminJobs({ jobsList, onAddJob, onEditJob, onDele
                 <th className="py-4.5 px-6">Official Role Title</th>
                 <th className="py-4.5 px-6">Department</th>
                 <th className="py-4.5 px-6">Experience / Location</th>
-                <th className="py-4.5 px-6 text-center">Applications</th>
+                <th className="py-4.5 px-6 text-center">Submissions</th>
                 <th className="py-4.5 px-6 text-center">Openings</th>
                 <th className="py-4.5 px-6 text-center">Status</th>
                 <th className="py-4.5 px-6 text-right">Actions</th>

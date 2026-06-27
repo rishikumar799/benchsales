@@ -423,15 +423,16 @@ export default function RecruiterHandshakeGateway() {
       <div className="p-6 sm:p-8 rounded-[32px] glass border border-app-border card-shadow space-y-5">
         <div className="flex justify-between items-center pb-2 border-b border-app-border/40">
           <div>
-            <h4 className="text-base font-display font-bold text-app-text">Active Handshakes & Pick Requests</h4>
-            <p className="text-xs text-app-muted font-medium mt-0.5">Track your instant talent requests.</p>
+            <h4 className="text-base font-display font-bold text-app-text">Assigned Recruiters</h4>
+            <p className="text-xs text-app-muted font-medium mt-0.5">Recruiters currently assigned to represent and assist the student for Marketplace opportunities.</p>
+            <p className="text-[11px] text-[#3b82f6] font-semibold mt-1">Recruiters currently representing your profile for suitable opportunities.</p>
           </div>
           <span className="text-[10px] font-mono font-bold text-app-muted">Total: {requests.length}</span>
         </div>
 
         {requests.length === 0 ? (
           <div className="p-10 bg-app-surface/20 border border-app-border border-dashed rounded-2xl text-center text-app-muted text-xs font-semibold">
-            No active pick requests yet. Click "Request to Pick Me" on any recruiter above to secure a handshake.
+            No assigned recruiters found. Click "Request to Pick Me" on any recruiter above to secure a representation.
           </div>
         ) : (
           <div className="space-y-3">

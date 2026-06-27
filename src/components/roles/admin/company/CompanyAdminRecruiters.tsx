@@ -8,6 +8,15 @@ import {
   Filter,
 } from 'lucide-react';
 
+const REPORTS_TO_MAP: Record<string, string> = {
+  'Priya Sharma': 'Amit Verma',
+  'Rahul Verma': 'Priya Sharma',
+  'Neha Patel': 'Priya Sharma',
+  'Kavya Reddy': 'Amit Verma',
+  'Sandeep Joshi': 'Sandeep Iyer',
+  'Amit Singh': 'Neha Patel'
+};
+
 interface Recruiter {
   id: string;
   name: string;
@@ -155,10 +164,11 @@ export default function CompanyAdminRecruiters({ recruitersList, onAddRecruiter,
             <thead>
               <tr className="border-b border-app-border text-[10px] font-extrabold uppercase tracking-widest text-app-muted bg-app-surface/40">
                 <th className="py-4.5 px-6">Recruiter name</th>
+                <th className="py-4.5 px-6">Reports To</th>
                 <th className="py-4.5 px-6">Department</th>
                 <th className="py-4.5 px-6 text-center">Active Jobs</th>
-                <th className="py-4.5 px-6 text-center">Applications</th>
-                <th className="py-4.5 px-6 text-center">Selections</th>
+                <th className="py-4.5 px-6 text-center">Submissions</th>
+                <th className="py-4.5 px-6 text-center">Hired</th>
                 <th className="py-4.5 px-6 text-center">Status</th>
                 <th className="py-4.5 px-6 text-right">Actions</th>
               </tr>
@@ -178,6 +188,16 @@ export default function CompanyAdminRecruiters({ recruitersList, onAddRecruiter,
                           <p className="font-extrabold text-sm text-app-text">{rec.name}</p>
                           <p className="text-[10px] text-app-muted font-bold font-mono mt-0.5">{rec.email}</p>
                         </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase text-app-muted font-bold">
+                          Reports To:
+                        </span>
+                        <span className="text-xs text-brand-blue font-extrabold">
+                          {REPORTS_TO_MAP[rec.name] || 'Amit Verma'}
+                        </span>
                       </div>
                     </td>
                     <td className="py-4 px-6">
@@ -220,7 +240,7 @@ export default function CompanyAdminRecruiters({ recruitersList, onAddRecruiter,
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-app-muted text-sm font-medium">
+                  <td colSpan={8} className="py-12 text-center text-app-muted text-sm font-medium">
                     <Users className="w-10 h-10 mx-auto text-app-border mb-3" />
                     No recruiters found matching your search.
                   </td>

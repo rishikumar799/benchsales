@@ -73,7 +73,7 @@ export default function RecruiterDashboardTab({
               onClick={() => onNavigate('applications')}
               className="px-5 py-2.5 bg-white text-brand-blue font-bold text-xs rounded-xl hover:bg-opacity-95 transform active:scale-95 transition-all shadow-md active:shadow-sm flex items-center gap-2 cursor-pointer"
             >
-              Review Applications <ArrowRight className="w-4 h-4 text-brand-blue" />
+              Review Submissions <ArrowRight className="w-4 h-4 text-brand-blue" />
             </button>
           </div>
         </div>
@@ -87,7 +87,7 @@ export default function RecruiterDashboardTab({
         {[
           { icon: Briefcase, label: 'Active Jobs', value: stats.activeJobs.toString(), change: '+3 from last week', color: 'text-violet-500', bg: 'bg-violet-500/10' },
           { icon: Users, label: 'Total Candidates', value: stats.totalCandidates.toString(), change: '+18 from last week', color: 'text-blue-500', bg: 'bg-blue-500/10' },
-          { icon: FileText, label: 'Applications', value: stats.applications.toString(), change: '+56 from last week', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+          { icon: FileText, label: 'Submissions', value: stats.applications.toString(), change: '+56 from last week', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
           { icon: CheckSquare, label: 'Open Positions', value: stats.openPositions.toString(), change: '+5 from last week', color: 'text-amber-500', bg: 'bg-amber-500/10' }
         ].map((st, idx) => (
           <div key={idx} className="p-5 md:p-6 rounded-[28px] bg-app-surface border border-app-border card-shadow flex items-start justify-between hover:border-brand-blue/30 transition-all duration-200">
@@ -147,10 +147,10 @@ export default function RecruiterDashboardTab({
           </div>
         </div>
 
-        {/* Recent Applications Box (Right column, span 6) */}
+        {/* Recent Submissions Box (Right column, span 6) */}
         <div className="lg:col-span-6 p-6 md:p-8 rounded-[32px] bg-app-surface border border-app-border card-shadow space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-display font-black text-app-text">Recent Applications</h3>
+            <h3 className="text-base font-display font-black text-app-text">Recent Submissions</h3>
             <button 
               onClick={() => onNavigate('applications')}
               className="text-xs font-bold text-brand-blue hover:underline cursor-pointer"

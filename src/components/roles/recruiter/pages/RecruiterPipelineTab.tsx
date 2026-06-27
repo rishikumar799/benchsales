@@ -29,18 +29,24 @@ interface RecruiterPipelineTabProps {
   }>;
   onUpdateStatus: (id: string, status: 'Applied' | 'Under Review' | 'Shortlisted' | 'Interview' | 'Selected' | 'Rejected') => void;
   onSelectCandidate: (id: string) => void;
+  selectedJob?: string;
+  setSelectedJob?: (job: string) => void;
 }
 
 export default function RecruiterPipelineTab({
   onNavigate,
   candidates,
   onUpdateStatus,
-  onSelectCandidate
+  onSelectCandidate,
+  selectedJob: propsSelectedJob,
+  setSelectedJob: propsSetSelectedJob
 }: RecruiterPipelineTabProps) {
-  const [selectedJob, setSelectedJob] = useState('All');
+  const [localSelectedJob, setLocalSelectedJob] = useState('All');
+  const activeJob = propsSelectedJob !== undefined ? propsSelectedJob : localSelectedJob;
+  const setActiveJob = propsSetSelectedJob !== undefined ? propsSetSelectedJob : setLocalSelectedJob;
 
   const stages: Array<{
-    id: 'Applied' | 'Under Review' | 'Shortlisted' | 'Interview' | 'Selected';
+    id: 'Applied' | 'Under Review' | 'Shortlisted' | 'Interview' | 'Selected' | 'Rejected';
     label: string;
     totalCount: number;
     extraLabel: string;
@@ -51,13 +57,14 @@ export default function RecruiterPipelineTab({
     { id: 'Under Review', label: 'Under Review', totalCount: 128, extraLabel: '125 more', color: 'text-violet-500', barColor: 'bg-violet-500' },
     { id: 'Shortlisted', label: 'Shortlisted', totalCount: 96, extraLabel: '93 more', color: 'text-pink-500', barColor: 'bg-pink-500' },
     { id: 'Interview', label: 'Interview', totalCount: 32, extraLabel: '29 more', color: 'text-amber-500', barColor: 'bg-amber-500' },
-    { id: 'Selected', label: 'Selected', totalCount: 18, extraLabel: '15 more', color: 'text-emerald-500', barColor: 'bg-emerald-500' }
+    { id: 'Selected', label: 'Selected', totalCount: 18, extraLabel: '15 more', color: 'text-emerald-500', barColor: 'bg-emerald-500' },
+    { id: 'Rejected', label: 'Rejected', totalCount: 12, extraLabel: '10 more', color: 'text-rose-500', barColor: 'bg-rose-500' }
   ];
 
   const getStageCandidates = (status: string) => {
     return candidates.filter(c => {
       const matchesStatus = c.status === status;
-      const matchesJob = selectedJob === 'All' || c.role === selectedJob;
+      const matchesJob = activeJob === 'All' || c.role === activeJob;
       return matchesStatus && matchesJob;
     });
   };
@@ -66,8 +73,8 @@ export default function RecruiterPipelineTab({
 
   // Define transition sequences
   const moveCard = (id: string, currentStatus: string, dir: 'left' | 'right') => {
-    const sequence: Array<'Applied' | 'Under Review' | 'Shortlisted' | 'Interview' | 'Selected'> = [
-      'Applied', 'Under Review', 'Shortlisted', 'Interview', 'Selected'
+    const sequence: Array<'Applied' | 'Under Review' | 'Shortlisted' | 'Interview' | 'Selected' | 'Rejected'> = [
+      'Applied', 'Under Review', 'Shortlisted', 'Interview', 'Selected', 'Rejected'
     ];
     const currentIdx = sequence.indexOf(currentStatus as any);
     if (currentIdx === -1) return;
@@ -92,8 +99,8 @@ export default function RecruiterPipelineTab({
         {/* Dropdown Job selector */}
         <div className="relative">
           <select 
-            value={selectedJob}
-            onChange={(e) => setSelectedJob(e.target.value)}
+            value={activeJob}
+            onChange={(e) => setActiveJob(e.target.value)}
             className="appearance-none pl-4 pr-10 py-2.5 bg-app-surface border border-app-border text-xs font-bold text-app-text rounded-xl focus:outline-none focus:border-brand-blue cursor-pointer"
           >
             <option value="All">All Jobs</option>
@@ -106,7 +113,7 @@ export default function RecruiterPipelineTab({
       </div>
 
       {/* Kanban Board Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 overflow-x-auto pb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6 overflow-x-auto pb-4">
         {stages.map((stage) => {
           const stageList = getStageCandidates(stage.id);
           return (

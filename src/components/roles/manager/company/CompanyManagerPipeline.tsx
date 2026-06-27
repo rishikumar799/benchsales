@@ -29,22 +29,22 @@ interface CandidateType {
 
 export default function CompanyManagerPipeline() {
   
-  // Real stats of stages matching the screenshot exactly
+  // Real stats of stages matching the requested workflow
   const stages = [
-    { label: 'Applied', value: 1246, pct: '100%', color: 'from-blue-600 to-blue-500' },
-    { label: 'Under Review', value: 382, pct: '30.6%', color: 'from-amber-500 to-amber-400' },
-    { label: 'Shortlisted', value: 188, pct: '15.0%', color: 'from-teal-500 to-teal-400' },
-    { label: 'Interview', value: 94, pct: '7.5%', color: 'from-indigo-600 to-indigo-500' },
-    { label: 'Selected', value: 28, pct: '2.2%', color: 'from-emerald-600 to-emerald-500' },
+    { label: 'Jobs', value: 18, pct: '100%', color: 'from-blue-600 to-blue-500', displayMetric: 'Openings' },
+    { label: 'Recruiters Assigned', value: 4, pct: '100%', color: 'from-amber-500 to-amber-400', displayMetric: 'Recruiters' },
+    { label: 'Submissions Received', value: 842, pct: '100%', color: 'from-teal-500 to-teal-400', displayMetric: 'Submissions' },
+    { label: 'Interviews Created', value: 94, pct: '11.1%', color: 'from-indigo-600 to-indigo-500', displayMetric: 'Interviews' },
+    { label: 'Selected / Hired', value: 28, pct: '3.3%', color: 'from-emerald-600 to-emerald-500', displayMetric: 'Hires' },
   ];
 
-  // Pipeline by Department dataset from the screenshot
+  // Pipeline by Department dataset matching total submissions 842
   const deptData = [
-    { name: 'Engineering', value: 773, percent: '62%', color: '#3b82f6' },
-    { name: 'Product', value: 187, percent: '15%', color: '#10b981' },
-    { name: 'Data Science', value: 125, percent: '10%', color: '#8b5cf6' },
-    { name: 'Design', value: 87, percent: '7%', color: '#ec4899' },
-    { name: 'Others', value: 74, percent: '6%', color: '#6b7280' },
+    { name: 'Engineering', value: 522, percent: '62%', color: '#3b82f6' },
+    { name: 'Product', value: 126, percent: '15%', color: '#10b981' },
+    { name: 'Data Science', value: 84, percent: '10%', color: '#8b5cf6' },
+    { name: 'Design', value: 59, percent: '7%', color: '#ec4899' },
+    { name: 'Others', value: 51, percent: '6%', color: '#6b7280' },
   ];
 
   // Traditional Custom tooltips for Recharts
@@ -53,7 +53,7 @@ export default function CompanyManagerPipeline() {
       return (
         <div className="bg-app-bg border border-app-border p-3.5 rounded-2xl font-bold text-xs shadow-xl">
           <p className="text-app-text">{payload[0].name}</p>
-          <p className="text-brand-blue mt-1 font-extrabold">{payload[0].value} Candidates ({payload[0].payload.percent})</p>
+          <p className="text-brand-blue mt-1 font-extrabold">{payload[0].value} Submissions ({payload[0].payload.percent})</p>
         </div>
       );
     }
@@ -67,19 +67,105 @@ export default function CompanyManagerPipeline() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-display font-black text-app-text tracking-tight">Hiring Pipeline</h1>
-          <p className="text-app-muted text-sm font-medium mt-1">Track the hiring funnel distribution and throughput across all divisions.</p>
+          <p className="text-app-muted text-sm font-medium mt-1">Track the hiring funnel distribution and recruiter submission throughput across all active divisions.</p>
         </div>
       </div>
 
       {/* Stage Indicators */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {stages.map((st, sIdx) => (
-          <div key={sIdx} className="p-4 rounded-2xl bg-app-surface/50 border border-app-border text-center">
-            <span className="text-[10px] font-extrabold text-app-muted uppercase tracking-widest">{st.label}</span>
-            <div className="text-2xl font-display font-black text-app-text mt-1.5">{st.value.toLocaleString()}</div>
-            <div className="text-[10px] text-brand-blue font-bold mt-1">Yield: {st.pct}</div>
-          </div>
-        ))}
+        {stages.map((st, sIdx) => {
+          const stageConfigs = [
+            {
+              icon: Briefcase,
+              accentColor: 'text-blue-500',
+              accentBg: 'bg-blue-500/10 border-blue-500/20',
+              glow: 'bg-blue-500/5',
+              hoverBorder: 'hover:border-blue-500/30'
+            },
+            {
+              icon: Layers,
+              accentColor: 'text-amber-500',
+              accentBg: 'bg-amber-500/10 border-amber-500/20',
+              glow: 'bg-amber-500/5',
+              hoverBorder: 'hover:border-amber-500/30'
+            },
+            {
+              icon: GitPullRequest,
+              accentColor: 'text-teal-500',
+              accentBg: 'bg-teal-500/10 border-teal-500/20',
+              glow: 'bg-teal-500/5',
+              hoverBorder: 'hover:border-teal-500/30'
+            },
+            {
+              icon: Target,
+              accentColor: 'text-indigo-500',
+              accentBg: 'bg-indigo-500/10 border-indigo-500/20',
+              glow: 'bg-indigo-500/5',
+              hoverBorder: 'hover:border-indigo-500/30'
+            },
+            {
+              icon: Award,
+              accentColor: 'text-emerald-500',
+              accentBg: 'bg-emerald-500/10 border-emerald-500/20',
+              glow: 'bg-emerald-500/5',
+              hoverBorder: 'hover:border-emerald-500/30'
+            }
+          ];
+
+          const config = stageConfigs[sIdx] || stageConfigs[0];
+          const isConversion = st.label === 'Selected / Hired' || st.label === 'Interviews Created';
+          
+          let cardHeader = st.label.toUpperCase();
+          let cardSubHeader = "";
+          if (st.label === 'Recruiters Assigned') {
+            cardHeader = "RECRUITERS";
+            cardSubHeader = "ASSIGNED";
+          } else if (st.label === 'Submissions Received') {
+            cardHeader = "SUBMISSIONS";
+            cardSubHeader = "RECEIVED";
+          } else if (st.label === 'Interviews Created') {
+            cardHeader = "INTERVIEWS CREATED";
+          } else if (st.label === 'Selected / Hired') {
+            cardHeader = "SELECTED / HIRED";
+          } else if (st.label === 'Jobs') {
+            cardHeader = "JOBS";
+          }
+
+          return (
+            <div 
+              key={sIdx} 
+              className={`relative overflow-hidden p-5 rounded-[24px] bg-gradient-to-b from-app-surface/90 to-app-surface/40 border border-app-border/80 ${config.hoverBorder} text-center flex flex-col justify-between items-center min-h-[155px] transition-all duration-300 transform hover:-translate-y-1 hover:shadow-[0_12px_24px_-10px_rgba(59,130,246,0.15)] group`}
+            >
+              {/* Decorative radial background glow */}
+              <div className={`absolute -right-6 -top-6 w-16 h-16 rounded-full ${config.glow} blur-xl group-hover:scale-150 transition-all duration-500`} />
+              
+              {/* Card Header Label */}
+              <div className="flex flex-col items-center gap-0.5 w-full z-10">
+                <span className="text-[10px] font-black tracking-wider text-app-muted uppercase leading-none">{cardHeader}</span>
+                {cardSubHeader && (
+                  <span className="text-[9px] font-extrabold tracking-widest text-app-muted/80 uppercase mt-0.5 leading-none">{cardSubHeader}</span>
+                )}
+              </div>
+
+              {/* Central Value */}
+              <div className="my-3 flex items-baseline justify-center gap-1.5 z-10">
+                <span className="text-3xl font-display font-black text-app-text tracking-tight group-hover:scale-105 transition-transform duration-300">
+                  {st.value.toLocaleString()}
+                </span>
+                <span className="text-[10px] font-bold text-app-muted lowercase">
+                  {st.displayMetric}
+                </span>
+              </div>
+
+              {/* Premium Footer Accent */}
+              <div className="w-full pt-2 border-t border-app-border/30 z-10">
+                <span className="text-[10px] font-black tracking-wide text-brand-blue uppercase">
+                  {isConversion ? `Conversion: ${st.pct}` : 'Stage Capacity'}
+                </span>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Pipeline Analytics Panels */}
@@ -91,7 +177,7 @@ export default function CompanyManagerPipeline() {
           <div className="space-y-4">
             {stages.map((st, i) => {
               // Calculate width based on proportion
-              const maxWidths = [100, 80, 64, 48, 32];
+              const maxWidths = [100, 90, 80, 60, 40];
               const widthPct = `${maxWidths[i]}%`;
               return (
                 <div key={i} className="flex items-center gap-4">
@@ -101,7 +187,7 @@ export default function CompanyManagerPipeline() {
                       className={`h-9 rounded-xl bg-gradient-to-r ${st.color} flex items-center justify-between px-4 text-white text-xs font-bold transition-all hover:brightness-105 duration-300`}
                       style={{ width: widthPct }}
                     >
-                      <span>{st.value.toLocaleString()}</span>
+                      <span>{st.value.toLocaleString()} {st.displayMetric}</span>
                       <span>{st.pct}</span>
                     </div>
                   </div>
@@ -110,7 +196,7 @@ export default function CompanyManagerPipeline() {
             })}
           </div>
           <div className="mt-8 p-4 rounded-2xl bg-app-surface/40 border border-app-border text-xs text-app-muted font-medium leading-relaxed">
-            💡 <strong className="text-app-text">Throughput Indicator:</strong> The progression from Applied to Selected shows a steady 2.2% conversion yield, in line with company SLA targets for Engineering and Data hires.
+            💡 <strong className="text-app-text">Throughput Indicator:</strong> The progression from Submissions to Selected/Hired shows a steady 3.3% conversion yield, in line with company SLA targets for ecosystem sourcing.
           </div>
         </div>
 
@@ -143,8 +229,8 @@ export default function CompanyManagerPipeline() {
                 </ResponsiveContainer>
                 {/* Center text metrics */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <div className="text-2xl font-display font-black text-app-text leading-none">1,246</div>
-                  <div className="text-[10px] font-bold text-app-muted uppercase tracking-wider mt-1">Total Pool</div>
+                  <div className="text-2xl font-display font-black text-app-text leading-none">842</div>
+                  <div className="text-[10px] font-bold text-app-muted uppercase tracking-wider mt-1">Submissions</div>
                 </div>
               </div>
 

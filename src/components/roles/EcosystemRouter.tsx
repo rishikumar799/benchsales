@@ -190,6 +190,10 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
     status: 'Applied' | 'Under Review' | 'Shortlisted' | 'Interview' | 'Selected' | 'Rejected';
     appliedDate: string;
     dept: string;
+    assignedRecruiterId?: string;
+    assignedByAdmin?: string;
+    assignedDate?: string;
+    assignedJobs?: string[];
   }>>([
     {
       id: 'c-1',
@@ -205,7 +209,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
       about: 'Experienced software engineer with a strong background in building scalable web applications using modern technologies. Passionate about problem solving and clean code.',
       status: 'Applied',
       appliedDate: '25 May 25',
-      dept: 'Engineering'
+      dept: 'Engineering',
+      assignedRecruiterId: 'rec-1',
+      assignedByAdmin: 'Amit Sen (Company Admin)',
+      assignedDate: '24 May 25',
+      assignedJobs: ['Senior Software Engineer']
     },
     {
       id: 'c-2',
@@ -221,7 +229,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
       about: 'Cloud professional focused on deploying high-availability architectures and automating software delivery pipelines.',
       status: 'Under Review',
       appliedDate: '25 May 25',
-      dept: 'Infrastructure'
+      dept: 'Infrastructure',
+      assignedRecruiterId: 'rec-1',
+      assignedByAdmin: 'Amit Sen (Company Admin)',
+      assignedDate: '24 May 25',
+      assignedJobs: ['Cloud Engineer']
     },
     {
       id: 'c-3',
@@ -237,7 +249,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
       about: 'Passionate team lead with experience architecting backend systems and spearheading multi-engineer platform squads.',
       status: 'Shortlisted',
       appliedDate: '24 May 25',
-      dept: 'Engineering'
+      dept: 'Engineering',
+      assignedRecruiterId: 'rec-1',
+      assignedByAdmin: 'Amit Sen (Company Admin)',
+      assignedDate: '24 May 25',
+      assignedJobs: ['Tech Lead']
     },
     {
       id: 'c-4',
@@ -253,7 +269,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
       about: 'Detail-oriented data analyst specialized in transforming complex query results into intuitive visual intelligence boards.',
       status: 'Interview',
       appliedDate: '24 May 25',
-      dept: 'Data'
+      dept: 'Data',
+      assignedRecruiterId: 'rec-1',
+      assignedByAdmin: 'Amit Sen (Company Admin)',
+      assignedDate: '24 May 25',
+      assignedJobs: ['Data Analyst']
     },
     {
       id: 'c-5',
@@ -269,7 +289,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
       about: 'DevOps professional passionate about robust infrastructure automation, safety alerts, and continuous deployment.',
       status: 'Applied',
       appliedDate: '23 May 25',
-      dept: 'Infrastructure'
+      dept: 'Infrastructure',
+      assignedRecruiterId: 'rec-1',
+      assignedByAdmin: 'Amit Sen (Company Admin)',
+      assignedDate: '24 May 25',
+      assignedJobs: ['DevOps Engineer']
     },
     {
       id: 'c-6',
@@ -285,9 +309,15 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
       about: 'Experienced architect specializing in scalable microservices development and containerized system orchestration.',
       status: 'Selected',
       appliedDate: '22 May 25',
-      dept: 'Engineering'
+      dept: 'Engineering',
+      assignedRecruiterId: 'rec-1',
+      assignedByAdmin: 'Amit Sen (Company Admin)',
+      assignedDate: '24 May 25',
+      assignedJobs: ['Tech Lead']
     }
   ]);
+
+  const [recruiterSelectedPipelineJob, setRecruiterSelectedPipelineJob] = useState('All');
 
   // Company Manager (c_manager) stateful data
   const [managerJobsList, setManagerJobsList] = useState<Array<{
@@ -380,6 +410,8 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
       recruitersCount: 5,
       submissionsCount: 18,
       status: 'Active' as const,
+      assignmentMode: 'restricted' as const,
+      assignedRecruiters: ['rec-1', 'rec-2', 'rec-3', 'rec-4', 'rec-5'],
     },
     {
       id: 'job-2',
@@ -392,6 +424,8 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
       recruitersCount: 3,
       submissionsCount: 12,
       status: 'Active' as const,
+      assignmentMode: 'open' as const,
+      assignedRecruiters: [] as string[],
     },
     {
       id: 'job-3',
@@ -404,6 +438,8 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
       recruitersCount: 2,
       submissionsCount: 8,
       status: 'Active' as const,
+      assignmentMode: 'restricted' as const,
+      assignedRecruiters: ['rec-2', 'rec-3'],
     },
     {
       id: 'job-4',
@@ -416,6 +452,8 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
       recruitersCount: 4,
       submissionsCount: 15,
       status: 'Active' as const,
+      assignmentMode: 'open' as const,
+      assignedRecruiters: [] as string[],
     }
   ]);
   const [editingMManagerJob, setEditingMManagerJob] = useState<any | null>(null);
@@ -697,7 +735,10 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
             skills: jobData.skills,
             location: jobData.location,
             openings: jobData.openings,
-            status: jobData.status
+            status: jobData.status,
+            assignmentMode: jobData.assignmentMode || 'open',
+            assignedRecruiters: jobData.assignedRecruiters || [],
+            recruitersCount: jobData.assignmentMode === 'restricted' ? (jobData.assignedRecruiters?.length || 0) : job.recruitersCount
           };
         }
         return job;
@@ -713,9 +754,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
         skills: jobData.skills,
         location: jobData.location,
         openings: jobData.openings,
-        recruitersCount: 0,
+        recruitersCount: jobData.assignmentMode === 'restricted' ? (jobData.assignedRecruiters?.length || 0) : 5, // default to 5 if open
         submissionsCount: 0,
-        status: jobData.status
+        status: jobData.status,
+        assignmentMode: jobData.assignmentMode || 'open',
+        assignedRecruiters: jobData.assignedRecruiters || []
       };
       setMManagerJobs([newJob, ...mManagerJobs]);
       setSuccessMsg('Requirement Published on Marketplace Sourcing Partners!');
@@ -841,7 +884,7 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
         <div className="space-y-6">
           {activeTab === 'dashboard' && <DashboardTab onNavigate={(tab) => setActiveTab?.(tab)} />}
           {activeTab === 'jobs' && <JobsTab />}
-          {activeTab === 'ai_matching' && <AiMatchingTab />}
+          {activeTab === 'ai_matching' && <AiMatchingTab onNavigate={(tab) => setActiveTab?.(tab)} />}
           {activeTab === 'resume_builder' && <ResumeBuilderTab />}
           {activeTab === 'applications' && <ApplicationsTab />}
           {activeTab === 'documents' && <DocumentsTab />}
@@ -1498,135 +1541,155 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
       {/* ==================================================== */}
       {/* 9. INTERNAL RECRUITER (c_recruiter) */}
       {/* ==================================================== */}
-      {role === 'c_recruiter' && (
-        <div className="space-y-6">
-          {activeTab === 'dashboard' && (
-            <CorpRecruiterDashboardTab 
-              onNavigate={(tab) => {
-                if (setActiveTab) setActiveTab(tab);
-              }}
-              onSelectCandidate={(candidateId) => {
-                setRecruiterActiveCandidateId(candidateId);
-                if (setActiveTab) setActiveTab('candidates');
-              }}
-              stats={{
-                activeJobs: recruiterJobsList.filter(j => j.status === 'Active').length,
-                totalCandidates: recruiterCandidatesList.length,
-                applications: recruiterCandidatesList.length,
-                openPositions: recruiterJobsList.reduce((acc, curr) => acc + curr.openings, 0)
-              }}
-              activeJobsList={recruiterJobsList}
-              recentApplications={recruiterCandidatesList.map(c => ({
-                id: c.id,
-                candidateName: c.name,
-                role: c.role,
-                date: c.appliedDate,
-                status: c.status
-              })).slice(0, 3)}
-              hiringProgress={{
-                applied: recruiterCandidatesList.filter(c => c.status === 'Applied').length,
-                underReview: recruiterCandidatesList.filter(c => c.status === 'Under Review').length,
-                shortlisted: recruiterCandidatesList.filter(c => c.status === 'Shortlisted').length,
-                interview: recruiterCandidatesList.filter(c => c.status === 'Interview').length,
-                selected: recruiterCandidatesList.filter(c => c.status === 'Selected').length
-              }}
-            />
-          )}
+      {role === 'c_recruiter' && (() => {
+        const assignedCandidates = recruiterCandidatesList.filter(c => c.assignedRecruiterId === 'rec-1');
+        return (
+          <div className="space-y-6">
+            {activeTab === 'dashboard' && (
+              <CorpRecruiterDashboardTab 
+                onNavigate={(tab) => {
+                  if (setActiveTab) setActiveTab(tab);
+                }}
+                onSelectCandidate={(candidateId) => {
+                  setRecruiterActiveCandidateId(candidateId);
+                  if (setActiveTab) setActiveTab('candidates');
+                }}
+                stats={{
+                  activeJobs: recruiterJobsList.filter(j => j.status === 'Active').length,
+                  totalCandidates: assignedCandidates.length,
+                  applications: assignedCandidates.length,
+                  openPositions: recruiterJobsList.reduce((acc, curr) => acc + curr.openings, 0)
+                }}
+                activeJobsList={recruiterJobsList}
+                recentApplications={assignedCandidates.map(c => ({
+                  id: c.id,
+                  candidateName: c.name,
+                  role: c.role,
+                  date: c.appliedDate,
+                  status: c.status
+                })).slice(0, 3)}
+                hiringProgress={{
+                  applied: assignedCandidates.filter(c => c.status === 'Applied').length,
+                  underReview: assignedCandidates.filter(c => c.status === 'Under Review').length,
+                  shortlisted: assignedCandidates.filter(c => c.status === 'Shortlisted').length,
+                  interview: assignedCandidates.filter(c => c.status === 'Interview').length,
+                  selected: assignedCandidates.filter(c => c.status === 'Selected').length
+                }}
+              />
+            )}
 
-          {activeTab === 'jobs' && (
-            <CorpRecruiterJobsTab 
-              onNavigate={(tab) => {
-                if (setActiveTab) setActiveTab(tab);
-              }}
-              jobs={recruiterJobsList}
-              onAddJob={(newJob) => {
-                const jobWithId = {
-                  ...newJob,
-                  id: `job-${recruiterJobsList.length + 1}`,
-                  applicationsCount: 0
-                };
-                setRecruiterJobsList([jobWithId, ...recruiterJobsList]);
-                setSuccessMsg(`Successfully created job opening "${newJob.title}"`);
-                setTimeout(() => setSuccessMsg(''), 4000);
-              }}
-            />
-          )}
-
-          {activeTab === 'candidates' && (
-            <CorpRecruiterCandidatesTab 
-              candidates={recruiterCandidatesList}
-              selectedCandidateId={recruiterActiveCandidateId}
-              onSelectCandidate={(id) => setRecruiterActiveCandidateId(id)}
-              onUpdateStatus={(id, status) => {
-                const updatedList = recruiterCandidatesList.map(cand => {
-                  if (cand.id === id) {
-                    return { ...cand, status };
+            {activeTab === 'jobs' && (
+              <CorpRecruiterJobsTab 
+                onNavigate={(tab, jobFilter) => {
+                  if (jobFilter) {
+                    setRecruiterSelectedPipelineJob(jobFilter);
+                  } else {
+                    setRecruiterSelectedPipelineJob('All');
                   }
-                  return cand;
-                });
-                setRecruiterCandidatesList(updatedList);
-                const candName = recruiterCandidatesList.find(c => c.id === id)?.name || 'Candidate';
-                setSuccessMsg(`Updated status of ${candName} to "${status}"`);
-                setTimeout(() => setSuccessMsg(''), 4000);
-              }}
-            />
-          )}
+                  if (setActiveTab) setActiveTab(tab);
+                }}
+                jobs={recruiterJobsList}
+                onAddJob={(newJob) => {
+                  const jobWithId = {
+                    ...newJob,
+                    id: `job-${recruiterJobsList.length + 1}`,
+                    applicationsCount: 0
+                  };
+                  setRecruiterJobsList([jobWithId, ...recruiterJobsList]);
+                  setSuccessMsg(`Successfully created job opening "${newJob.title}"`);
+                  setTimeout(() => setSuccessMsg(''), 4000);
+                }}
+                onUpdateJob={(updatedJob) => {
+                  setRecruiterJobsList(recruiterJobsList.map(j => j.id === updatedJob.id ? updatedJob : j));
+                  setSuccessMsg(`Successfully updated job opening "${updatedJob.title}"`);
+                  setTimeout(() => setSuccessMsg(''), 4000);
+                }}
+              />
+            )}
 
-          {activeTab === 'applications' && (
-            <CorpRecruiterApplicationsTab 
-              onNavigate={(tab) => {
-                if (setActiveTab) setActiveTab(tab);
-              }}
-              applications={recruiterCandidatesList.map(c => ({
-                id: c.id,
-                candidateName: c.name,
-                role: c.role,
-                date: c.appliedDate,
-                status: c.status,
-                dept: c.dept
-              }))}
-              onSelectCandidate={(id) => setRecruiterActiveCandidateId(id)}
-              hiringProgress={{
-                applied: recruiterCandidatesList.filter(c => c.status === 'Applied').length,
-                underReview: recruiterCandidatesList.filter(c => c.status === 'Under Review').length,
-                shortlisted: recruiterCandidatesList.filter(c => c.status === 'Shortlisted').length,
-                interview: recruiterCandidatesList.filter(c => c.status === 'Interview').length,
-                selected: recruiterCandidatesList.filter(c => c.status === 'Selected').length
-              }}
-            />
-          )}
+            {activeTab === 'candidates' && (
+              <CorpRecruiterCandidatesTab 
+                candidates={assignedCandidates}
+                selectedCandidateId={recruiterActiveCandidateId}
+                onSelectCandidate={(id) => setRecruiterActiveCandidateId(id)}
+                onUpdateStatus={(id, status) => {
+                  const updatedList = recruiterCandidatesList.map(cand => {
+                    if (cand.id === id) {
+                      return { ...cand, status };
+                    }
+                    return cand;
+                  });
+                  setRecruiterCandidatesList(updatedList);
+                  const candName = recruiterCandidatesList.find(c => c.id === id)?.name || 'Candidate';
+                  setSuccessMsg(`Updated status of ${candName} to "${status}"`);
+                  setTimeout(() => setSuccessMsg(''), 4000);
+                }}
+              />
+            )}
 
-          {activeTab === 'pipeline' && (
-            <CorpRecruiterPipelineTab 
-              onNavigate={(tab) => {
-                if (setActiveTab) setActiveTab(tab);
-              }}
-              candidates={recruiterCandidatesList.filter(c => c.status !== 'Rejected')}
-              onUpdateStatus={(id, status) => {
-                const updatedList = recruiterCandidatesList.map(cand => {
-                  if (cand.id === id) {
-                    return { ...cand, status };
+            {activeTab === 'applications' && (
+              <CorpRecruiterApplicationsTab 
+                onNavigate={(tab, jobFilter) => {
+                  if (jobFilter) {
+                    setRecruiterSelectedPipelineJob(jobFilter);
+                  } else {
+                    setRecruiterSelectedPipelineJob('All');
                   }
-                  return cand;
-                });
-                setRecruiterCandidatesList(updatedList);
-                const candName = recruiterCandidatesList.find(c => c.id === id)?.name || 'Candidate';
-                setSuccessMsg(`Successfully moved ${candName} to "${status}"`);
-                setTimeout(() => setSuccessMsg(''), 4000);
-              }}
-              onSelectCandidate={(id) => setRecruiterActiveCandidateId(id)}
-            />
-          )}
+                  if (setActiveTab) setActiveTab(tab);
+                }}
+                applications={assignedCandidates.map(c => ({
+                  id: c.id,
+                  candidateName: c.name,
+                  role: c.role,
+                  date: c.appliedDate,
+                  status: c.status,
+                  dept: c.dept
+                }))}
+                onSelectCandidate={(id) => setRecruiterActiveCandidateId(id)}
+                hiringProgress={{
+                  applied: assignedCandidates.filter(c => c.status === 'Applied').length,
+                  underReview: assignedCandidates.filter(c => c.status === 'Under Review').length,
+                  shortlisted: assignedCandidates.filter(c => c.status === 'Shortlisted').length,
+                  interview: assignedCandidates.filter(c => c.status === 'Interview').length,
+                  selected: assignedCandidates.filter(c => c.status === 'Selected').length
+                }}
+              />
+            )}
 
-          {activeTab === 'analytics' && (
-            <CorpRecruiterAnalyticsTab />
-          )}
+            {activeTab === 'pipeline' && (
+              <CorpRecruiterPipelineTab 
+                onNavigate={(tab) => {
+                  if (setActiveTab) setActiveTab(tab);
+                }}
+                candidates={assignedCandidates}
+                onUpdateStatus={(id, status) => {
+                  const updatedList = recruiterCandidatesList.map(cand => {
+                    if (cand.id === id) {
+                      return { ...cand, status };
+                    }
+                    return cand;
+                  });
+                  setRecruiterCandidatesList(updatedList);
+                  const candName = recruiterCandidatesList.find(c => c.id === id)?.name || 'Candidate';
+                  setSuccessMsg(`Successfully moved ${candName} to "${status}"`);
+                  setTimeout(() => setSuccessMsg(''), 4000);
+                }}
+                onSelectCandidate={(id) => setRecruiterActiveCandidateId(id)}
+                selectedJob={recruiterSelectedPipelineJob}
+                setSelectedJob={setRecruiterSelectedPipelineJob}
+              />
+            )}
 
-          {activeTab === 'profile' && (
-            <CorpRecruiterProfileTab />
-          )}
-        </div>
-      )}
+            {activeTab === 'analytics' && (
+              <CorpRecruiterAnalyticsTab />
+            )}
+
+            {activeTab === 'profile' && (
+              <CorpRecruiterProfileTab />
+            )}
+          </div>
+        );
+      })()}
 
       {/* ==================================================== */}
       {/* 10. EMPLOYEE (c_employee) */}

@@ -12,7 +12,8 @@ import {
   SlidersHorizontal,
   ChevronRight,
   Eye,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react';
 
 interface JobType {
@@ -37,6 +38,73 @@ interface CompanyManagerJobsProps {
   onViewPipelineClick: (jobTitle: string) => void;
 }
 
+const RECRUITER_PROFILES: Record<string, {
+  name: string;
+  dept: string;
+  avatar: string;
+  email: string;
+  activeJobs: number;
+  submissions: number;
+  shortlisted: number;
+  interviews: number;
+  hires: number;
+  lastActive: string;
+  assignedJobs: string[];
+}> = {
+  'Priya Sharma': {
+    name: 'Priya Sharma',
+    dept: 'Engineering Dept.',
+    avatar: 'https://picsum.photos/seed/priya/100/100',
+    email: 'priya.sharma@company.com',
+    activeJobs: 4,
+    submissions: 248,
+    shortlisted: 54,
+    interviews: 26,
+    hires: 8,
+    lastActive: '2 hrs ago',
+    assignedJobs: ['Senior Software Engineer', 'Cloud Engineer', 'Tech Lead', 'Data Scientist']
+  },
+  'Rahul Verma': {
+    name: 'Rahul Verma',
+    dept: 'Infrastructure Dept.',
+    avatar: 'https://picsum.photos/seed/rahulv/100/100',
+    email: 'rahul.verma@company.com',
+    activeJobs: 3,
+    submissions: 186,
+    shortlisted: 36,
+    interviews: 18,
+    hires: 6,
+    lastActive: '4 hrs ago',
+    assignedJobs: ['Senior Software Engineer', 'Cloud Engineer', 'DevOps Engineer']
+  },
+  'Neha Patel': {
+    name: 'Neha Patel',
+    dept: 'Engineering Dept.',
+    avatar: 'https://picsum.photos/seed/nehap/100/100',
+    email: 'neha.patel@company.com',
+    activeJobs: 5,
+    submissions: 310,
+    shortlisted: 68,
+    interviews: 30,
+    hires: 9,
+    lastActive: 'Just now',
+    assignedJobs: ['Senior Software Engineer', 'Tech Lead', 'Data Scientist', 'DevOps Engineer']
+  },
+  'Amit Singh': {
+    name: 'Amit Singh',
+    dept: 'Engineering Dept.',
+    avatar: 'https://picsum.photos/seed/amits/100/100',
+    email: 'amit.singh@company.com',
+    activeJobs: 2,
+    submissions: 142,
+    shortlisted: 22,
+    interviews: 12,
+    hires: 3,
+    lastActive: '1 day ago',
+    assignedJobs: ['Data Scientist', 'DevOps Engineer']
+  },
+};
+
 export default function CompanyManagerJobs({ 
   jobsList, 
   onAddJobClick, 
@@ -48,6 +116,7 @@ export default function CompanyManagerJobs({
   const [searchQuery, setSearchQuery] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [selectedRecruiter, setSelectedRecruiter] = useState<any | null>(null);
 
   // Filter list
   const filteredJobs = jobsList.filter(job => {
@@ -87,7 +156,7 @@ export default function CompanyManagerJobs({
         </div>
         <button 
           onClick={onAddJobClick}
-          className="px-5 py-3 bg-brand-blue hover:bg-brand-blue/90 text-white font-extrabold rounded-2xl flex items-center gap-2 text-xs transition-colors shadow-lg shadow-brand-blue/20 shrink-0"
+          className="px-5 py-3 bg-brand-blue hover:bg-brand-blue/90 text-white font-extrabold rounded-2xl flex items-center gap-2 text-xs transition-colors shadow-lg shadow-brand-blue/20 shrink-0 cursor-pointer"
         >
           <Plus className="w-4 h-4 stroke-[3px]" /> Create Job
         </button>
@@ -177,11 +246,104 @@ export default function CompanyManagerJobs({
                     <span>Experience: {job.experience}</span>
                   </div>
 
-                  {/* Assigned Recruiters details */}
-                  <div className="text-xs font-semibold text-app-muted mt-3">
-                    <span className="text-brand-violet font-bold">Recruiters: </span>
-                    {job.recruitersAssigned.join(', ')}
-                  </div>
+                  {/* Assigned Recruiters with avatars and click profile logic */}
+                  {job.recruitersAssigned && job.recruitersAssigned.length > 0 ? (
+                    <div className="mt-4 flex flex-wrap items-center gap-3 bg-app-surface/40 p-3 rounded-2xl border border-app-border/40">
+                      <span className="text-[10px] font-bold text-app-muted uppercase tracking-widest">Assigned Recruiters ({job.recruitersAssigned.length}):</span>
+                      
+                      {/* Avatars stack */}
+                      <div className="flex -space-x-2">
+                        {job.recruitersAssigned.map((recName) => {
+                          const profile = RECRUITER_PROFILES[recName] || {
+                            name: recName,
+                            avatar: `https://picsum.photos/seed/${recName.replace(' ', '')}/100/100`
+                          };
+                          return (
+                            <button
+                              key={recName}
+                              type="button"
+                              onClick={() => {
+                                const prof = RECRUITER_PROFILES[recName] || {
+                                  name: recName,
+                                  dept: 'Staffing Dept.',
+                                  avatar: `https://picsum.photos/seed/${recName.replace(' ', '')}/100/100`,
+                                  email: `${recName.toLowerCase().replace(' ', '.')}@company.com`,
+                                  activeJobs: 1,
+                                  submissions: 15,
+                                  shortlisted: 5,
+                                  interviews: 2,
+                                  hires: 1,
+                                  lastActive: 'Recently',
+                                  assignedJobs: [job.title]
+                                };
+                                setSelectedRecruiter(prof);
+                              }}
+                              className="w-8 h-8 rounded-full border-2 border-app-bg hover:border-brand-blue hover:scale-110 transition-all overflow-hidden cursor-pointer shrink-0"
+                              title={`View ${recName}'s performance activity`}
+                            >
+                              <img src={profile.avatar} alt={recName} className="w-full h-full object-cover" />
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Text names clickable with arrow */}
+                      <div className="flex items-center gap-1.5 text-xs text-app-text font-bold">
+                        {job.recruitersAssigned.map((recName, rIdx) => (
+                          <button
+                            key={recName}
+                            onClick={() => {
+                              const prof = RECRUITER_PROFILES[recName] || {
+                                name: recName,
+                                dept: 'Staffing Dept.',
+                                avatar: `https://picsum.photos/seed/${recName.replace(' ', '')}/100/100`,
+                                email: `${recName.toLowerCase().replace(' ', '.')}@company.com`,
+                                activeJobs: 1,
+                                submissions: 15,
+                                shortlisted: 5,
+                                interviews: 2,
+                                hires: 1,
+                                lastActive: 'Recently',
+                                assignedJobs: [job.title]
+                              };
+                              setSelectedRecruiter(prof);
+                            }}
+                            className="hover:text-brand-blue transition-colors text-left"
+                          >
+                            {recName}{rIdx < job.recruitersAssigned.length - 1 ? ',' : ''}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => {
+                            const firstRec = job.recruitersAssigned[0] || 'Priya Sharma';
+                            const prof = RECRUITER_PROFILES[firstRec] || {
+                              name: firstRec,
+                              dept: 'Staffing Dept.',
+                              avatar: `https://picsum.photos/seed/${firstRec.replace(' ', '')}/100/100`,
+                              email: `${firstRec.toLowerCase().replace(' ', '.')}@company.com`,
+                              activeJobs: 1,
+                              submissions: 15,
+                              shortlisted: 5,
+                              interviews: 2,
+                              hires: 1,
+                              lastActive: 'Recently',
+                              assignedJobs: [job.title]
+                            };
+                            setSelectedRecruiter(prof);
+                          }}
+                          className="p-1 hover:bg-app-surface rounded-full text-brand-violet cursor-pointer transition-colors"
+                          title="View detailed performance"
+                        >
+                          <ChevronRight className="w-4 h-4 inline stroke-[3px]" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-4 p-3 bg-app-surface/30 border border-dashed border-app-border text-xs text-app-muted rounded-2xl font-semibold">
+                      📢 Open for all recruiters. Sourcing is active.
+                    </div>
+                  )}
+
                 </div>
               </div>
 
@@ -191,7 +353,7 @@ export default function CompanyManagerJobs({
                 {/* Visual statistics */}
                 <div className="flex gap-6">
                   <div className="text-center md:text-right lg:text-center shrink-0">
-                    <span className="text-xs font-bold uppercase tracking-wider text-app-muted block">Applications</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-app-muted block">Submissions</span>
                     <span className="text-xl font-display font-black text-app-text mt-0.5 block">{job.applicationsCount}</span>
                   </div>
                   <div className="text-center md:text-right lg:text-center shrink-0">
@@ -217,19 +379,19 @@ export default function CompanyManagerJobs({
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => onViewPipelineClick(job.title)}
-                    className="px-4 py-2 bg-brand-blue/10 border border-brand-blue/20 hover:bg-brand-blue/15 text-brand-blue font-bold text-xs rounded-xl"
+                    className="px-4 py-2 bg-brand-blue/10 border border-brand-blue/20 hover:bg-brand-blue/15 text-brand-blue font-bold text-xs rounded-xl cursor-pointer"
                   >
                     View Pipeline
                   </button>
                   <button 
                     onClick={() => onEditJobClick(job)}
-                    className="px-4 py-2 bg-app-surface border border-app-border hover:bg-app-surface/80 text-app-text font-bold text-xs rounded-xl"
+                    className="px-4 py-2 bg-app-surface border border-app-border hover:bg-app-surface/80 text-app-text font-bold text-xs rounded-xl cursor-pointer"
                   >
                     Edit Job
                   </button>
                   <button 
                     onClick={() => onDeleteJobClick(job.id)}
-                    className="p-2 border border-red-500/10 hover:border-red-500/25 text-red-500 hover:bg-red-500/10 rounded-xl"
+                    className="p-2 border border-red-500/10 hover:border-red-500/25 text-red-500 hover:bg-red-500/10 rounded-xl cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -240,6 +402,84 @@ export default function CompanyManagerJobs({
           ))
         )}
       </div>
+
+      {/* Recruiter Details Popup Modal */}
+      {selectedRecruiter && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-app-bg border border-app-border rounded-[32px] max-w-xl w-full p-6 sm:p-8 card-shadow space-y-6">
+            <div className="flex justify-between items-center border-b border-app-border/60 pb-4">
+              <div className="flex items-center gap-3">
+                <img src={selectedRecruiter.avatar} alt={selectedRecruiter.name} className="w-12 h-12 rounded-full border border-app-border object-cover" />
+                <div>
+                  <h3 className="font-display font-black text-lg text-app-text">{selectedRecruiter.name}</h3>
+                  <div className="text-xs text-app-muted font-bold flex items-center gap-1.5 mt-0.5">
+                    <span className="bg-brand-blue/10 text-brand-blue px-2 py-0.5 rounded text-[10px] font-extrabold">{selectedRecruiter.dept}</span>
+                    <span>•</span>
+                    <span className="text-app-muted font-normal">Last active: {selectedRecruiter.lastActive}</span>
+                  </div>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedRecruiter(null)}
+                className="p-1.5 border border-app-border hover:bg-app-surface rounded-lg text-app-muted cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-4 gap-4 text-center">
+              <div className="p-3 bg-blue-500/5 rounded-xl border border-blue-500/10">
+                <div className="text-[10px] font-bold text-app-muted uppercase">Jobs</div>
+                <div className="text-lg font-black text-blue-500 mt-1">{selectedRecruiter.activeJobs}</div>
+              </div>
+              <div className="p-3 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
+                <div className="text-[10px] font-bold text-app-muted uppercase font-sans">Submissions</div>
+                <div className="text-lg font-black text-emerald-500 mt-1">{selectedRecruiter.submissions}</div>
+              </div>
+              <div className="p-3 bg-violet-500/5 rounded-xl border border-violet-500/10">
+                <div className="text-[10px] font-bold text-app-muted uppercase">Shortlisted</div>
+                <div className="text-lg font-black text-violet-500 mt-1">{selectedRecruiter.shortlisted}</div>
+              </div>
+              <div className="p-3 bg-amber-500/5 rounded-xl border border-amber-500/10">
+                <div className="text-[10px] font-bold text-app-muted uppercase">Hires</div>
+                <div className="text-lg font-black text-amber-500 mt-1">{selectedRecruiter.hires}</div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-app-muted">Assigned Requirements</h4>
+              <div className="flex flex-wrap gap-2">
+                {selectedRecruiter.assignedJobs.map((jobName: string, jIdx: number) => (
+                  <span key={jIdx} className="bg-app-surface border border-app-border text-app-text px-3 py-1.5 rounded-xl text-xs font-bold">
+                    {jobName}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-brand-blue/5 to-indigo-500/5 border border-brand-blue/15 space-y-2">
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-brand-blue">Performance Analytics</h4>
+              <div className="grid grid-cols-2 gap-4 text-xs font-bold text-app-text pt-1">
+                <div>
+                  <span className="text-app-muted font-normal block">Interview Conversion Rate</span>
+                  <span>{Math.round((selectedRecruiter.interviews / selectedRecruiter.submissions) * 100)}%</span>
+                </div>
+                <div>
+                  <span className="text-app-muted font-normal block">Hiring Success Ratio</span>
+                  <span>{Math.round((selectedRecruiter.hires / selectedRecruiter.interviews) * 100)}%</span>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setSelectedRecruiter(null)}
+              className="w-full py-3 bg-app-surface border border-app-border hover:bg-app-surface/80 rounded-xl text-xs font-extrabold text-app-text cursor-pointer"
+            >
+              Close Recruiter Profile
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
