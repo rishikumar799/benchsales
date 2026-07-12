@@ -6,18 +6,98 @@
       "type": "object",
       "properties": {
         "uid": { "type": "string", "description": "The unique Firebase Auth UID" },
-        "fullName": { "type": "string", "description": "The full name of the user" },
         "email": { "type": "string", "description": "The email address of the user" },
-        "phoneNumber": { "type": "string", "description": "The contact phone number of the user" },
-        "role": { "type": "string", "description": "The role identifier mapping to UI screens" },
-        "accountType": { "type": "string", "description": "individual or organization" },
-        "organizationType": { "type": "string", "description": "university or company (optional)" },
+        "displayName": { "type": "string", "description": "The display name of the user" },
+        "photoURL": { "type": "string", "description": "User photo URL" },
+        "role": { "type": "string", "description": "Role identifier (marketplace_student, marketplace_recruiter, marketplace_bdm)" },
+        "ecosystem": { "type": "string", "description": "System identifier" },
         "organizationId": { "type": "string", "description": "ID of associated organization (optional)" },
         "status": { "type": "string", "description": "Status of account (approved/active)" },
         "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "lastLogin": { "type": "string", "format": "date-time" }
       },
-      "required": ["uid", "fullName", "email", "role", "accountType", "status"]
+      "required": ["uid", "email", "role", "status"]
+    },
+    "MarketplaceBDM": {
+      "title": "Marketplace BDM Profile",
+      "description": "Specific business development manager data document",
+      "type": "object",
+      "properties": {
+        "profile": { "type": "object" },
+        "dashboard_cache": { "type": "object" },
+        "analytics_cache": { "type": "object" },
+        "draft_jobs": { "type": "array" },
+        "notes": { "type": "array" },
+        "activity": { "type": "array" },
+        "settings": { "type": "object" }
+      },
+      "required": ["profile"]
+    },
+    "MarketplaceRecruiter": {
+      "title": "Marketplace Recruiter Profile",
+      "description": "Specific recruiter data document",
+      "type": "object",
+      "properties": {
+        "profile": { "type": "object" },
+        "candidate_queue": { "type": "array" },
+        "saved_candidates": { "type": "array" },
+        "activity": { "type": "array" },
+        "notes": { "type": "array" },
+        "dashboard_cache": { "type": "object" },
+        "settings": { "type": "object" }
+      },
+      "required": ["profile"]
+    },
+    "SavedCandidate": {
+      "title": "Saved Candidate",
+      "description": "Candidate profile saved by a recruiter",
+      "type": "object",
+      "properties": {
+        "candidateUid": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "skills": { "type": "array" },
+        "savedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["candidateUid", "fullName", "email", "skills", "savedAt"]
+    },
+    "MarketplaceJobseeker": {
+      "title": "Marketplace Job Seeker Profile",
+      "description": "Specific job seeker student data document",
+      "type": "object",
+      "properties": {
+        "profile": { "type": "object" },
+        "resume": {
+          "type": "object",
+          "properties": {
+            "fullName": { "type": "string" },
+            "email": { "type": "string" },
+            "phone": { "type": "string" },
+            "location": { "type": "string" },
+            "linkedin": { "type": "string" },
+            "portfolio": { "type": "string" },
+            "headline": { "type": "string" },
+            "summary": { "type": "string" },
+            "experience": { "type": "string" },
+            "education": { "type": "string" },
+            "skills": { "type": "string" },
+            "projects": { "type": "string" },
+            "certifications": { "type": "string" },
+            "languages": { "type": "string" },
+            "references": { "type": "string" },
+            "resumeCompletion": { "type": "integer" },
+            "updatedAt": { "type": "string", "format": "date-time" }
+          }
+        },
+        "documents": { "type": "array" },
+        "certificates": { "type": "array" },
+        "saved_jobs": { "type": "array" },
+        "ai_profile": { "type": "object" },
+        "preferences": { "type": "object" },
+        "activity": { "type": "array" },
+        "settings": { "type": "object" }
+      },
+      "required": ["profile"]
     },
     "Organization": {
       "title": "Organization",
@@ -30,53 +110,110 @@
         "adminUid": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["organizationId", "organizationName", "organizationType", "adminUid", "createdAt"]
+      "required": ["organizationId", "organizationName", "organizationType"]
     },
-    "MarketplaceStudent": {
-      "title": "Marketplace Student",
-      "description": "Specific student candidate profile",
+    "MarketplaceJob": {
+      "title": "Global Marketplace Job",
+      "description": "Unique representation of a job opening",
       "type": "object",
       "properties": {
-        "uid": { "type": "string" },
-        "fullName": { "type": "string" },
-        "email": { "type": "string" },
-        "phoneNumber": { "type": "string" },
+        "id": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "companyId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "skills": { "type": "array" },
+        "experience": { "type": "string" },
+        "salary": { "type": "string" },
         "status": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "visibility": { "type": "string" },
+        "assignedRecruiters": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
       },
-      "required": ["uid", "fullName", "email"]
+      "required": ["id", "createdBy", "title", "status"]
     },
-    "MarketplaceRecruiter": {
-      "title": "Marketplace Recruiter",
-      "description": "Specific recruiter profile",
+    "MarketplaceApplication": {
+      "title": "Global Job Application",
+      "description": "Student job application document",
       "type": "object",
       "properties": {
-        "uid": { "type": "string" },
-        "fullName": { "type": "string" },
-        "email": { "type": "string" },
-        "phoneNumber": { "type": "string" },
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "jobId": { "type": "string" },
         "status": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "resumeId": { "type": "string" },
+        "appliedAt": { "type": "string" },
+        "timeline": { "type": "array" }
       },
-      "required": ["uid", "fullName", "email"]
+      "required": ["id", "studentId", "jobId", "status"]
+    },
+    "MarketplaceSubmission": {
+      "title": "Global Recruiter Candidate Submission",
+      "description": "Recruiter-sourced candidate submission",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "recruiterId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "jobId": { "type": "string" },
+        "bdmId": { "type": "string" },
+        "status": { "type": "string" },
+        "submittedAt": { "type": "string" },
+        "timeline": { "type": "array" }
+      },
+      "required": ["id", "recruiterId", "studentId", "jobId", "status"]
+    },
+    "NotificationContainer": {
+      "title": "User Notification Container",
+      "description": "User specific notifications document",
+      "type": "object",
+      "properties": {
+        "items": { "type": "array" }
+      },
+      "required": ["items"]
     }
   },
   "firestore": {
     "users/{uid}": {
       "schema": "User",
-      "description": "Master users collection"
+      "description": "Core Auth user metadata mapping"
+    },
+    "marketplace_bdms/{uid}": {
+      "schema": "MarketplaceBDM",
+      "description": "BDM-specific notes, cache, and draft jobs"
+    },
+    "marketplace_recruiters/{uid}": {
+      "schema": "MarketplaceRecruiter",
+      "description": "Recruiter-specific saved candidates and activity"
+    },
+    "marketplace_recruiters/{uid}/saved_candidates/{candidateId}": {
+      "schema": "SavedCandidate",
+      "description": "Subcollection of candidates saved by this recruiter"
+    },
+    "marketplace_jobseekers/{uid}": {
+      "schema": "MarketplaceJobseeker",
+      "description": "Jobseeker-specific student profiles and preferences"
     },
     "organizations/{organizationId}": {
       "schema": "Organization",
       "description": "Organizations directory collection"
     },
-    "marketplace_students/{uid}": {
-      "schema": "MarketplaceStudent",
-      "description": "Marketplace Students directory"
+    "marketplace_jobs/{jobId}": {
+      "schema": "MarketplaceJob",
+      "description": "Global list of all job postings"
     },
-    "marketplace_recruiters/{uid}": {
-      "schema": "MarketplaceRecruiter",
-      "description": "Marketplace Recruiters directory"
+    "marketplace_applications/{applicationId}": {
+      "schema": "MarketplaceApplication",
+      "description": "Global student job applications"
+    },
+    "marketplace_submissions/{submissionId}": {
+      "schema": "MarketplaceSubmission",
+      "description": "Global recruiter sourced candidate submissions"
+    },
+    "notifications/{uid}": {
+      "schema": "NotificationContainer",
+      "description": "User specific notifications"
     }
   }
 }

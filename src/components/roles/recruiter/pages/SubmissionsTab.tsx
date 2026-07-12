@@ -18,17 +18,28 @@ import {
   Sparkles,
   ExternalLink
 } from 'lucide-react';
-import { recruiterStorage, CandidateSubmission, RecruiterJob, RecruiterCandidate } from '../utils/recruiterStorage';
+import { db, auth, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
+import { 
+  collection, 
+  query, 
+  where, 
+  onSnapshot, 
+  doc, 
+  updateDoc,
+  getDoc
+} from 'firebase/firestore';
+import { CandidateSubmission, RecruiterJob, RecruiterCandidate } from '../utils/recruiterStorage';
 
 interface SubmissionsTabProps {
   onAddLogMessage?: (msg: string) => void;
 }
 
 export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps) {
-  
   const [submissions, setSubmissions] = useState<CandidateSubmission[]>([]);
   const [jobs, setJobs] = useState<RecruiterJob[]>([]);
   const [candidates, setCandidates] = useState<RecruiterCandidate[]>([]);
+  const [recruiterName, setRecruiterName] = useState('Rohit Kumar');
+  const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [jobFilter, setJobFilter] = useState('All');
@@ -39,19 +50,137 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
   const [previewResumePath, setPreviewResumePath] = useState<string | null>(null);
   const [selectedJobDetails, setSelectedJobDetails] = useState<RecruiterJob | null>(null);
   const [selectedCandidateDetails, setSelectedCandidateDetails] = useState<RecruiterCandidate | null>(null);
-  const [trackedSubmission, setTrackedSubmission] = useState<CandidateSubmission | null>(null);
+  const [trackedSubmissionId, setTrackedSubmissionId] = useState<string | null>(null);
 
-  // Load from localStorage on mount and sync
-  const loadData = () => {
-    setSubmissions(recruiterStorage.getSubmissions());
-    setJobs(recruiterStorage.getJobs());
-    setCandidates(recruiterStorage.getCandidates());
-  };
-
+  // Load recruiter profile, submissions, candidates, and jobs from Firestore in real-time
   useEffect(() => {
-    loadData();
-    window.addEventListener('storage', loadData);
-    return () => window.removeEventListener('storage', loadData);
+    const user = auth.currentUser;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    // 1. Subscribe to recruiter profile
+    const recruiterRef = doc(db, 'marketplace_recruiters', user.uid);
+    const unsubProfile = onSnapshot(recruiterRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setRecruiterName(data?.profile?.fullName || user.displayName || 'Rohit Kumar');
+      } else {
+        setRecruiterName(user.displayName || 'Rohit Kumar');
+      }
+    }, (err) => {
+      console.warn("Error subscribing to recruiter profile:", err);
+    });
+
+    // 2. Subscribe to submissions where recruiterUid == current user's UID
+    const qSubmissions = query(
+      collection(db, 'marketplace_submissions'),
+      where('recruiterUid', '==', user.uid)
+    );
+    const unsubSubmissions = onSnapshot(qSubmissions, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          submissionId: data.submissionId || docSnap.id,
+          jobId: data.jobId || 'N/A',
+          jobTitle: data.jobTitle || 'N/A',
+          companyName: data.companyName || 'N/A',
+          candidateUid: data.candidateUid || 'N/A',
+          candidateId: data.candidateId || data.candidateUid || 'N/A',
+          candidateName: data.candidateName || 'Anonymous',
+          candidateEmail: data.candidateEmail || 'N/A',
+          candidatePhone: data.candidatePhone || 'N/A',
+          candidateResume: data.candidateResume || `${(data.candidateName || 'Candidate').replace(' ', '_')}_Resume.pdf`,
+          submissionDate: data.submissionDate || (data.submittedAt ? new Date(data.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'),
+          submittedBy: data.submittedBy || data.recruiterName || 'Marketplace Recruiter',
+          recruiterUid: data.recruiterUid || 'N/A',
+          recruiterName: data.recruiterName || 'Marketplace Recruiter',
+          bdmUid: data.bdmUid || 'N/A',
+          companyId: data.companyId || 'N/A',
+          status: data.status || 'submitted',
+          submittedAt: data.submittedAt || '',
+          updatedAt: data.updatedAt || '',
+          assignedBdm: data.assignedBdm || 'John Mathew',
+          lastUpdated: data.lastUpdated || (data.updatedAt ? new Date(data.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'),
+          notes: data.notes || '',
+          timeline: data.timeline || []
+        });
+      });
+      
+      // Sort submissions by submittedAt descending
+      list.sort((a, b) => {
+        const timeA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+        const timeB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+        return timeB - timeA;
+      });
+
+      setSubmissions(list);
+      setLoading(false);
+    }, (err) => {
+      console.error("Submissions sync error:", err);
+      setLoading(false);
+    });
+
+    // 3. Subscribe to all candidate profiles to dynamically enrich details popups
+    const unsubCandidates = onSnapshot(collection(db, 'marketplace_jobseekers'), (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const profile = data.profile || {};
+        list.push({
+          id: docSnap.id,
+          name: profile.fullName || data.name || 'Anonymous',
+          experience: profile.experience || data.experience || 'Entry Level',
+          skills: profile.skills || data.skills || [],
+          availability: profile.availability || data.availability || 'Available',
+          details: profile.details || data.details || {
+            role: profile.role || data.role || 'Software Engineer',
+            skillsFull: profile.skills || data.skills || [],
+            years: 2,
+            currentCompany: 'N/A',
+            currentRole: 'N/A',
+            availabilityDetails: 'Immediate'
+          }
+        });
+      });
+      setCandidates(list);
+    }, (err) => {
+      console.error("Candidates sync error in SubmissionsTab:", err);
+    });
+
+    // 4. Subscribe to all jobs to dynamically enrich details popups
+    const unsubJobs = onSnapshot(collection(db, 'marketplace_jobs'), (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          title: data.title || 'N/A',
+          company: data.company || data.companyName || 'N/A',
+          experience: data.experience || '3-5 Years',
+          skills: data.skills || [],
+          location: data.location || 'Remote',
+          positions: data.positions || 'N/A',
+          priority: data.priority || 'Medium',
+          posted: data.posted || 'Recent',
+          bdm: data.bdm || 'John Mathew',
+          ...data
+        });
+      });
+      setJobs(list);
+    }, (err) => {
+      console.error("Jobs sync error in SubmissionsTab:", err);
+    });
+
+    return () => {
+      unsubProfile();
+      unsubSubmissions();
+      unsubCandidates();
+      unsubJobs();
+    };
   }, []);
 
   // Export report simulation
@@ -59,9 +188,54 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
     setExporting(true);
     setTimeout(() => {
       setExporting(false);
-      alert('ARYX AI: Submissions report exported successfully as CSV/Excel format to local downloads!');
+      alert('Submissions report exported successfully as CSV/Excel format to local downloads!');
     }, 1500);
   };
+
+  // Update status in Firestore document (Never duplicates, respects single document boundary)
+  const handleUpdateStatus = async (subId: string, newStatus: string) => {
+    const sub = submissions.find(s => s.id === subId);
+    if (!sub) return;
+
+    try {
+      const actionName = newStatus === 'submitted' ? 'Submitted' 
+                       : newStatus === 'under_review' ? 'Reviewed' 
+                       : newStatus === 'shortlisted' ? 'Shortlisted' 
+                       : newStatus === 'rejected' ? 'Rejected' 
+                       : 'Selected';
+
+      const updatedTimeline = [...(sub.timeline || []), {
+        action: actionName,
+        performedBy: recruiterName,
+        performedByRole: 'Marketplace Recruiter',
+        timestamp: new Date().toISOString()
+      }];
+
+      const docRef = doc(db, 'marketplace_submissions', subId);
+      await updateDoc(docRef, {
+        status: newStatus,
+        updatedAt: new Date().toISOString(),
+        lastUpdated: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        timeline: updatedTimeline
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `marketplace_submissions/${subId}`);
+    }
+  };
+
+  // Standardize lowercase database status to capital case for matching the filters/pills
+  const getStatusLabel = (status: string) => {
+    const s = status?.toLowerCase();
+    if (s === 'submitted') return 'Submitted';
+    if (s === 'under_review') return 'In Review';
+    if (s === 'shortlisted') return 'Shortlisted';
+    if (s === 'rejected') return 'Rejected';
+    if (s === 'selected') return 'Selected';
+    return status;
+  };
+
+  // Extract unique job title values for filters
+  const uniqueJobTitles = Array.from(new Set(submissions.map(s => s.jobTitle))).filter(Boolean);
 
   // Filter submissions
   const filteredSubmissions = submissions.filter(sub => {
@@ -70,10 +244,26 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
                           sub.id.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesJob = jobFilter === 'All' || sub.jobTitle === jobFilter;
-    const matchesStatus = statusFilter === 'All' || sub.status === statusFilter;
+    
+    const mappedStatus = getStatusLabel(sub.status);
+    const matchesStatus = statusFilter === 'All' || 
+                          sub.status === statusFilter || 
+                          mappedStatus === statusFilter;
 
     return matchesSearch && matchesJob && matchesStatus;
   });
+
+  // Dynamic tracked submission state
+  const liveTrackedSubmission = trackedSubmissionId ? submissions.find(s => s.id === trackedSubmissionId) : null;
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+        <div className="w-12 h-12 border-4 border-brand-blue border-t-transparent rounded-full animate-spin" />
+        <p className="text-app-muted text-sm font-semibold">Loading Submissions from Firestore...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -125,11 +315,9 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
             className="bg-app-surface border border-app-border rounded-xl px-4 py-3 text-xs font-semibold text-app-text outline-none cursor-pointer flex-1"
           >
             <option value="All">All Jobs (All)</option>
-            <option value="Frontend Developer">Frontend Developer</option>
-            <option value="DevOps Engineer">DevOps Engineer</option>
-            <option value="Backend Developer">Backend Developer</option>
-            <option value="Java Developer">Java Developer</option>
-            <option value="QA Engineer">QA Engineer</option>
+            {uniqueJobTitles.map(title => (
+              <option key={title} value={title}>{title}</option>
+            ))}
           </select>
 
           {/* Status Filter */}
@@ -142,10 +330,8 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
             <option value="Submitted">Submitted</option>
             <option value="In Review">In Review</option>
             <option value="Shortlisted">Shortlisted</option>
-            <option value="Interview">Interview</option>
             <option value="Selected">Selected</option>
             <option value="Rejected">Rejected</option>
-            <option value="Joined">Joined</option>
           </select>
         </div>
 
@@ -175,14 +361,13 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
                 filteredSubmissions.map((sub) => {
                   
                   // Style configurations
-                  let pillStyle = '';
-                  if (sub.status === 'Submitted') pillStyle = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-                  else if (sub.status === 'In Review') pillStyle = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
-                  else if (sub.status === 'Shortlisted') pillStyle = 'bg-teal-500/10 text-teal-500 border-teal-500/20';
-                  else if (sub.status === 'Interview') pillStyle = 'bg-violet-500/10 text-violet-500 border-violet-500/20';
-                  else if (sub.status === 'Selected') pillStyle = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-                  else if (sub.status === 'Rejected') pillStyle = 'bg-red-500/10 text-red-500 border-red-500/20';
-                  else if (sub.status === 'Joined') pillStyle = 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20';
+                  const sLabel = getStatusLabel(sub.status);
+                  let pillStyle = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+                  if (sLabel === 'Submitted') pillStyle = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+                  else if (sLabel === 'In Review') pillStyle = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+                  else if (sLabel === 'Shortlisted') pillStyle = 'bg-teal-500/10 text-teal-500 border-teal-500/20';
+                  else if (sLabel === 'Selected') pillStyle = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+                  else if (sLabel === 'Rejected') pillStyle = 'bg-red-500/10 text-red-500 border-red-500/20';
 
                   return (
                     <tr key={sub.id} className="hover:bg-app-surface/30 transition-colors">
@@ -208,8 +393,7 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
                               priority: 'Medium',
                               posted: 'Posted recently',
                               bdm: sub.assignedBdm,
-                              jobType: 'open',
-                              accessStatus: 'approved'
+                              status: 'open'
                             });
                           }}
                           className="font-bold text-app-text text-left hover:text-brand-blue hover:underline"
@@ -268,7 +452,7 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
                       {/* Current Status */}
                       <td className="py-4 px-3">
                         <span className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-extrabold px-2.5 py-1 rounded-full border ${pillStyle}`}>
-                          {sub.status}
+                          {sLabel}
                         </span>
                       </td>
 
@@ -300,8 +484,7 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
                                 priority: 'Medium',
                                 posted: 'Posted recently',
                                 bdm: sub.assignedBdm,
-                                jobType: 'open',
-                                accessStatus: 'approved'
+                                status: 'open'
                               });
                             }}
                             className="p-1.5 bg-app-surface border border-app-border rounded-lg text-app-muted hover:text-brand-violet"
@@ -336,7 +519,7 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
                           </button>
 
                           <button 
-                            onClick={() => setTrackedSubmission(sub)}
+                            onClick={() => setTrackedSubmissionId(sub.id)}
                             className="px-2.5 py-1.5 bg-brand-blue/10 hover:bg-brand-blue/20 text-brand-blue rounded-lg text-xs font-extrabold flex items-center gap-1"
                             title="Track Status"
                           >
@@ -349,7 +532,7 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
                 })
               ) : (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-app-muted">
+                  <td colSpan={11} className="py-12 text-center text-app-muted">
                     <AlertCircle className="w-10 h-10 text-app-muted mx-auto mb-3" />
                     <p className="font-semibold text-app-text text-sm">No submissions matched active filters</p>
                     <p className="text-xs text-app-muted mt-1">Refine your search keywords.</p>
@@ -500,16 +683,18 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <span className="block text-xs font-bold text-app-muted uppercase tracking-wider">Required Skills</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedJobDetails.skills.map((sk, idx) => (
-                    <span key={idx} className="text-xs font-mono font-bold bg-app-bg px-2.5 py-1 rounded-lg border border-app-border text-app-text">
-                      {sk}
-                    </span>
-                  ))}
+              {selectedJobDetails.skills && selectedJobDetails.skills.length > 0 && (
+                <div className="space-y-2">
+                  <span className="block text-xs font-bold text-app-muted uppercase tracking-wider">Required Skills</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedJobDetails.skills.map((sk, idx) => (
+                      <span key={idx} className="text-xs font-mono font-bold bg-app-bg px-2.5 py-1 rounded-lg border border-app-border text-app-text">
+                        {sk}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="h-16 border-t border-app-border/40 px-6 flex items-center justify-end bg-app-surface/20">
@@ -551,7 +736,7 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
                 </div>
                 <div>
                   <h4 className="font-display font-black text-lg text-app-text">{selectedCandidateDetails.name}</h4>
-                  <p className="text-xs text-app-muted mt-0.5">{selectedCandidateDetails.details.role} • {selectedCandidateDetails.experience} Experience</p>
+                  <p className="text-xs text-app-muted mt-0.5">{(selectedCandidateDetails.details as any)?.role || 'Software Engineer'} • {selectedCandidateDetails.experience} Experience</p>
                 </div>
               </div>
 
@@ -570,16 +755,18 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <span className="block text-xs font-bold text-app-muted uppercase tracking-wider">Complete Skillset Index</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedCandidateDetails.details.skillsFull.map((sk, idx) => (
-                    <span key={idx} className="text-xs font-mono font-bold bg-app-bg px-2.5 py-1 rounded-lg border border-app-border text-app-text">
-                      {sk}
-                    </span>
-                  ))}
+              {selectedCandidateDetails.details.skillsFull && selectedCandidateDetails.details.skillsFull.length > 0 && (
+                <div className="space-y-2">
+                  <span className="block text-xs font-bold text-app-muted uppercase tracking-wider">Complete Skillset Index</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedCandidateDetails.details.skillsFull.map((sk, idx) => (
+                      <span key={idx} className="text-xs font-mono font-bold bg-app-bg px-2.5 py-1 rounded-lg border border-app-border text-app-text">
+                        {sk}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="h-16 border-t border-app-border/40 px-6 flex items-center justify-end bg-app-surface/20">
@@ -597,7 +784,7 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
       {/* ---------------------------------------------------- */}
       {/* POPUP D: TRACK STATUS (TIMELINE PROGRESS DIALOG) */}
       {/* ---------------------------------------------------- */}
-      {trackedSubmission && (
+      {liveTrackedSubmission && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="w-full max-w-lg bg-[#090D1A] border border-app-border rounded-3xl overflow-hidden shadow-2xl animate-scale-up text-app-text">
             
@@ -607,24 +794,45 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
                 <h3 className="font-display font-extrabold text-base text-app-text">Track Submission Status</h3>
               </div>
               <button 
-                onClick={() => setTrackedSubmission(null)}
+                onClick={() => setTrackedSubmissionId(null)}
                 className="p-2 text-app-muted hover:text-app-text bg-app-surface/60 rounded-xl border border-app-border"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
               
               {/* Context bar */}
               <div className="p-4 rounded-xl bg-app-surface/80 border border-app-border flex justify-between items-center text-xs font-semibold">
                 <div>
                   <span className="text-app-muted block text-[10px] uppercase tracking-wider">Candidate</span>
-                  <span className="text-app-text font-extrabold text-sm">{trackedSubmission.candidateName}</span>
+                  <span className="text-app-text font-extrabold text-sm">{liveTrackedSubmission.candidateName}</span>
                 </div>
                 <div className="text-right">
                   <span className="text-app-muted block text-[10px] uppercase tracking-wider">Submission ID</span>
-                  <span className="text-brand-blue font-mono font-bold">{trackedSubmission.id}</span>
+                  <span className="text-brand-blue font-mono font-bold">{liveTrackedSubmission.id}</span>
+                </div>
+              </div>
+
+              {/* Status Update Dropdown for verification and lifecycle flow */}
+              <div className="p-4 rounded-xl bg-app-surface/60 border border-app-border space-y-2">
+                <label className="block text-xs font-bold text-app-muted uppercase tracking-wider">Update Current Status</label>
+                <div className="flex gap-2">
+                  <select 
+                    value={liveTrackedSubmission.status?.toLowerCase() || 'submitted'}
+                    onChange={async (e) => {
+                      const newStatus = e.target.value;
+                      await handleUpdateStatus(liveTrackedSubmission.id, newStatus);
+                    }}
+                    className="flex-1 bg-app-bg border border-app-border rounded-xl px-3 py-2 text-xs font-semibold text-app-text outline-none cursor-pointer"
+                  >
+                    <option value="submitted">Submitted</option>
+                    <option value="under_review">In Review</option>
+                    <option value="shortlisted">Shortlisted</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="selected">Selected</option>
+                  </select>
                 </div>
               </div>
 
@@ -635,14 +843,14 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
                 <div className="relative border-l-2 border-app-border ml-4 pl-6 space-y-5 py-2">
                   
                   {[
-                    { label: 'Submitted', desc: `Profile submitted successfully by ${trackedSubmission.submittedBy}`, date: trackedSubmission.submissionDate, passed: true },
-                    { label: 'In Review', desc: 'BDM and company screening team analyzing credentials', date: trackedSubmission.lastUpdated, passed: ['In Review', 'Shortlisted', 'Interview', 'Selected', 'Joined'].includes(trackedSubmission.status) },
-                    { label: 'Shortlisted', desc: 'Candidate flagged for active tech screen schedule', date: trackedSubmission.lastUpdated, passed: ['Shortlisted', 'Interview', 'Selected', 'Joined'].includes(trackedSubmission.status) },
-                    { label: 'Interview', desc: 'Technical rounds/client loops in progress', date: '-', passed: ['Interview', 'Selected', 'Joined'].includes(trackedSubmission.status) },
-                    { label: 'Selected', desc: 'Offer release process initiated', date: '-', passed: ['Selected', 'Joined'].includes(trackedSubmission.status) },
-                    { label: 'Joined', desc: 'Onboarding finalized', date: '-', passed: trackedSubmission.status === 'Joined' }
+                    { label: 'Submitted', desc: `Profile submitted successfully by ${liveTrackedSubmission.submittedBy}`, date: liveTrackedSubmission.submissionDate, passed: true },
+                    { label: 'In Review', desc: 'BDM and company screening team analyzing credentials', date: liveTrackedSubmission.lastUpdated, passed: ['under_review', 'shortlisted', 'rejected', 'selected'].includes(liveTrackedSubmission.status?.toLowerCase()) },
+                    { label: 'Shortlisted', desc: 'Candidate flagged for active tech screen schedule', date: liveTrackedSubmission.lastUpdated, passed: ['shortlisted', 'rejected', 'selected'].includes(liveTrackedSubmission.status?.toLowerCase()) },
+                    { label: 'Rejected', desc: 'Screening process completed', date: liveTrackedSubmission.lastUpdated, passed: ['rejected'].includes(liveTrackedSubmission.status?.toLowerCase()) },
+                    { label: 'Selected', desc: 'Offer release process initiated', date: liveTrackedSubmission.lastUpdated, passed: ['selected'].includes(liveTrackedSubmission.status?.toLowerCase()) }
                   ].map((step, idx) => {
-                    const isActive = trackedSubmission.status === step.label;
+                    const currentStatusStr = getStatusLabel(liveTrackedSubmission.status);
+                    const isActive = currentStatusStr === step.label;
                     return (
                       <div key={idx} className="relative">
                         {/* Timeline bubble */}
@@ -674,7 +882,7 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
 
             <div className="h-16 border-t border-app-border/40 px-6 flex items-center justify-end bg-app-surface/20">
               <button 
-                onClick={() => setTrackedSubmission(null)}
+                onClick={() => setTrackedSubmissionId(null)}
                 className="px-5 py-2.5 bg-brand-blue text-white rounded-xl text-xs font-bold"
               >
                 Close Tracking

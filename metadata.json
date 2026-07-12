@@ -1,5 +1,8 @@
 {
   "name": "Aryx AI",
   "description": "Autonomous job search agent for students, agents, and admins. Automate your career velocity with Aryx AI's domain-driven application tailoring and tracking.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

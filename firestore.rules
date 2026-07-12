@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to verify user identity matches the document path UID
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // Core users metadata: read/write allowed if you are authenticated
+    match /users/{uid} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // BDM specific profile: read/write allowed only for the BDM owner
+    match /marketplace_bdms/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // Recruiter specific profile: read/write allowed only for the Recruiter owner
+    match /marketplace_recruiters/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /saved_candidates/{candidateId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // Jobseeker (student) specific profile: read/write allowed only for the student owner, or read/write by recruiters/BDMs
+    match /marketplace_jobseekers/{uid} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // University collection rules
+    match /organizations_universities/{universityId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+
+      match /{subcollection}/{uid} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(uid) || isAuthenticated();
+      }
+    }
+
+    // Company collection rules
+    match /organizations_companies/{companyId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+
+      match /{subcollection}/{uid} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(uid) || isAuthenticated();
+      }
+    }
+
+    // Global jobs: read allowed by all authenticated, write allowed by BDM or authorized managers
+    match /marketplace_jobs/{jobId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.createdBy;
+      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.createdBy;
+
+      // Subcollections of marketplace_jobs (activity, timeline, assigned_recruiters, submissions, etc.)
+      match /{subcollection}/{documentId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated() && get(/databases/$(database)/documents/marketplace_jobs/$(jobId)).data.createdBy == request.auth.uid;
+      }
+    }
+
+    // Global job applications: read and write by any authenticated marketplace member (students apply, recruiters/BDMs view)
+    match /marketplace_applications/{applicationId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Global submissions: read and write by any authenticated recruiter/BDM/student involved
+    match /marketplace_submissions/{submissionId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Notifications: read and write allowed only for the target user owner
+    match /notifications/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // System collection: read-only for authenticated, write-only by platform admins
+    match /system/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only manageable via Firebase Console / Admin SDK
+    }
+  }
+}

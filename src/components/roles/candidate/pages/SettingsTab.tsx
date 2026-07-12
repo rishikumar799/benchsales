@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Settings, 
@@ -16,8 +16,15 @@ import {
   AlertTriangle,
   Check
 } from 'lucide-react';
+import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db } from '../../../../firebase/firebase';
+import { useAuth } from '../../../../context/AuthContext';
 
 export default function SettingsTab() {
+  const { user, userProfile } = useAuth();
+  const uid = user?.uid || userProfile?.uid;
+  const [loading, setLoading] = useState(true);
+
   const [activeSubTab, setActiveSubTab] = useState('AccountSettings');
 
   // Account settings state
@@ -48,13 +55,107 @@ export default function SettingsTab() {
 
   const [showSavedMsg, setShowSavedMsg] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  // Real-time Firestore Sync
+  useEffect(() => {
+    if (!uid) {
+      setLoading(false);
+      return;
+    }
+
+    const docRef = doc(db, 'marketplace_jobseekers', uid);
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const prof = data.profile || {};
+        const sets = data.settings || {};
+
+        setFullName(prof.fullName || data.fullName || 'Rishi Kumar');
+        setEmail(prof.email || data.email || 'rishi.kumar@email.com');
+        setPhone(prof.phone || prof.phoneNumber || data.phone || data.phoneNumber || '+91 98765 43210');
+
+        setEmailAlerts(sets.emailNotifications !== undefined ? sets.emailNotifications : true);
+        setPushAlerts(sets.pushAlerts !== undefined ? sets.pushAlerts : true);
+        setSmsAlerts(sets.smsAlerts !== undefined ? sets.smsAlerts : false);
+        setRecomAlerts(sets.recomAlerts !== undefined ? sets.recomAlerts : true);
+        setSearchableByRecruiters(sets.searchableByRecruiters !== undefined ? sets.searchableByRecruiters : true);
+        setShowActiveStatus(sets.showActiveStatus !== undefined ? sets.showActiveStatus : true);
+        setAutoHandshake(sets.autoHandshake !== undefined ? sets.autoHandshake : false);
+      }
+      setLoading(false);
+    }, (error) => {
+      console.error("Error subscribing to settings:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [uid]);
+
+  const updateSettingsInFirestore = async (overrideFields: any = {}) => {
+    if (!uid) return;
+
+    const currentEmailAlerts = overrideFields.emailNotifications !== undefined ? overrideFields.emailNotifications : emailAlerts;
+    const currentPushAlerts = overrideFields.pushAlerts !== undefined ? overrideFields.pushAlerts : pushAlerts;
+    const currentSmsAlerts = overrideFields.smsAlerts !== undefined ? overrideFields.smsAlerts : smsAlerts;
+    const currentRecomAlerts = overrideFields.recomAlerts !== undefined ? overrideFields.recomAlerts : recomAlerts;
+    const currentSearchable = overrideFields.searchableByRecruiters !== undefined ? overrideFields.searchableByRecruiters : searchableByRecruiters;
+    const currentShowActive = overrideFields.showActiveStatus !== undefined ? overrideFields.showActiveStatus : showActiveStatus;
+    const currentAutoHandshake = overrideFields.autoHandshake !== undefined ? overrideFields.autoHandshake : autoHandshake;
+
+    try {
+      const docRef = doc(db, 'marketplace_jobseekers', uid);
+      await updateDoc(docRef, {
+        settings: {
+          emailNotifications: currentEmailAlerts,
+          pushAlerts: currentPushAlerts,
+          smsAlerts: currentSmsAlerts,
+          recomAlerts: currentRecomAlerts,
+          searchableByRecruiters: currentSearchable,
+          showActiveStatus: currentShowActive,
+          autoHandshake: currentAutoHandshake,
+          updatedAt: new Date().toISOString()
+        },
+        activity: arrayUnion({
+          id: `act-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          action: overrideFields.activityAction || 'Settings Updated',
+          timestamp: new Date().toISOString(),
+          details: overrideFields.activityDetails || 'Saved settings modifications'
+        })
+      });
+    } catch (err) {
+      console.error("Error updating settings:", err);
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setShowSavedMsg(true);
-    setTimeout(() => setShowSavedMsg(false), 2500);
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    if (!uid) return;
+
+    try {
+      const docRef = doc(db, 'marketplace_jobseekers', uid);
+      await updateDoc(docRef, {
+        fullName: fullName,
+        email: email,
+        phone: phone,
+        'profile.fullName': fullName,
+        'profile.email': email,
+        'profile.phoneNumber': phone,
+        'profile.phone': phone,
+        'profile.updatedAt': new Date().toISOString(),
+        activity: arrayUnion({
+          id: `act-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          action: 'Profile Updated',
+          timestamp: new Date().toISOString(),
+          details: `Updated account primary contact details to ${fullName} (${email})`
+        })
+      });
+      setShowSavedMsg(true);
+      setTimeout(() => setShowSavedMsg(false), 2500);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      console.error("Error saving account settings:", err);
+    }
   };
 
   const handleDeleteAccountSubmit = (e: React.FormEvent) => {
@@ -78,6 +179,15 @@ export default function SettingsTab() {
     { id: 'HelpAndSupport', label: 'Help & Support', icon: HelpCircle },
     { id: 'DeleteAccount', label: 'Delete Account', icon: Trash2, destructive: true }
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-[400px] flex flex-col items-center justify-center space-y-4">
+        <div className="w-12 h-12 border-4 border-brand-blue border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-bold text-app-muted font-mono">Loading your settings from Firestore...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-12">
@@ -258,7 +368,11 @@ export default function SettingsTab() {
                       </div>
                       <button 
                         type="button"
-                        onClick={() => setEmailAlerts(!emailAlerts)}
+                        onClick={() => {
+                          const val = !emailAlerts;
+                          setEmailAlerts(val);
+                          updateSettingsInFirestore({ emailNotifications: val, activityAction: 'Settings Updated', activityDetails: 'Updated email notifications preference' });
+                        }}
                         className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${emailAlerts ? 'bg-brand-blue' : 'bg-neutral-800'}`}
                       >
                         <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${emailAlerts ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -273,7 +387,11 @@ export default function SettingsTab() {
                       </div>
                       <button 
                         type="button"
-                        onClick={() => setPushAlerts(!pushAlerts)}
+                        onClick={() => {
+                          const val = !pushAlerts;
+                          setPushAlerts(val);
+                          updateSettingsInFirestore({ pushAlerts: val, activityAction: 'Settings Updated', activityDetails: 'Updated push notifications preference' });
+                        }}
                         className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${pushAlerts ? 'bg-brand-blue' : 'bg-neutral-800'}`}
                       >
                         <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${pushAlerts ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -288,7 +406,11 @@ export default function SettingsTab() {
                       </div>
                       <button 
                         type="button"
-                        onClick={() => setSmsAlerts(!smsAlerts)}
+                        onClick={() => {
+                          const val = !smsAlerts;
+                          setSmsAlerts(val);
+                          updateSettingsInFirestore({ smsAlerts: val, activityAction: 'Settings Updated', activityDetails: 'Updated SMS alerts preference' });
+                        }}
                         className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${smsAlerts ? 'bg-brand-blue' : 'bg-neutral-800'}`}
                       >
                         <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${smsAlerts ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -303,7 +425,11 @@ export default function SettingsTab() {
                       </div>
                       <button 
                         type="button"
-                        onClick={() => setRecomAlerts(!recomAlerts)}
+                        onClick={() => {
+                          const val = !recomAlerts;
+                          setRecomAlerts(val);
+                          updateSettingsInFirestore({ recomAlerts: val, activityAction: 'Settings Updated', activityDetails: 'Updated AI recommendation notifications preference' });
+                        }}
                         className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${recomAlerts ? 'bg-brand-blue' : 'bg-neutral-800'}`}
                       >
                         <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${recomAlerts ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -327,7 +453,11 @@ export default function SettingsTab() {
                       <input 
                         type="checkbox" 
                         checked={searchableByRecruiters}
-                        onChange={(e) => setSearchableByRecruiters(e.target.checked)}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setSearchableByRecruiters(val);
+                          updateSettingsInFirestore({ searchableByRecruiters: val, activityAction: 'Privacy Updated', activityDetails: `Set discoverability to ${val ? 'public' : 'private'}` });
+                        }}
                         className="mt-0.5 rounded border-app-border text-brand-blue focus:ring-brand-blue bg-app-surface w-4 h-4 cursor-pointer" 
                       />
                       <div>
@@ -340,7 +470,11 @@ export default function SettingsTab() {
                       <input 
                         type="checkbox" 
                         checked={showActiveStatus}
-                        onChange={(e) => setShowActiveStatus(e.target.checked)}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setShowActiveStatus(val);
+                          updateSettingsInFirestore({ showActiveStatus: val, activityAction: 'Privacy Updated', activityDetails: `Set active status broadcast to ${val ? 'enabled' : 'disabled'}` });
+                        }}
                         className="mt-0.5 rounded border-app-border text-brand-blue focus:ring-brand-blue bg-app-surface w-4 h-4 cursor-pointer" 
                       />
                       <div>
@@ -353,7 +487,11 @@ export default function SettingsTab() {
                       <input 
                         type="checkbox" 
                         checked={autoHandshake}
-                        onChange={(e) => setAutoHandshake(e.target.checked)}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setAutoHandshake(val);
+                          updateSettingsInFirestore({ autoHandshake: val, activityAction: 'Privacy Updated', activityDetails: `Set auto-accept handshakes to ${val ? 'enabled' : 'disabled'}` });
+                        }}
                         className="mt-0.5 rounded border-app-border text-brand-blue focus:ring-brand-blue bg-app-surface w-4 h-4 cursor-pointer" 
                       />
                       <div>

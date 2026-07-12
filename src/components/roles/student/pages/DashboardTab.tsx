@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   Briefcase, 
@@ -13,37 +14,222 @@ import {
   BookOpen,
   Calendar
 } from 'lucide-react';
+import { db, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
+import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { useAuth } from '../../../../context/AuthContext';
 
 interface DashboardTabProps {
   onNavigate: (tabId: string) => void;
-  onApplyJob: (jobTitle: string, company: string) => void;
+  onApplyJob: (jobTitle: string, company: string, opportunityId?: string) => void;
 }
 
 export default function DashboardTab({ onNavigate, onApplyJob }: DashboardTabProps) {
+  const { userProfile } = useAuth();
+  const studentId = userProfile?.uid;
+  const organizationId = userProfile?.organizationId;
+
+  const [studentData, setStudentData] = useState<any>(null);
+  const [allOpportunities, setAllOpportunities] = useState<any[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 1. Listen to Student Profile document
+  useEffect(() => {
+    if (!organizationId || !studentId) return;
+
+    const studentDocRef = doc(db, 'organizations_universities', organizationId, 'students', studentId);
+    
+    const unsubscribe = onSnapshot(studentDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setStudentData(snapshot.data());
+        setLoading(false);
+      } else {
+        // Automatically seed student document if it doesn't exist to ensure consistency across pages
+        const defaultProfile = {
+          studentId: studentId,
+          fullName: userProfile?.fullName || 'Rohit Kumar',
+          email: userProfile?.email || 'rohit.kumar@email.com',
+          phone: userProfile?.phoneNumber || '+91 98765 43210',
+          rollNumber: 'CS2022001',
+          registrationNumber: 'REG2022001',
+          department: 'Computer Science Engineering',
+          branch: 'CSE',
+          year: '3rd Year',
+          semester: '6th Semester',
+          cgpa: 8.45,
+          skills: [
+            'Java', 'JavaScript', 'React.js', 'HTML', 'CSS', 
+            'SQL', 'Data Structures', 'Problem Solving', 'Git', 'Node.js', 'MongoDB'
+          ],
+          resume: 'Resume_Rohit_Kumar.pdf',
+          photoURL: userProfile?.photoURL || 'https://picsum.photos/seed/rohit123/200/200',
+          status: 'active',
+          placementStatus: 'eligible',
+          projects: [
+            { title: 'AI Placement Portal', description: 'Full-stack placement automation platform using React, Firestore and AI matching', link: 'github.com/rohit/ai-portal' },
+            { title: 'Smart Resume Parser', description: 'NLP-based resume parsing and rating application built using Python and FastAPI', link: 'github.com/rohit/parser' }
+          ],
+          documents: [
+            { name: 'Resume_Rohit_Kumar.pdf', category: 'Resume', date: '10 May 2026', size: '512 KB' },
+            { name: '10th_Marksheet.pdf', category: 'Academic Certificate', date: '15 Apr 2026', size: '245 KB' },
+            { name: '12th_Marksheet.pdf', category: 'Academic Certificate', date: '15 Apr 2026', size: '268 KB' },
+            { name: 'BTech_Sem6_Marksheet.pdf', category: 'Mark Sheets', date: '20 Apr 2026', size: '320 KB' }
+          ],
+          activityTimeline: [
+            { date: '10 May 2026', title: 'Profile Verified', description: 'Academic details verified by placement officer' },
+            { date: '08 May 2026', title: 'Resume Uploaded', description: 'Primary resume uploaded and indexed by AI model' }
+          ],
+          linkedin: 'linkedin.com/in/rohitkumar',
+          github: 'github.com/rohitkumar',
+          portfolio: 'rohitkumar.dev',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        setDoc(studentDocRef, defaultProfile)
+          .then(() => {
+            setStudentData(defaultProfile);
+            setLoading(false);
+          })
+          .catch(err => {
+            console.error("Error seeding default profile:", err);
+            setLoading(false);
+          });
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `organizations_universities/${organizationId}/students/${studentId}`);
+    });
+
+    return () => unsubscribe();
+  }, [organizationId, studentId, userProfile]);
+
+  // 2. Listen to Opportunities
+  useEffect(() => {
+    if (!organizationId) return;
+    const oppsCol = collection(db, 'organizations_universities', organizationId, 'opportunities');
+    const unsubscribe = onSnapshot(oppsCol, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      setAllOpportunities(list);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, `organizations_universities/${organizationId}/opportunities`);
+    });
+    return () => unsubscribe();
+  }, [organizationId]);
+
+  // 3. Listen to Applications
+  useEffect(() => {
+    if (!organizationId || !studentId) return;
+    const appsCol = collection(db, 'organizations_universities', organizationId, 'applications');
+    const unsubscribe = onSnapshot(appsCol, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.studentId === studentId) {
+          list.push({ id: doc.id, ...data });
+        }
+      });
+      setApplications(list);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, `organizations_universities/${organizationId}/applications`);
+    });
+    return () => unsubscribe();
+  }, [organizationId, studentId]);
+
+  // 4. Eligibility Checking Logic
+  const isEligible = (opp: any) => {
+    if (!studentData) return true; // Default to true if profile is loading
+
+    // Status check - only display open opportunities
+    if (opp.status && opp.status !== 'open') return false;
+
+    // CGPA check
+    if (opp.minimumCgpa) {
+      const minCgpa = parseFloat(opp.minimumCgpa);
+      const studentCgpa = parseFloat(studentData.cgpa || '0');
+      if (studentCgpa < minCgpa) return false;
+    }
+
+    // Department check
+    if (opp.eligibleDepartments && Array.isArray(opp.eligibleDepartments) && opp.eligibleDepartments.length > 0) {
+      const lowerDepts = opp.eligibleDepartments.map((d: string) => d.toLowerCase());
+      if (!lowerDepts.includes('all') && studentData.department) {
+        if (!lowerDepts.includes(studentData.department.toLowerCase())) return false;
+      }
+    }
+
+    // Branch check
+    if (opp.eligibleBranches && Array.isArray(opp.eligibleBranches) && opp.eligibleBranches.length > 0) {
+      const lowerBranches = opp.eligibleBranches.map((b: string) => b.toLowerCase());
+      if (!lowerBranches.includes('all') && studentData.branch) {
+        if (!lowerBranches.includes(studentData.branch.toLowerCase())) return false;
+      }
+    }
+
+    return true;
+  };
+
+  const getMatchScore = (opp: any) => {
+    if (!studentData || !opp) return 85;
+    const requiredSkills = opp.skills || [];
+    if (requiredSkills.length === 0) return 90;
+    const studentSkills = studentData.skills || [];
+    const matched = requiredSkills.filter((s: string) => 
+      studentSkills.some((sk: string) => sk.toLowerCase().includes(s.toLowerCase()))
+    );
+    const pct = Math.round((matched.length / requiredSkills.length) * 100);
+    return Math.max(70, Math.min(100, pct));
+  };
+
+  // 5. Derive Stats & Collections
+  const availableOpportunities = allOpportunities.filter(isEligible);
+  
   const stats = [
-    { label: 'Available Opportunities', value: '42', icon: Briefcase, color: 'text-blue-500', bg: 'bg-blue-500/10', link: 'opportunities' },
-    { label: 'Applications Submitted', value: '18', icon: CheckCircle2, color: 'text-violet-500', bg: 'bg-violet-500/10', link: 'applications' },
-    { label: 'AI Match Score', value: '91%', icon: Sparkles, color: 'text-emerald-500', bg: 'bg-emerald-500/10', subtext: 'Excellent Match' },
-    { label: 'Upcoming Drives', value: '5', icon: Calendar, color: 'text-amber-500', bg: 'bg-amber-500/10', link: 'opportunities' },
+    { label: 'Available Opportunities', value: String(availableOpportunities.length), icon: Briefcase, color: 'text-blue-500', bg: 'bg-blue-500/10', link: 'opportunities' },
+    { label: 'Applications Submitted', value: String(applications.length), icon: CheckCircle2, color: 'text-violet-500', bg: 'bg-violet-500/10', link: 'applications' },
+    { label: 'AI Match Score', value: availableOpportunities.length > 0 ? `${Math.round(availableOpportunities.reduce((acc, o) => acc + getMatchScore(o), 0) / availableOpportunities.length)}%` : '91%', icon: Sparkles, color: 'text-emerald-500', bg: 'bg-emerald-500/10', subtext: 'Excellent Match' },
+    { label: 'Upcoming Drives', value: String(availableOpportunities.filter(o => o.deadline && new Date(o.deadline) >= new Date()).length), icon: Calendar, color: 'text-amber-500', bg: 'bg-amber-500/10', link: 'opportunities' },
   ];
 
-  const announcements = [
-    { id: 1, title: 'TCS Campus Drive', detail: 'Applications are open for 2026 batch', time: '2 hours ago', tag: 'Direct' },
-    { id: 2, title: 'Infosys Hiring Drive', detail: 'Registration ends tomorrow', time: '1 day ago', tag: 'Urgent' },
-    { id: 3, title: 'Wipro Off-Campus Program', detail: 'New opportunity added regularly', time: '2 days ago', tag: 'External' },
-  ];
+  const announcements = allOpportunities.length > 0 ? 
+    allOpportunities.filter(o => o.status === 'open').slice(0, 3).map((opp, idx) => ({
+      id: opp.id || idx,
+      title: `${opp.companyName} Drive`,
+      detail: opp.title ? `Applications are open for ${opp.title}` : 'New opportunity posted',
+      time: opp.createdAt ? new Date(opp.createdAt).toLocaleDateString('en-GB') : 'Recently',
+      tag: opp.employmentType || 'Direct'
+    })) : [
+      { id: 1, title: 'TCS Campus Drive', detail: 'Applications are open for 2026 batch', time: '2 hours ago', tag: 'Direct' },
+      { id: 2, title: 'Infosys Hiring Drive', detail: 'Registration ends tomorrow', time: '1 day ago', tag: 'Urgent' },
+      { id: 3, title: 'Wipro Off-Campus Program', detail: 'New opportunity added regularly', time: '2 days ago', tag: 'External' },
+    ];
 
-  const recommendations = [
-    { title: 'Software Engineer', company: 'TCS', match: '94%', package: '4.5 LPA', location: 'Hyderabad' },
-    { title: 'Graduate Engineer Trainee', company: 'Infosys', match: '91%', package: '4.0 LPA', location: 'Bangalore' },
-    { title: 'Associate Software Engineer', company: 'Wipro', match: '88%', package: '3.6 LPA', location: 'Chennai' },
-  ];
+  const recommendations = availableOpportunities.length > 0 ? 
+    availableOpportunities.slice(0, 3).map((opp) => ({
+      id: opp.id,
+      title: opp.title,
+      company: opp.companyName,
+      match: `${getMatchScore(opp)}%`,
+      package: opp.salary || 'Competitive',
+      location: opp.location || 'Remote'
+    })) : [
+      { title: 'Software Engineer', company: 'TCS', match: '94%', package: '4.5 LPA', location: 'Hyderabad' },
+      { title: 'Graduate Engineer Trainee', company: 'Infosys', match: '91%', package: '4.0 LPA', location: 'Bangalore' },
+      { title: 'Associate Software Engineer', company: 'Wipro', match: '88%', package: '3.6 LPA', location: 'Chennai' },
+    ];
 
-  const upcommingDrives = [
-    { company: 'TCS', date: '20 Jun 2026', eligibility: 'B.Tech - 2026 Batch', status: 'Registration Open' },
-    { company: 'Infosys', date: '25 Jun 2026', eligibility: 'B.Tech / MCA - 2026 Batch', status: 'Closing Soon' },
-    { company: 'Wipro', date: '28 Jun 2026', eligibility: 'Any Degree - 2026 Batch', status: 'Open' },
-  ];
+  const upcommingDrives = availableOpportunities.filter(o => o.deadline).length > 0 ? 
+    availableOpportunities.filter(o => o.deadline).slice(0, 3).map((opp) => ({
+      company: opp.companyName,
+      date: new Date(opp.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      eligibility: opp.eligibleDepartments ? opp.eligibleDepartments.join(' / ') : 'All',
+      status: 'Open'
+    })) : [
+      { company: 'TCS', date: '20 Jun 2026', eligibility: 'B.Tech - 2026 Batch', status: 'Registration Open' },
+      { company: 'Infosys', date: '25 Jun 2026', eligibility: 'B.Tech / MCA - 2026 Batch', status: 'Closing Soon' },
+      { company: 'Wipro', date: '28 Jun 2026', eligibility: 'Any Degree - 2026 Batch', status: 'Open' },
+    ];
 
   return (
     <div className="space-y-6 pb-12">
@@ -85,18 +271,22 @@ export default function DashboardTab({ onNavigate, onApplyJob }: DashboardTabPro
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-xs font-bold uppercase tracking-widest text-emerald-500">Live Intake Sync</span>
             </div>
-            <h3 className="text-xl font-display font-bold text-app-text">Rohit Kumar</h3>
-            <p className="text-xs text-app-muted font-semibold">B.Tech CSE • 2026 Batch • St. Xavier's University</p>
+            <h3 className="text-xl font-display font-bold text-app-text">{studentData?.fullName || 'Rohit Kumar'}</h3>
+            <p className="text-xs text-app-muted font-semibold">
+              {studentData?.degree || 'B.Tech'} {studentData?.branch || 'CSE'} • {studentData?.year || '2026 Batch'} • {studentData?.university || "St. Xavier's University"}
+            </p>
           </div>
           
           <div className="mt-6 p-4 rounded-2xl bg-app-surface/60 border border-app-border flex items-center justify-between">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-app-muted block">Indexed CGPA</span>
-              <span className="text-2xl font-display font-extrabold text-brand-blue">8.45 / 10</span>
+              <span className="text-2xl font-display font-extrabold text-brand-blue">{studentData?.cgpa || '8.45'} / 10</span>
             </div>
             <div className="text-right">
               <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500 block">Status</span>
-              <span className="text-xs font-bold text-app-text">Eligible for All Drives</span>
+              <span className="text-xs font-bold text-app-text">
+                {studentData?.placementStatus === 'placed' ? 'Placed' : 'Eligible for All Drives'}
+              </span>
             </div>
           </div>
         </div>
@@ -108,7 +298,7 @@ export default function DashboardTab({ onNavigate, onApplyJob }: DashboardTabPro
           <div 
             key={idx} 
             onClick={() => st.link && onNavigate(st.link)}
-            className={`p-6 rounded-[28px] glass border-app-border card-shadow flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300`}
+            className="p-6 rounded-[28px] glass border-app-border card-shadow flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300"
           >
             <div className="flex items-center justify-between mb-4">
               <div className={`w-12 h-12 rounded-2xl ${st.bg} flex items-center justify-center`}>
@@ -186,12 +376,12 @@ export default function DashboardTab({ onNavigate, onApplyJob }: DashboardTabPro
             <div className="space-y-3.5">
               {recommendations.map((rec, i) => (
                 <div 
-                  key={i} 
+                  key={rec.id || i} 
                   className="p-4 rounded-2xl bg-app-surface/60 border border-app-border flex items-center justify-between hover:scale-[1.005] hover:bg-app-surface transition-all gap-4"
                 >
                   <div className="flex items-center gap-3.5">
                     <div className="w-10 h-10 rounded-xl bg-brand-blue/10 text-brand-blue flex items-center justify-center font-display font-extrabold text-sm shadow-inner">
-                      {rec.company}
+                      {rec.company ? rec.company.substring(0, 3).toUpperCase() : 'JOB'}
                     </div>
                     <div>
                       <div className="font-bold text-sm text-app-text leading-none">{rec.title}</div>
@@ -208,7 +398,7 @@ export default function DashboardTab({ onNavigate, onApplyJob }: DashboardTabPro
                       </span>
                     </div>
                     <button 
-                      onClick={() => onApplyJob(rec.title, rec.company)}
+                      onClick={() => onApplyJob(rec.title, rec.company, rec.id)}
                       className="px-4 py-2 bg-brand-blue hover:bg-brand-blue-dark text-white font-bold rounded-xl text-xs whitespace-nowrap transition-colors"
                     >
                       Apply

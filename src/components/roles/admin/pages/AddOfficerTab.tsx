@@ -14,7 +14,7 @@ import {
 
 interface AddOfficerTabProps {
   onBack: () => void;
-  onSubmit: (newOfficer: any) => void;
+  onSubmit: (newOfficer: any) => Promise<void> | void;
 }
 
 export default function AddOfficerTab({ onBack, onSubmit }: AddOfficerTabProps) {
@@ -25,8 +25,9 @@ export default function AddOfficerTab({ onBack, onSubmit }: AddOfficerTabProps) 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [dept, setDept] = useState('CSE');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!name || !email || !phone || !designation || !password || !confirmPassword) {
       alert('Please fill in all the required fields.');
@@ -37,19 +38,23 @@ export default function AddOfficerTab({ onBack, onSubmit }: AddOfficerTabProps) 
       return;
     }
 
-    const newOfficer = {
-      id: String(Date.now()),
-      name,
-      dept,
-      email,
-      phone,
-      opportunities: 0,
-      placements: 0,
-      status: 'Active',
-      avatar: `https://picsum.photos/seed/${name.replace(/\s+/g, '')}/100/100`,
-    };
+    setIsSubmitting(true);
+    try {
+      const newOfficer = {
+        name,
+        dept,
+        email,
+        phone,
+        designation,
+        password,
+      };
 
-    onSubmit(newOfficer);
+      await onSubmit(newOfficer);
+    } catch (err: any) {
+      alert(err.message || 'Error creating placement officer.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const permissions = [
@@ -220,16 +225,18 @@ export default function AddOfficerTab({ onBack, onSubmit }: AddOfficerTabProps) 
             <div className="flex justify-end items-center gap-4 border-t border-app-border/40 pt-6 mt-4">
               <button 
                 type="button"
+                disabled={isSubmitting}
                 onClick={onBack}
-                className="px-5 py-2.5 border border-app-border rounded-xl text-xs font-semibold text-app-muted hover:bg-app-bg hover:text-app-text transition-all cursor-pointer"
+                className="px-5 py-2.5 border border-app-border rounded-xl text-xs font-semibold text-app-muted hover:bg-app-bg hover:text-app-text transition-all cursor-pointer disabled:opacity-50"
               >
                 Cancel
               </button>
               <button 
                 type="submit"
-                className="px-6 py-2.5 bg-brand-blue hover:bg-brand-blue/90 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-brand-blue/15 transition-all cursor-pointer"
+                disabled={isSubmitting}
+                className="px-6 py-2.5 bg-brand-blue hover:bg-brand-blue/90 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-brand-blue/15 transition-all cursor-pointer disabled:opacity-50"
               >
-                Create Officer
+                {isSubmitting ? 'Creating...' : 'Create Officer'}
               </button>
             </div>
           </form>

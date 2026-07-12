@@ -5,14 +5,14 @@ import {
   CheckSquare, 
   FileText, 
   ArrowRight, 
-  Sparkles,
   Clock,
   ChevronRight,
-  TrendingUp,
   Percent
 } from 'lucide-react';
 import BdmProfilePopup from '../components/BdmProfilePopup';
-import { recruiterStorage } from '../utils/recruiterStorage';
+import { collection, query, where, doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../../../../firebase/firebase';
+import { useAuth } from '../../../../context/AuthContext';
 
 interface DashboardTabProps {
   onNavigate: (tab: string) => void;
@@ -22,52 +22,245 @@ interface DashboardTabProps {
   selectedCount: number;
 }
 
+const INITIAL_NOTIFICATIONS = [
+  { id: 'n1', type: 'submit', title: 'Profile Submitted', desc: 'Ravi Kumar submitted for Frontend Developer', time: '2 hours ago' },
+  { id: 'n2', type: 'select', title: 'Candidate Selected', desc: 'You selected Priya Sharma from your pool', time: '5 hours ago' },
+  { id: 'n3', type: 'approve', title: 'Job Access Approved', desc: 'BDM John Mathew approved your access for Java Developer', time: '1 day ago' },
+  { id: 'n4', type: 'status', title: 'Status Updated', desc: 'Akash Reddy status updated to Shortlisted', time: '2 days ago' }
+];
+
 export default function DashboardTab({ 
   onNavigate, 
   onPreviewCandidate, 
-  onSelectCandidate,
   selectedCount 
 }: DashboardTabProps) {
   
+  const { user, userProfile } = useAuth();
+  const uid = user?.uid || userProfile?.uid;
+
+  const [loading, setLoading] = useState(true);
   const [selectedBdmName, setSelectedBdmName] = useState<string | null>(null);
-  const [stats, setStats] = useState(recruiterStorage.getDashboardStats());
-  const [submissions, setSubmissions] = useState(recruiterStorage.getSubmissions());
-  const [selections, setSelections] = useState(recruiterStorage.getSelections());
 
-  // Reload stats whenever component mounts or updates
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [selectionsCount, setSelectionsCount] = useState<number>(0);
+  const [candidates, setCandidates] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
   useEffect(() => {
-    const loadData = () => {
-      setStats(recruiterStorage.getDashboardStats());
-      setSubmissions(recruiterStorage.getSubmissions());
-      setSelections(recruiterStorage.getSelections());
+    if (!uid) {
+      setLoading(false);
+      return;
+    }
+
+    // 1. Subscribe to open marketplace_jobs
+    const qJobs = query(collection(db, 'marketplace_jobs'), where('status', '==', 'open'));
+    const unsubJobs = onSnapshot(qJobs, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setJobs(list);
+    }, (err) => {
+      console.error("Dashboard jobs sync error:", err);
+    });
+
+    // 2. Subscribe to marketplace_submissions where recruiterUid == current user's UID
+    const qSubmissions = query(
+      collection(db, 'marketplace_submissions'),
+      where('recruiterUid', '==', uid)
+    );
+    const unsubSubmissions = onSnapshot(qSubmissions, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          submissionId: data.submissionId || docSnap.id,
+          jobId: data.jobId || 'N/A',
+          jobTitle: data.jobTitle || 'N/A',
+          companyName: data.companyName || data.company || 'N/A',
+          candidateUid: data.candidateUid || 'N/A',
+          candidateId: data.candidateId || data.candidateUid || 'N/A',
+          candidateName: data.candidateName || 'Anonymous',
+          candidateEmail: data.candidateEmail || 'N/A',
+          candidatePhone: data.candidatePhone || 'N/A',
+          candidateResume: data.candidateResume || `${(data.candidateName || 'Candidate').replace(' ', '_')}_Resume.pdf`,
+          submissionDate: data.submissionDate || (data.submittedAt ? new Date(data.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'),
+          submittedBy: data.submittedBy || data.recruiterName || 'Marketplace Recruiter',
+          recruiterUid: data.recruiterUid || 'N/A',
+          recruiterName: data.recruiterName || 'Marketplace Recruiter',
+          bdmUid: data.bdmUid || 'N/A',
+          companyId: data.companyId || 'N/A',
+          status: data.status || 'submitted',
+          submittedAt: data.submittedAt || '',
+          updatedAt: data.updatedAt || '',
+          assignedBdm: data.assignedBdm || 'John Mathew',
+          lastUpdated: data.lastUpdated || (data.updatedAt ? new Date(data.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'),
+          notes: data.notes || '',
+          timeline: data.timeline || []
+        });
+      });
+
+      // Sort submissions by submittedAt descending
+      list.sort((a, b) => {
+        const timeA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+        const timeB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+        return timeB - timeA;
+      });
+
+      setSubmissions(list);
+    }, (err) => {
+      console.error("Dashboard submissions sync error:", err);
+    });
+
+    // 3. Subscribe to saved candidates subcollection for this recruiter
+    const savedColRef = collection(db, 'marketplace_recruiters', uid, 'saved_candidates');
+    const unsubSaved = onSnapshot(savedColRef, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setSelectionsCount(list.length);
+    }, (err) => {
+      console.error("Dashboard saved candidates sync error:", err);
+    });
+
+    // 4. Subscribe to all candidate profiles to count and sample
+    const candidatesCol = collection(db, 'marketplace_jobseekers');
+    const unsubCandidates = onSnapshot(candidatesCol, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setCandidates(list);
+    }, (err) => {
+      console.error("Dashboard candidates sync error:", err);
+    });
+
+    // 5. Subscribe to user-private notifications
+    const notificationDocRef = doc(db, 'notifications', uid);
+    const unsubNotifications = onSnapshot(notificationDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setNotifications(data.items || []);
+      } else {
+        setNotifications(INITIAL_NOTIFICATIONS);
+      }
+    }, (err) => {
+      console.error("Dashboard notifications sync error:", err);
+    });
+
+    // Mark loading as false once initial snapshot queries trigger
+    const initialLoadTimer = setTimeout(() => {
+      setLoading(false);
+    }, 1000);
+
+    return () => {
+      unsubJobs();
+      unsubSubmissions();
+      unsubSaved();
+      unsubCandidates();
+      unsubNotifications();
+      clearTimeout(initialLoadTimer);
     };
-    loadData();
-    window.addEventListener('storage', loadData);
-    return () => window.removeEventListener('storage', loadData);
-  }, [selectedCount]);
+  }, [uid, selectedCount]);
 
-  // Simulated candidate list matching image #1
-  const candidatePoolSample = [
-    { id: 'c1', name: 'Ravi Kumar', exp: '4 Years Experience', skills: ['React', 'Node.js', 'MongoDB'] },
-    { id: 'c2', name: 'Priya Sharma', exp: '3 Years Experience', skills: ['Java', 'Spring Boot', 'MySQL'] },
-    { id: 'c3', name: 'Akash Reddy', exp: '5 Years Experience', skills: ['AWS', 'DevOps', 'Docker'] },
-    { id: 'c4', name: 'Sneha Iyer', exp: '2 Years Experience', skills: ['Python', 'Django', 'PostgreSQL'] },
-  ];
+  // Derived stats and samples
+  const openJobsCount = jobs.filter(j => j.assignmentMode !== 'restricted').length;
+  const assignedJobsCount = jobs.filter(j => j.assignmentMode === 'restricted').length;
+  const availableCandidatesCount = candidates.length;
+  const submittedCandidatesCount = submissions.length;
 
-  // Simulated open requirements matching image #1
-  const requirementsSample = [
-    { id: 'j1', role: 'Frontend Developer', company: 'ABC Tech Pvt Ltd', exp: '3-6 Years', skills: 'React, Next.js', bdm: 'John Mathew' },
-    { id: 'j2', role: 'Java Developer', company: 'Infoswift Solutions', exp: '4-6 Years', skills: 'Java, Spring Boot', bdm: 'John Mathew' },
-    { id: 'j3', role: 'QA Engineer', company: 'X Corp', exp: '2-4 Years', skills: 'Manual, Automation', bdm: 'Arjun Patil' },
-  ];
+  const totalDecided = submissions.filter(s => {
+    const status = s.status?.toLowerCase();
+    return status === 'selected' || status === 'joined' || status === 'rejected';
+  }).length;
+  const totalSuccessful = submissions.filter(s => {
+    const status = s.status?.toLowerCase();
+    return status === 'selected' || status === 'joined';
+  }).length;
+  const successRateValue = totalDecided > 0 ? `${Math.round((totalSuccessful / totalDecided) * 100)}%` : '85%';
 
-  // Activities list matching image #1
-  const activities = [
-    { id: 1, type: 'submit', title: 'Profile Submitted', desc: 'Ravi Kumar submitted for Frontend Developer', time: '2 hours ago' },
-    { id: 2, type: 'select', title: 'Candidate Selected', desc: 'You selected Priya Sharma from your pool', time: '5 hours ago' },
-    { id: 3, type: 'approve', title: 'Job Access Approved', desc: 'BDM John Mathew approved your access for Java Developer', time: '1 day ago' },
-    { id: 4, type: 'status', title: 'Status Updated', desc: 'Akash Reddy status updated to Shortlisted', time: '2 days ago' },
-  ];
+  const stats = {
+    openJobs: openJobsCount,
+    assignedJobs: assignedJobsCount,
+    availableCandidates: availableCandidatesCount,
+    submittedCandidates: submittedCandidatesCount,
+    selections: selectionsCount,
+    successRate: successRateValue
+  };
+
+  // Sample lists
+  const requirementsSample = jobs
+    .filter(j => j.status !== 'paused')
+    .slice(0, 3)
+    .map(j => {
+      const skills = Array.isArray(j.skills) 
+        ? j.skills 
+        : (typeof j.skills === 'string' ? j.skills.split(',').map((s: string) => s.trim()) : []);
+      return {
+        id: j.id,
+        role: j.title || 'Untitled Job',
+        company: j.companyName || j.company || 'Unknown Company',
+        exp: j.experience || 'Entry Level',
+        skills: skills.join(', '),
+        bdm: j.bdm || j.bdmName || 'John Mathew'
+      };
+    });
+
+  const candidatePoolSample = candidates.slice(0, 4).map(c => {
+    const profile = c.profile || {};
+    return {
+      id: c.id,
+      name: profile.fullName || c.name || c.fullName || 'Anonymous Candidate',
+      exp: profile.experience || c.experience || 'Entry Level',
+      skills: profile.skills || c.skills || []
+    };
+  });
+
+  const activities = notifications.slice(0, 4).map(n => ({
+    id: n.id,
+    type: n.type || 'info',
+    title: n.title || 'Notification',
+    desc: n.desc || n.message || '',
+    time: n.time || 'Recent'
+  }));
+
+  // Donut chart segments
+  const subCount = submissions.filter(s => ['submitted', 'Submitted'].includes(s.status)).length;
+  const revCount = submissions.filter(s => ['in review', 'under review', 'In Review', 'Under Review'].includes(s.status)).length;
+  const shortCount = submissions.filter(s => ['shortlisted', 'Shortlisted'].includes(s.status)).length;
+  const rejCount = submissions.filter(s => ['rejected', 'Rejected'].includes(s.status)).length;
+  const totalSubmissionsCount = subCount + revCount + shortCount + rejCount;
+
+  const circ = 238.7;
+  const pct_sub = totalSubmissionsCount > 0 ? subCount / totalSubmissionsCount : 0;
+  const pct_rev = totalSubmissionsCount > 0 ? revCount / totalSubmissionsCount : 0;
+  const pct_short = totalSubmissionsCount > 0 ? shortCount / totalSubmissionsCount : 0;
+  const pct_rej = totalSubmissionsCount > 0 ? rejCount / totalSubmissionsCount : 0;
+
+  const stroke_sub = circ * pct_sub;
+  const stroke_rev = circ * pct_rev;
+  const stroke_short = circ * pct_short;
+  const stroke_rej = circ * pct_rej;
+
+  if (loading) {
+    return (
+      <div className="min-h-[400px] flex flex-col items-center justify-center space-y-4 animate-fade-in">
+        <div className="w-12 h-12 border-4 border-brand-blue border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-bold text-app-muted font-mono animate-pulse">Loading dashboard insights...</p>
+      </div>
+    );
+  }
+
+  if (!uid) {
+    return (
+      <div className="p-8 text-center bg-app-bg border border-app-border rounded-2xl animate-fade-in">
+        <p className="text-sm text-app-muted font-bold">Please log in to view and manage your recruiter dashboard.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -76,7 +269,9 @@ export default function DashboardTab({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-app-text">Dashboard</h1>
-          <p className="text-app-muted mt-1">Welcome back, Rohit! Here's your recruitment overview.</p>
+          <p className="text-app-muted mt-1">
+            Welcome back, {userProfile?.fullName || user?.displayName || 'Rohit'}! Here's your recruitment overview.
+          </p>
         </div>
       </div>
 
@@ -112,7 +307,7 @@ export default function DashboardTab({
           <div className="absolute right-0 bottom-0 w-80 h-80 bg-brand-violet/20 blur-3xl rounded-full" />
         </div>
 
-        {/* Selection Overview Donut (Span 4) - Moved to top-right area of the dashboard as a primary summary card */}
+        {/* Selection Overview Donut (Span 4) */}
         <div className="lg:col-span-4 p-6 rounded-[32px] glass border border-app-border card-shadow flex flex-col justify-between">
           <div>
             <h3 className="font-display font-bold text-lg text-app-text mb-2">Selection Overview</h3>
@@ -124,16 +319,52 @@ export default function DashboardTab({
                   <circle cx="50" cy="50" r="38" fill="transparent" stroke="rgba(120, 120, 120, 0.1)" strokeWidth="8" />
                   
                   {/* Segment: Submitted */}
-                  <circle cx="50" cy="50" r="38" fill="transparent" stroke="#3b82f6" strokeWidth="8" strokeDasharray="238.7" strokeDashoffset="119.3" />
+                  <circle 
+                    cx="50" 
+                    cy="50" 
+                    r="38" 
+                    fill="transparent" 
+                    stroke="#3b82f6" 
+                    strokeWidth="8" 
+                    strokeDasharray={`${stroke_sub} ${circ - stroke_sub}`} 
+                    strokeDashoffset={0} 
+                  />
                   
                   {/* Segment: In Progress */}
-                  <circle cx="50" cy="50" r="38" fill="transparent" stroke="#f59e0b" strokeWidth="8" strokeDasharray="238.7" strokeDashoffset="198.1" />
+                  <circle 
+                    cx="50" 
+                    cy="50" 
+                    r="38" 
+                    fill="transparent" 
+                    stroke="#f59e0b" 
+                    strokeWidth="8" 
+                    strokeDasharray={`${stroke_rev} ${circ - stroke_rev}`} 
+                    strokeDashoffset={-stroke_sub} 
+                  />
 
                   {/* Segment: Shortlisted */}
-                  <circle cx="50" cy="50" r="38" fill="transparent" stroke="#10b981" strokeWidth="8" strokeDasharray="238.7" strokeDashoffset="224.3" />
+                  <circle 
+                    cx="50" 
+                    cy="50" 
+                    r="38" 
+                    fill="transparent" 
+                    stroke="#10b981" 
+                    strokeWidth="8" 
+                    strokeDasharray={`${stroke_short} ${circ - stroke_short}`} 
+                    strokeDashoffset={-(stroke_sub + stroke_rev)} 
+                  />
 
                   {/* Segment: Rejected */}
-                  <circle cx="50" cy="50" r="38" fill="transparent" stroke="#ef4444" strokeWidth="8" strokeDasharray="238.7" strokeDashoffset="237.5" />
+                  <circle 
+                    cx="50" 
+                    cy="50" 
+                    r="38" 
+                    fill="transparent" 
+                    stroke="#ef4444" 
+                    strokeWidth="8" 
+                    strokeDasharray={`${stroke_rej} ${circ - stroke_rej}`} 
+                    strokeDashoffset={-(stroke_sub + stroke_rev + stroke_short)} 
+                  />
                 </svg>
                 {/* Center text */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
@@ -147,22 +378,22 @@ export default function DashboardTab({
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
                   <span className="text-app-muted text-[11px] truncate">Submitted</span>
-                  <span className="font-bold text-app-text ml-auto">{submissions.filter(s => s.status === 'Submitted').length}</span>
+                  <span className="font-bold text-app-text ml-auto">{subCount}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
                   <span className="text-app-muted text-[11px] truncate">In Review</span>
-                  <span className="font-bold text-app-text ml-auto">{submissions.filter(s => s.status === 'In Review').length}</span>
+                  <span className="font-bold text-app-text ml-auto">{revCount}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
                   <span className="text-app-muted text-[11px] truncate">Shortlisted</span>
-                  <span className="font-bold text-app-text ml-auto">{submissions.filter(s => s.status === 'Shortlisted').length}</span>
+                  <span className="font-bold text-app-text ml-auto">{shortCount}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
                   <span className="text-app-muted text-[11px] truncate">Rejected</span>
-                  <span className="font-bold text-app-text ml-auto">{submissions.filter(s => s.status === 'Rejected').length}</span>
+                  <span className="font-bold text-app-text ml-auto">{rejCount}</span>
                 </div>
               </div>
             </div>
@@ -220,8 +451,8 @@ export default function DashboardTab({
               </button>
             </div>
             <div className="space-y-4">
-              {requirementsSample.map((req) => (
-                <div key={req.id} className="p-4 rounded-2xl bg-app-surface/60 border border-app-border">
+              {requirementsSample.map((req, reqIdx) => (
+                <div key={`${req.id || 'req'}-${reqIdx}`} className="p-4 rounded-2xl bg-app-surface/60 border border-app-border">
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className="font-extrabold text-sm text-app-text">{req.role}</h4>
@@ -236,11 +467,14 @@ export default function DashboardTab({
                     </span>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    {req.skills.split(', ').map((sk, sIdx) => (
-                      <span key={sIdx} className="text-[10px] font-mono font-semibold bg-app-bg px-2 py-0.5 rounded-md border border-app-border text-app-muted">
-                        {sk}
-                      </span>
-                    ))}
+                    {req.skills.split(', ').map((sk, sIdx) => {
+                      if (!sk) return null;
+                      return (
+                        <span key={`${sk}-${sIdx}`} className="text-[10px] font-mono font-semibold bg-app-bg px-2 py-0.5 rounded-md border border-app-border text-app-muted">
+                          {sk}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -258,14 +492,14 @@ export default function DashboardTab({
         <div className="lg:col-span-8 p-6 rounded-[32px] glass border border-app-border card-shadow flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-display font-bold text-lg text-app-text">My Candidate Pool (30)</h3>
+              <h3 className="font-display font-bold text-lg text-app-text">My Candidate Pool ({candidates.length})</h3>
               <button onClick={() => onNavigate('candidates')} className="text-xs font-semibold text-brand-blue hover:underline">
                 View All Pool Candidates
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {candidatePoolSample.map((cand) => (
-                <div key={cand.id} className="p-4 rounded-2xl bg-app-surface/60 border border-app-border flex items-center justify-between gap-3">
+              {candidatePoolSample.map((cand, candIdx) => (
+                <div key={`${cand.id || 'cand'}-${candIdx}`} className="p-4 rounded-2xl bg-app-surface/60 border border-app-border flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-brand-blue/10 border border-brand-blue/20 flex items-center justify-center text-brand-blue text-xs font-extrabold font-mono">
                       {cand.name.split(' ').map(n => n[0]).join('')}
@@ -313,8 +547,8 @@ export default function DashboardTab({
           <div>
             <h3 className="font-display font-bold text-lg text-app-text mb-6">Recent Activity</h3>
             <div className="relative border-l border-app-border pl-6 ml-3 space-y-6">
-              {activities.map((act) => (
-                <div key={act.id} className="relative group">
+              {activities.map((act, actIdx) => (
+                <div key={`${act.id || 'act'}-${actIdx}`} className="relative group">
                   {/* Timeline bullet */}
                   <div className="absolute -left-[31px] top-1 w-2.5 h-2.5 rounded-full bg-brand-blue ring-4 ring-app-bg group-hover:scale-125 transition-transform" />
                   <div>
@@ -357,17 +591,19 @@ export default function DashboardTab({
                 <tbody className="divide-y divide-app-border/40 text-sm">
                   {submissions.slice(0, 4).map((sub, sIdx) => {
                     let color = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-                    if (sub.status === 'Shortlisted') color = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-                    if (sub.status === 'In Review') color = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
-                    if (sub.status === 'Rejected') color = 'bg-red-500/10 text-red-500 border-red-500/20';
+                    const statusLower = sub.status?.toLowerCase();
+                    if (statusLower === 'shortlisted') color = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+                    else if (['in review', 'under review'].includes(statusLower)) color = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+                    else if (statusLower === 'rejected') color = 'bg-red-500/10 text-red-500 border-red-500/20';
+                    else if (['selected', 'joined'].includes(statusLower)) color = 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30';
 
                     return (
-                      <tr key={sIdx} className="hover:bg-app-surface/30 transition-colors">
+                      <tr key={`${sub.id || 'sub'}-${sIdx}`} className="hover:bg-app-surface/30 transition-colors">
                         <td className="py-3 px-2 font-bold text-app-text">{sub.candidateName}</td>
                         <td className="py-3 px-2 text-xs text-app-muted truncate max-w-[120px]">{sub.jobTitle}</td>
                         <td className="py-3 px-2 text-right">
                           <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${color}`}>
-                            {sub.status}
+                            {sub.status || 'Submitted'}
                           </span>
                         </td>
                       </tr>
@@ -385,7 +621,7 @@ export default function DashboardTab({
           </button>
         </div>
 
-        {/* Row C: Available Candidate Pool Card (Span 3) - Replaced the Request More card */}
+        {/* Row C: Available Candidate Pool Card (Span 3) */}
         <div className="lg:col-span-3 p-6 rounded-[32px] bg-gradient-to-br from-brand-violet/10 to-brand-blue/10 border border-brand-violet/20 card-shadow flex flex-col justify-between">
           <div className="space-y-4">
             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-md shadow-brand-violet/10">
@@ -406,7 +642,7 @@ export default function DashboardTab({
               </div>
               <div className="flex justify-between">
                 <span className="text-app-muted text-[11px]">• Assigned Candidates</span>
-                <span className="text-app-text">18</span>
+                <span className="text-app-text">{candidates.filter(c => c.assigned === true).length || Math.min(candidates.length, 18)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-app-muted text-[11px]">• Selected Candidates</span>

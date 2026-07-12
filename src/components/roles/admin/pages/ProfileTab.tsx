@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   User, 
@@ -13,8 +13,18 @@ import {
   ChevronRight,
   Sparkles
 } from 'lucide-react';
+import { db } from '../../../../firebase/firebase';
+import { useAuth } from '../../../../context/AuthContext';
+import { 
+  doc, 
+  onSnapshot, 
+  updateDoc 
+} from 'firebase/firestore';
 
 export default function ProfileTab() {
+  const { userProfile } = useAuth();
+  const organizationId = userProfile?.organizationId;
+
   // University values
   const [univCode, setUnivCode] = useState('SXU2026');
   const [address, setAddress] = useState('5, Mahapalika Marg, Mumbai, Maharashtra 400001');
@@ -37,10 +47,62 @@ export default function ProfileTab() {
 
   const [isEditing, setIsEditing] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  // Real-time Firestore Sync
+  useEffect(() => {
+    if (!organizationId) return;
+
+    const docRef = doc(db, 'organizations_universities', organizationId);
+    const unsub = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.univCode !== undefined) setUnivCode(data.univCode);
+        if (data.address !== undefined) setAddress(data.address);
+        if (data.univEmail !== undefined) setUnivEmail(data.univEmail);
+        if (data.phone !== undefined) setPhone(data.phone);
+        if (data.website !== undefined) setWebsite(data.website);
+
+        if (data.adminName !== undefined) setAdminName(data.adminName);
+        if (data.designation !== undefined) setDesignation(data.designation);
+        if (data.adminEmail !== undefined) setAdminEmail(data.adminEmail);
+        if (data.adminPhone !== undefined) setAdminPhone(data.adminPhone);
+        if (data.dept !== undefined) setDept(data.dept);
+
+        if (data.deadline !== undefined) setDeadline(data.deadline);
+        if (data.resumeVisible !== undefined) setResumeVisible(data.resumeVisible);
+        if (data.multiApply !== undefined) setMultiApply(data.multiApply);
+        if (data.emailNotify !== undefined) setEmailNotify(data.emailNotify);
+      }
+    });
+
+    return () => unsub();
+  }, [organizationId]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!organizationId) return;
+
+    const docRef = doc(db, 'organizations_universities', organizationId);
+    await updateDoc(docRef, {
+      univCode,
+      address,
+      univEmail,
+      phone,
+      website,
+      adminName,
+      designation,
+      adminEmail,
+      adminPhone,
+      dept
+    });
+
     setIsEditing(false);
-    alert('Success: University Profile & Administrator credentials updated successfully inside Xavier\'s core SQL database.');
+    alert('✓ institutional configuration & administrator credentials updated successfully in Firestore.');
+  };
+
+  const handleTogglePreference = async (key: string, value: any) => {
+    if (!organizationId) return;
+    const docRef = doc(db, 'organizations_universities', organizationId);
+    await updateDoc(docRef, { [key]: value });
   };
 
   return (
@@ -63,11 +125,11 @@ export default function ProfileTab() {
             {/* University Shield Emblem representation */}
             <div className="flex items-center gap-4 bg-app-bg/50 p-4 rounded-2xl border border-app-border">
               <div className="w-12 h-12 bg-gradient-to-tr from-brand-blue to-brand-violet rounded-xl flex items-center justify-center text-white font-black text-lg">
-                SXU
+                {(userProfile?.organizationName || 'SXU').substring(0, 3).toUpperCase()}
               </div>
               <div>
-                <div className="text-sm font-extrabold text-app-text">St. Xavier's University</div>
-                <span className="text-[10px] text-emerald-500 font-bold block mt-0.5">✓ Vetted University Registrar Unit #B2</span>
+                <div className="text-sm font-extrabold text-app-text">{userProfile?.organizationName || "St. Xavier's University"}</div>
+                <span className="text-[10px] text-emerald-500 font-bold block mt-0.5">✓ Vetted University Registrar Unit</span>
               </div>
             </div>
 
@@ -104,7 +166,7 @@ export default function ProfileTab() {
                 <div className="space-y-1.5">
                   <span className="text-[10px] font-extrabold text-app-muted uppercase block">E-mail Registry</span>
                   <div className="relative">
-                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-app-muted" />
+                     <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-app-muted" />
                     <input 
                       type="email" 
                       disabled={!isEditing}
@@ -158,8 +220,8 @@ export default function ProfileTab() {
               {/* Headshot and status info */}
               <div className="flex items-center gap-4">
                 <img 
-                  src="https://picsum.photos/seed/sandeepjain/100/100" 
-                  alt="Dr. Sandeep" 
+                  src={`https://picsum.photos/seed/${adminName.replace(/\s+/g, '')}/100/100`}
+                  alt={adminName} 
                   className="w-12 h-12 rounded-full object-cover border-2 border-app-border shrink-0 shadow-sm"
                   referrerPolicy="no-referrer"
                 />
@@ -281,7 +343,10 @@ export default function ProfileTab() {
               </div>
               <select 
                 value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
+                onChange={(e) => {
+                  setDeadline(e.target.value);
+                  handleTogglePreference('deadline', e.target.value);
+                }}
                 className="bg-app-bg border border-app-border text-xs font-extrabold py-2 px-3 rounded-lg text-brand-blue focus:outline-none cursor-pointer"
               >
                 <option value="3 Days">3 Days</option>
@@ -300,8 +365,12 @@ export default function ProfileTab() {
               </div>
               <button 
                 type="button"
-                onClick={() => setResumeVisible(!resumeVisible)}
-                className={`relative w-12 h-6 rounded-full transition-all flex items-center ${
+                onClick={() => {
+                  const newVal = !resumeVisible;
+                  setResumeVisible(newVal);
+                  handleTogglePreference('resumeVisible', newVal);
+                }}
+                className={`relative w-12 h-6 rounded-full transition-all flex items-center cursor-pointer ${
                   resumeVisible ? 'bg-brand-violet' : 'bg-app-surface border border-app-border'
                 }`}
               >
@@ -319,8 +388,12 @@ export default function ProfileTab() {
               </div>
               <button 
                 type="button"
-                onClick={() => setMultiApply(!multiApply)}
-                className={`relative w-12 h-6 rounded-full transition-all flex items-center ${
+                onClick={() => {
+                  const newVal = !multiApply;
+                  setMultiApply(newVal);
+                  handleTogglePreference('multiApply', newVal);
+                }}
+                className={`relative w-12 h-6 rounded-full transition-all flex items-center cursor-pointer ${
                   multiApply ? 'bg-brand-violet' : 'bg-app-surface border border-app-border'
                 }`}
               >
@@ -338,8 +411,12 @@ export default function ProfileTab() {
               </div>
               <button 
                 type="button"
-                onClick={() => setEmailNotify(!emailNotify)}
-                className={`relative w-12 h-6 rounded-full transition-all flex items-center ${
+                onClick={() => {
+                  const newVal = !emailNotify;
+                  setEmailNotify(newVal);
+                  handleTogglePreference('emailNotify', newVal);
+                }}
+                className={`relative w-12 h-6 rounded-full transition-all flex items-center cursor-pointer ${
                   emailNotify ? 'bg-brand-violet' : 'bg-app-surface border border-app-border'
                 }`}
               >

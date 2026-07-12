@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   User, 
@@ -33,6 +33,9 @@ import {
   ChevronDown,
   AlertTriangle
 } from 'lucide-react';
+import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db } from '../../../../firebase/firebase';
+import { useAuth } from '../../../../context/AuthContext';
 
 interface ExperienceItem {
   id: string;
@@ -79,6 +82,10 @@ interface SocialLinks {
 }
 
 export default function ProfileTab() {
+  const { user, userProfile } = useAuth();
+  const uid = user?.uid || userProfile?.uid;
+  const [loading, setLoading] = useState(true);
+
   const [activeSubTab, setActiveSubTab] = useState('INFO');
   const [showSavedMsg, setShowSavedMsg] = useState(false);
   const [savedMsgText, setSavedMsgText] = useState('Your profile changes have been saved successfully!');
@@ -96,6 +103,16 @@ export default function ProfileTab() {
   const [aboutMe, setAboutMe] = useState(
     'Passionate Full Stack Developer with 2+ years of hands-on experience in engineering high-fidelity React applications, Express REST APIs, and responsive UI frameworks. Enthusiastic about design systems, cloud architecture, and building user-centric digital platforms.'
   );
+
+  // New fields to persist
+  const [dbResumeScore, setDbResumeScore] = useState(85);
+  const [dbCreatedAt, setDbCreatedAt] = useState('');
+  const [headline, setHeadline] = useState('Student / Job Seeker');
+  const [languages, setLanguages] = useState('English, Telugu, Hindi');
+  const [experienceStr, setExperienceStr] = useState('Entry Level');
+  const [educationStr, setEducationStr] = useState('B.Tech in Computer Science & Engineering');
+  const [profilePhoto, setProfilePhoto] = useState('https://picsum.photos/seed/user123/200/200');
+  const [zip, setZip] = useState('500081');
 
   // Experience Tab State
   const [experiences, setExperiences] = useState<ExperienceItem[]>([
@@ -220,16 +237,293 @@ export default function ProfileTab() {
     setTimeout(() => setShowSavedMsg(false), 3000);
   };
 
+  // Real-time Firestore Sync
+  useEffect(() => {
+    if (!uid) {
+      setLoading(false);
+      return;
+    }
+
+    const docRef = doc(db, 'marketplace_jobseekers', uid);
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const prof = data.profile || {};
+        const resData = data.resume || {};
+        
+        setDbResumeScore(resData.resumeCompletion || resData.completion || 85);
+        setDbCreatedAt(data.createdAt || prof.createdAt || '');
+
+        setFullName(prof.fullName || data.fullName || '');
+        setEmail(prof.email || data.email || '');
+        setPhone(prof.phone || prof.phoneNumber || data.phone || data.phoneNumber || '');
+        setDob(prof.dateOfBirth || data.dateOfBirth || '');
+        setGender(prof.gender || data.gender || 'Male');
+        setCity(data.city || '');
+        setState(data.state || '');
+        setCountry(data.country || '');
+        setAddress(prof.address || data.address || '');
+        setAboutMe(prof.bio || data.bio || prof.aboutMe || data.aboutMe || '');
+        setHeadline(prof.headline || data.headline || 'Student / Job Seeker');
+        setLanguages(prof.languages || data.languages || 'English, Telugu, Hindi');
+        setExperienceStr(prof.experience || data.experience || 'Entry Level');
+        setEducationStr(prof.education || data.education || 'B.Tech in Computer Science & Engineering');
+        setProfilePhoto(prof.profilePhoto || data.profilePhoto || 'https://picsum.photos/seed/user123/200/200');
+        setZip(data.zip || '500081');
+
+        setExperiences(data.experiences || prof.experiences || []);
+        setEducations(data.educations || prof.educations || []);
+        if (data.skillsCategories) {
+          setSkillsCategories(data.skillsCategories);
+        }
+
+        const currentLinks = data.links || {};
+        setLinks({
+          github: currentLinks.github || data.github || '',
+          linkedin: currentLinks.linkedin || data.linkedin || '',
+          portfolio: currentLinks.portfolio || data.portfolio || '',
+          website: currentLinks.website || data.website || '',
+          leetcode: currentLinks.leetcode || data.leetcode || '',
+          hackerrank: currentLinks.hackerrank || data.hackerrank || '',
+          codeforces: currentLinks.codeforces || data.codeforces || '',
+          behance: currentLinks.behance || data.behance || '',
+          dribbble: currentLinks.dribbble || data.dribbble || '',
+          medium: currentLinks.medium || data.medium || '',
+          youtube: currentLinks.youtube || data.youtube || '',
+          x: currentLinks.x || data.x || ''
+        });
+
+        const prefs = data.preferences || {};
+        setPrefSalary(prefs.prefSalary || data.expectedSalary || '₹12 - 18 LPA');
+        setPrefNoticePeriod(prefs.prefNoticePeriod || data.noticePeriod || 'Immediate');
+        setPrefRoles(prefs.prefRoles || data.prefRoles || ['Frontend Developer', 'Full Stack Developer']);
+        setPrefLocations(prefs.prefLocations || data.preferredLocation || data.prefLocations || ['Hyderabad', 'Bangalore']);
+        setPrefRemote(prefs.prefRemote !== undefined ? prefs.prefRemote : true);
+        setPrefHybrid(prefs.prefHybrid !== undefined ? prefs.prefHybrid : true);
+        setPrefOnsite(prefs.prefOnsite !== undefined ? prefs.prefOnsite : false);
+        setPrefRelocation(prefs.prefRelocation !== undefined ? prefs.prefRelocation : true);
+        setPrefInternational(prefs.prefInternational !== undefined ? prefs.prefInternational : false);
+        setPrefEmploymentType(prefs.prefEmploymentType || ['Full-Time']);
+        setPrefIndustries(prefs.prefIndustries || ['SaaS', 'AI/Deep Tech']);
+        setJobAlerts(prefs.jobAlerts !== undefined ? prefs.jobAlerts : true);
+        setAiRecommendation(prefs.aiRecommendation !== undefined ? prefs.aiRecommendation : true);
+        setRecruiterVisibility(prefs.recruiterVisibility !== undefined ? prefs.recruiterVisibility : true);
+        setAvailabilityStatus(prefs.availabilityStatus || data.availability || 'Actively Looking');
+      }
+      setLoading(false);
+    }, (error) => {
+      console.error("Error subscribing to profile:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [uid]);
+
+  // Unified Update Helper
+  const updateProfileInFirestore = async (overrideFields: any = {}) => {
+    if (!uid) return;
+    
+    // Construct current state snapshots
+    const currentFullName = overrideFields.fullName !== undefined ? overrideFields.fullName : fullName;
+    const currentEmail = overrideFields.email !== undefined ? overrideFields.email : email;
+    const currentPhone = overrideFields.phone !== undefined ? overrideFields.phone : phone;
+    const currentDob = overrideFields.dateOfBirth !== undefined ? overrideFields.dateOfBirth : dob;
+    const currentGender = overrideFields.gender !== undefined ? overrideFields.gender : gender;
+    const currentCity = overrideFields.city !== undefined ? overrideFields.city : city;
+    const currentState = overrideFields.state !== undefined ? overrideFields.state : state;
+    const currentCountry = overrideFields.country !== undefined ? overrideFields.country : country;
+    const currentAddress = overrideFields.address !== undefined ? overrideFields.address : address;
+    const currentAboutMe = overrideFields.bio !== undefined ? overrideFields.bio : aboutMe;
+    const currentHeadline = overrideFields.headline !== undefined ? overrideFields.headline : headline;
+    const currentLanguages = overrideFields.languages !== undefined ? overrideFields.languages : languages;
+    const currentExperienceStr = overrideFields.experience !== undefined ? overrideFields.experience : experienceStr;
+    const currentEducationStr = overrideFields.education !== undefined ? overrideFields.education : educationStr;
+    const currentProfilePhoto = overrideFields.profilePhoto !== undefined ? overrideFields.profilePhoto : profilePhoto;
+    const currentZip = overrideFields.zip !== undefined ? overrideFields.zip : zip;
+    
+    const currentExperiences = overrideFields.experiences !== undefined ? overrideFields.experiences : experiences;
+    const currentEducations = overrideFields.educations !== undefined ? overrideFields.educations : educations;
+    const currentSkillsCategories = overrideFields.skillsCategories !== undefined ? overrideFields.skillsCategories : skillsCategories;
+    const flatSkills = currentSkillsCategories.reduce((acc: string[], cat: any) => [...acc, ...cat.skills], []);
+    
+    const currentLinks = overrideFields.links !== undefined ? overrideFields.links : links;
+    
+    const currentPrefSalary = overrideFields.prefSalary !== undefined ? overrideFields.prefSalary : prefSalary;
+    const currentPrefNoticePeriod = overrideFields.prefNoticePeriod !== undefined ? overrideFields.prefNoticePeriod : prefNoticePeriod;
+    const currentPrefRoles = overrideFields.prefRoles !== undefined ? overrideFields.prefRoles : prefRoles;
+    const currentPrefLocations = overrideFields.prefLocations !== undefined ? overrideFields.prefLocations : prefLocations;
+    const currentPrefRemote = overrideFields.prefRemote !== undefined ? overrideFields.prefRemote : prefRemote;
+    const currentPrefHybrid = overrideFields.prefHybrid !== undefined ? overrideFields.prefHybrid : prefHybrid;
+    const currentPrefOnsite = overrideFields.prefOnsite !== undefined ? overrideFields.prefOnsite : prefOnsite;
+    const currentPrefRelocation = overrideFields.prefRelocation !== undefined ? overrideFields.prefRelocation : prefRelocation;
+    const currentPrefInternational = overrideFields.prefInternational !== undefined ? overrideFields.prefInternational : prefInternational;
+    const currentPrefEmploymentType = overrideFields.prefEmploymentType !== undefined ? overrideFields.prefEmploymentType : prefEmploymentType;
+    const currentPrefIndustries = overrideFields.prefIndustries !== undefined ? overrideFields.prefIndustries : prefIndustries;
+    const currentJobAlerts = overrideFields.jobAlerts !== undefined ? overrideFields.jobAlerts : jobAlerts;
+    const currentAiRecommendation = overrideFields.aiRecommendation !== undefined ? overrideFields.aiRecommendation : aiRecommendation;
+    const currentRecruiterVisibility = overrideFields.recruiterVisibility !== undefined ? overrideFields.recruiterVisibility : recruiterVisibility;
+    const currentAvailabilityStatus = overrideFields.availabilityStatus !== undefined ? overrideFields.availabilityStatus : availabilityStatus;
+
+    const locationStr = `${currentCity}, ${currentState}, ${currentCountry}`;
+    const timestamp = new Date().toISOString();
+
+    const activityAction = overrideFields.activityAction || 'Profile Updated';
+    const activityDetails = overrideFields.activityDetails || 'Saved personal profile details and information';
+
+    const calculatedProfileScore = Math.min(100, (
+      (currentFullName ? 15 : 0) +
+      (currentEmail ? 15 : 0) +
+      (currentPhone ? 15 : 0) +
+      (currentAboutMe ? 15 : 0) +
+      (currentExperiences.length > 0 ? 15 : 0) +
+      (currentEducations.length > 0 ? 15 : 0) +
+      (flatSkills.length > 0 ? 10 : 0)
+    ));
+    const calculatedSkillScore = Math.min(100, flatSkills.length * 6 + 40);
+
+    const updatePayload: any = {
+      fullName: currentFullName,
+      email: currentEmail,
+      phone: currentPhone,
+      dateOfBirth: currentDob,
+      gender: currentGender,
+      location: locationStr,
+      city: currentCity,
+      state: currentState,
+      country: currentCountry,
+      address: currentAddress,
+      headline: currentHeadline,
+      bio: currentAboutMe,
+      experience: currentExperienceStr,
+      experiences: currentExperiences,
+      education: currentEducationStr,
+      educations: currentEducations,
+      skills: flatSkills,
+      skillsCategories: currentSkillsCategories,
+      languages: currentLanguages,
+      linkedin: currentLinks.linkedin || '',
+      github: currentLinks.github || '',
+      portfolio: currentLinks.portfolio || '',
+      website: currentLinks.website || '',
+      leetcode: currentLinks.leetcode || '',
+      hackerrank: currentLinks.hackerrank || '',
+      codeforces: currentLinks.codeforces || '',
+      behance: currentLinks.behance || '',
+      dribbble: currentLinks.dribbble || '',
+      medium: currentLinks.medium || '',
+      youtube: currentLinks.youtube || '',
+      x: currentLinks.x || '',
+      profilePhoto: currentProfilePhoto,
+      availability: currentAvailabilityStatus,
+      preferredLocation: currentPrefLocations,
+      expectedSalary: currentPrefSalary,
+      noticePeriod: currentPrefNoticePeriod,
+      zip: currentZip,
+      updatedAt: timestamp,
+
+      profile: {
+        uid,
+        fullName: currentFullName,
+        email: currentEmail,
+        phoneNumber: currentPhone,
+        phone: currentPhone,
+        dateOfBirth: currentDob,
+        gender: currentGender,
+        location: locationStr,
+        address: currentAddress,
+        headline: currentHeadline,
+        bio: currentAboutMe,
+        experience: currentExperienceStr,
+        education: currentEducationStr,
+        skills: flatSkills,
+        languages: currentLanguages.split(',').map((l: string) => l.trim()).filter(Boolean),
+        linkedin: currentLinks.linkedin || '',
+        github: currentLinks.github || '',
+        portfolio: currentLinks.portfolio || '',
+        availability: currentAvailabilityStatus,
+        preferredLocation: currentPrefLocations,
+        photoURL: currentProfilePhoto,
+        status: 'approved',
+        createdAt: dbCreatedAt || timestamp,
+        updatedAt: timestamp
+      },
+      preferences: {
+        prefSalary: currentPrefSalary,
+        prefNoticePeriod: currentPrefNoticePeriod,
+        prefRoles: currentPrefRoles,
+        prefLocations: currentPrefLocations,
+        prefRemote: currentPrefRemote,
+        prefHybrid: currentPrefHybrid,
+        prefOnsite: currentPrefOnsite,
+        prefRelocation: currentPrefRelocation,
+        prefInternational: currentPrefInternational,
+        prefEmploymentType: currentPrefEmploymentType,
+        prefIndustries: currentPrefIndustries,
+        jobAlerts: currentJobAlerts,
+        aiRecommendation: currentAiRecommendation,
+        recruiterVisibility: currentRecruiterVisibility,
+        availabilityStatus: currentAvailabilityStatus,
+
+        preferredRoles: currentPrefRoles,
+        preferredLocations: currentPrefLocations,
+        expectedSalary: currentPrefSalary,
+        employmentTypes: currentPrefEmploymentType,
+        workMode: currentPrefRemote ? 'Remote' : currentPrefHybrid ? 'Hybrid' : 'Onsite',
+        noticePeriod: currentPrefNoticePeriod
+      },
+      ai_profile: {
+        resumeScore: dbResumeScore,
+        profileScore: calculatedProfileScore,
+        skillScore: calculatedSkillScore,
+        matchScore: Math.round((calculatedProfileScore + calculatedSkillScore) / 2),
+        missingSkills: ['Docker', 'Kubernetes', 'AWS', 'CI/CD'],
+        strengths: ['Frontend Development', 'State Management', 'React Architecture'],
+        recommendations: ['Complete all profile details', 'Add certifications for cloud services']
+      },
+      activity: arrayUnion({
+        id: `act-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        action: activityAction,
+        timestamp: timestamp,
+        details: activityDetails
+      })
+    };
+
+    try {
+      const docRef = doc(db, 'marketplace_jobseekers', uid);
+      await updateDoc(docRef, updatePayload);
+    } catch (err) {
+      console.error("Error updating profile in Firestore:", err);
+      triggerToast("Failed to save changes to Firestore.");
+    }
+  };
+
   // Profile Completion list trigger action
   const handleCompleteMissingDetails = () => {
-    // Focus or guide candidate to respective tabs
     setActiveSubTab('EDUCATION, SKILLS & LINKS');
     triggerToast("Let's complete your Skills, Academic and Social links!");
   };
 
   // INFO Save
-  const handleInfoSave = (e: React.FormEvent) => {
+  const handleInfoSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    await updateProfileInFirestore({
+      fullName,
+      email,
+      phone,
+      dateOfBirth: dob,
+      gender,
+      city,
+      state,
+      country,
+      address,
+      bio: aboutMe,
+      headline,
+      languages,
+      experience: experienceStr,
+      education: educationStr,
+      profilePhoto,
+      zip
+    });
     triggerToast("Personal Information updated successfully!");
   };
 
@@ -260,32 +554,30 @@ export default function ProfileTab() {
     setShowExpModal(true);
   };
 
-  const handleSaveExperience = (e: React.FormEvent) => {
+  const handleSaveExperience = async (e: React.FormEvent) => {
     e.preventDefault();
     const skillsArr = expSkillsInput
       .split(',')
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
 
+    let updatedExperiences: ExperienceItem[];
     if (editingExpId) {
-      setExperiences(
-        experiences.map((exp) =>
-          exp.id === editingExpId
-            ? {
-                ...exp,
-                role: expRole,
-                company: expCompany,
-                employmentType: expType,
-                startDate: expStart,
-                endDate: expCurrent ? 'Present' : expEnd,
-                current: expCurrent,
-                description: expDesc,
-                skillsUsed: skillsArr
-              }
-            : exp
-        )
+      updatedExperiences = experiences.map((exp) =>
+        exp.id === editingExpId
+          ? {
+              ...exp,
+              role: expRole,
+              company: expCompany,
+              employmentType: expType,
+              startDate: expStart,
+              endDate: expCurrent ? 'Present' : expEnd,
+              current: expCurrent,
+              description: expDesc,
+              skillsUsed: skillsArr
+            }
+          : exp
       );
-      triggerToast('Experience details updated successfully!');
     } else {
       const newExp: ExperienceItem = {
         id: `exp-${Date.now()}`,
@@ -298,14 +590,19 @@ export default function ProfileTab() {
         description: expDesc,
         skillsUsed: skillsArr
       };
-      setExperiences([...experiences, newExp]);
-      triggerToast('Professional experience card added!');
+      updatedExperiences = [...experiences, newExp];
     }
+
+    setExperiences(updatedExperiences);
+    await updateProfileInFirestore({ experiences: updatedExperiences });
     setShowExpModal(false);
+    triggerToast(editingExpId ? 'Experience details updated successfully!' : 'Professional experience card added!');
   };
 
-  const handleDeleteExperience = (id: string) => {
-    setExperiences(experiences.filter((exp) => exp.id !== id));
+  const handleDeleteExperience = async (id: string) => {
+    const updatedExperiences = experiences.filter((exp) => exp.id !== id);
+    setExperiences(updatedExperiences);
+    await updateProfileInFirestore({ experiences: updatedExperiences });
     triggerToast('Experience card deleted.');
   };
 
@@ -332,25 +629,23 @@ export default function ProfileTab() {
     setShowEduModal(true);
   };
 
-  const handleSaveEducation = (e: React.FormEvent) => {
+  const handleSaveEducation = async (e: React.FormEvent) => {
     e.preventDefault();
+    let updatedEducations: EducationItem[];
     if (editingEduId) {
-      setEducations(
-        educations.map((edu) =>
-          edu.id === editingEduId
-            ? {
-                ...edu,
-                institute: eduInstitute,
-                degree: eduDegree,
-                specialization: eduSpecialization,
-                cgpa: eduCgpa,
-                startYear: eduStart,
-                endYear: eduEnd
-              }
-            : edu
-        )
+      updatedEducations = educations.map((edu) =>
+        edu.id === editingEduId
+          ? {
+              ...edu,
+              institute: eduInstitute,
+              degree: eduDegree,
+              specialization: eduSpecialization,
+              cgpa: eduCgpa,
+              startYear: eduStart,
+              endYear: eduEnd
+            }
+          : edu
       );
-      triggerToast('Education credentials saved!');
     } else {
       const newEdu: EducationItem = {
         id: `edu-${Date.now()}`,
@@ -361,63 +656,88 @@ export default function ProfileTab() {
         startYear: eduStart,
         endYear: eduEnd
       };
-      setEducations([...educations, newEdu]);
-      triggerToast('Education card created!');
+      updatedEducations = [...educations, newEdu];
     }
+
+    setEducations(updatedEducations);
+    await updateProfileInFirestore({ educations: updatedEducations });
     setShowEduModal(false);
+    triggerToast(editingEduId ? 'Education credentials saved!' : 'Education card created!');
   };
 
-  const handleDeleteEducation = (id: string) => {
-    setEducations(educations.filter((edu) => edu.id !== id));
+  const handleDeleteEducation = async (id: string) => {
+    const updatedEducations = educations.filter((edu) => edu.id !== id);
+    setEducations(updatedEducations);
+    await updateProfileInFirestore({ educations: updatedEducations });
     triggerToast('Education card deleted.');
   };
 
   // SKILLS Actions
-  const handleAddSkill = (e: React.FormEvent) => {
+  const handleAddSkill = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSkillText.trim()) return;
 
-    setSkillsCategories(
-      skillsCategories.map((cat) => {
-        if (cat.id === selectedSkillCategory) {
-          if (cat.skills.includes(newSkillText.trim())) return cat;
-          return {
-            ...cat,
-            skills: [...cat.skills, newSkillText.trim()]
-          };
-        }
-        return cat;
-      })
-    );
+    const updatedSkillsCategories = skillsCategories.map((cat) => {
+      if (cat.id === selectedSkillCategory) {
+        if (cat.skills.includes(newSkillText.trim())) return cat;
+        return {
+          ...cat,
+          skills: [...cat.skills, newSkillText.trim()]
+        };
+      }
+      return cat;
+    });
+
+    setSkillsCategories(updatedSkillsCategories);
     setNewSkillText('');
+    await updateProfileInFirestore({ skillsCategories: updatedSkillsCategories });
     triggerToast(`Added skill into ${skillsCategories.find(c => c.id === selectedSkillCategory)?.label}`);
   };
 
-  const handleRemoveSkill = (categoryId: string, skillName: string) => {
-    setSkillsCategories(
-      skillsCategories.map((cat) => {
-        if (cat.id === categoryId) {
-          return {
-            ...cat,
-            skills: cat.skills.filter((s) => s !== skillName)
-          };
-        }
-        return cat;
-      })
-    );
+  const handleRemoveSkill = async (categoryId: string, skillName: string) => {
+    const updatedSkillsCategories = skillsCategories.map((cat) => {
+      if (cat.id === categoryId) {
+        return {
+          ...cat,
+          skills: cat.skills.filter((s) => s !== skillName)
+        };
+      }
+      return cat;
+    });
+
+    setSkillsCategories(updatedSkillsCategories);
+    await updateProfileInFirestore({ skillsCategories: updatedSkillsCategories });
     triggerToast(`Removed ${skillName}`);
   };
 
   // SOCIAL LINKS Actions
-  const handleSaveLinks = (e: React.FormEvent) => {
+  const handleSaveLinks = async (e: React.FormEvent) => {
     e.preventDefault();
     setEditingLinks(false);
+    await updateProfileInFirestore({ links });
     triggerToast('Social links saved successfully!');
   };
 
   // PREFERENCES Save
-  const handlePreferencesSave = (e: React.FormEvent) => {
+  const handlePreferencesSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    await updateProfileInFirestore({
+      prefSalary,
+      prefNoticePeriod,
+      prefRoles,
+      prefLocations,
+      prefRemote,
+      prefHybrid,
+      prefOnsite,
+      prefRelocation,
+      prefInternational,
+      prefEmploymentType,
+      prefIndustries,
+      jobAlerts,
+      aiRecommendation,
+      recruiterVisibility,
+      availabilityStatus
+    });
     triggerToast('Matching preferences updated successfully!');
   };
 
@@ -472,6 +792,38 @@ export default function ProfileTab() {
     { id: 'PREFERENCES', label: 'Preferences' }
   ];
 
+  const getProfileCompletion = () => {
+    let score = 0;
+    const total = 6;
+    if (fullName && email && phone && dob && city && address && aboutMe) score += 1;
+    if (experiences.length > 0) score += 1;
+    if (educations.length > 0) score += 1;
+    const totalSkills = skillsCategories.reduce((sum, cat) => sum + cat.skills.length, 0);
+    if (totalSkills > 0) score += 1;
+    const hasLinks = Object.values(links).some(val => !!val);
+    if (hasLinks) score += 1;
+    if (prefRoles.length > 0 && prefLocations.length > 0) score += 1;
+    return Math.round((score / total) * 100);
+  };
+  const completionPercentage = getProfileCompletion();
+
+  if (!uid) {
+    return (
+      <div className="p-8 text-center bg-app-bg border border-app-border rounded-2xl">
+        <p className="text-sm text-app-muted font-bold">Please log in to view and manage your profile.</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-[400px] flex flex-col items-center justify-center space-y-4">
+        <div className="w-12 h-12 border-4 border-brand-blue border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-bold text-app-muted font-mono">Loading your profile from Firestore...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 pb-12">
       {/* Page Title Header */}
@@ -502,14 +854,24 @@ export default function ProfileTab() {
           <div className="p-6 rounded-[28px] bg-app-surface border border-app-border card-shadow flex flex-col items-center text-center space-y-5">
             
             {/* User Avatar Frame */}
-            <div className="w-28 h-28 rounded-full blue-gradient p-1 shadow-xl relative group">
+            <div 
+              onClick={() => {
+                const url = prompt("Enter a profile photo image URL:", profilePhoto);
+                if (url !== null && url.trim() !== '') {
+                  setProfilePhoto(url);
+                  updateProfileInFirestore({ profilePhoto: url });
+                  triggerToast("Profile photo URL updated!");
+                }
+              }}
+              className="w-28 h-28 rounded-full blue-gradient p-1 shadow-xl relative group cursor-pointer"
+            >
               <img 
-                src="https://picsum.photos/seed/user123/200/200" 
-                alt="Rishi Kumar profile avatar" 
+                src={profilePhoto} 
+                alt={`${fullName} profile avatar`} 
                 className="w-full h-full rounded-full object-cover border-4 border-app-surface shadow-md"
                 referrerPolicy="no-referrer"
               />
-              <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
+              <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                 <Edit className="w-5 h-5 text-white" />
               </div>
             </div>
@@ -518,7 +880,7 @@ export default function ProfileTab() {
             <div>
               <h2 className="text-2xl font-display font-black text-app-text">{fullName}</h2>
               <span className="text-[10px] font-black text-brand-blue uppercase tracking-widest block mt-1 bg-brand-blue/10 border border-brand-blue/20 rounded-full px-3 py-1 w-fit mx-auto">
-                Student / Job Seeker
+                {headline}
               </span>
               <p className="text-xs text-app-muted mt-3 max-w-xs font-medium leading-relaxed italic">
                 "{aboutMe.length > 120 ? `${aboutMe.slice(0, 117)}...` : aboutMe}"
@@ -540,14 +902,14 @@ export default function ProfileTab() {
             <div className="w-full border-t border-app-border/40 pt-5 text-left space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-black text-app-muted uppercase tracking-widest">Profile Completion</span>
-                <span className="text-sm font-black text-brand-blue">82%</span>
+                <span className="text-sm font-black text-brand-blue">{completionPercentage}%</span>
               </div>
               
               {/* Premium Slim Progress Slat */}
               <div className="h-2 w-full bg-app-bg rounded-full overflow-hidden border border-app-border/30">
                 <div 
                   className="h-full bg-brand-blue rounded-full transition-all duration-500"
-                  style={{ width: '82%' }}
+                  style={{ width: `${completionPercentage}%` }}
                 />
               </div>
 
@@ -557,23 +919,23 @@ export default function ProfileTab() {
 
               {/* Missing Details checklist */}
               <div className="bg-app-bg border border-app-border/40 rounded-2xl p-4 space-y-2.5">
-                <span className="text-[9px] font-black text-brand-blue uppercase tracking-wider block">Missing Fields</span>
+                <span className="text-[9px] font-black text-brand-blue uppercase tracking-wider block">Profile Status Checklist</span>
                 <div className="grid grid-cols-2 gap-2 text-[11px] text-app-muted font-bold">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-                    <span>Experience</span>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${experiences.length > 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    <span className={experiences.length > 0 ? 'text-app-text font-bold' : 'text-app-muted'}>Experience</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-                    <span>Skills</span>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${skillsCategories.some(c => c.skills.length > 0) ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    <span className={skillsCategories.some(c => c.skills.length > 0) ? 'text-app-text font-bold' : 'text-app-muted'}>Skills</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-                    <span>Portfolio</span>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${links.portfolio || links.website ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    <span className={links.portfolio || links.website ? 'text-app-text font-bold' : 'text-app-muted'}>Portfolio</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-                    <span>Resume</span>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${educations.length > 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    <span className={educations.length > 0 ? 'text-app-text font-bold' : 'text-app-muted'}>Education</span>
                   </div>
                 </div>
               </div>
@@ -732,8 +1094,59 @@ export default function ProfileTab() {
                       <label className="text-[10px] font-black text-app-muted uppercase tracking-wider block">Postal ZIP / Code</label>
                       <input 
                         type="text" 
-                        defaultValue="500081"
+                        value={zip}
+                        onChange={(e) => setZip(e.target.value)}
+                        className="w-full bg-app-bg border border-app-border rounded-xl p-3 text-xs text-app-text focus:ring-1 focus:ring-brand-blue focus:outline-none focus:border-brand-blue transition-all font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-bold">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-app-muted uppercase tracking-wider block">Headline / Professional Title</label>
+                      <input 
+                        type="text" 
+                        value={headline}
+                        onChange={(e) => setHeadline(e.target.value)}
+                        placeholder="e.g. Senior React Engineer"
                         className="w-full bg-app-bg border border-app-border rounded-xl p-3 text-xs text-app-text focus:ring-1 focus:ring-brand-blue focus:outline-none focus:border-brand-blue transition-all"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-app-muted uppercase tracking-wider block">Spoken Languages</label>
+                      <input 
+                        type="text" 
+                        value={languages}
+                        onChange={(e) => setLanguages(e.target.value)}
+                        placeholder="e.g. English, Telugu, Spanish"
+                        className="w-full bg-app-bg border border-app-border rounded-xl p-3 text-xs text-app-text focus:ring-1 focus:ring-brand-blue focus:outline-none focus:border-brand-blue transition-all"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-bold">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-app-muted uppercase tracking-wider block">Overall Experience Level</label>
+                      <input 
+                        type="text" 
+                        value={experienceStr}
+                        onChange={(e) => setExperienceStr(e.target.value)}
+                        placeholder="e.g. Entry Level / 3+ Years"
+                        className="w-full bg-app-bg border border-app-border rounded-xl p-3 text-xs text-app-text focus:ring-1 focus:ring-brand-blue focus:outline-none focus:border-brand-blue transition-all"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-app-muted uppercase tracking-wider block">Education Summary Brief</label>
+                      <input 
+                        type="text" 
+                        value={educationStr}
+                        onChange={(e) => setEducationStr(e.target.value)}
+                        placeholder="e.g. B.Tech in CSE"
+                        className="w-full bg-app-bg border border-app-border rounded-xl p-3 text-xs text-app-text focus:ring-1 focus:ring-brand-blue focus:outline-none focus:border-brand-blue transition-all"
+                        required
                       />
                     </div>
                   </div>

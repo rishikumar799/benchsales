@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { 
   Bell, 
   Lock, 
@@ -7,13 +7,66 @@ import {
   Shield, 
   Globe, 
   Zap, 
-  Settings as SettingsIcon,
-  Check,
-  ChevronRight
+  ChevronRight,
+  Check
 } from 'lucide-react';
+import { db, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { useAuth } from '../../../../context/AuthContext';
 
 export default function StudentSettings() {
+  const { userProfile } = useAuth();
+  const studentId = userProfile?.uid;
+  const organizationId = userProfile?.organizationId;
+
   const [activePart, setActivePart] = useState('account');
+  const [studentData, setStudentData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Editable Account fields
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // 1. Listen to Student Profile document in real-time
+  useEffect(() => {
+    if (!organizationId || !studentId) return;
+    const docRef = doc(db, 'organizations_universities', organizationId, 'students', studentId);
+    const unsubscribe = onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setStudentData(data);
+        setFullName(data.fullName || data.name || userProfile?.name || '');
+        setPhone(data.phone || '');
+      }
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `organizations_universities/${organizationId}/students/${studentId}`);
+    });
+    return () => unsubscribe();
+  }, [organizationId, studentId, userProfile]);
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!organizationId || !studentId) return;
+
+    setSaving(true);
+    try {
+      const docRef = doc(db, 'organizations_universities', organizationId, 'students', studentId);
+      await updateDoc(docRef, {
+        fullName,
+        name: fullName, // Sync both fields
+        phone,
+        updatedAt: new Date().toISOString()
+      });
+      alert('Settings saved successfully!');
+    } catch (error: any) {
+      handleFirestoreError(error, OperationType.UPDATE, `organizations_universities/${organizationId}/students/${studentId}`);
+      alert(`Failed to save settings: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const menu = [
     { id: 'account', label: 'Account Settings', icon: User },
@@ -22,6 +75,14 @@ export default function StudentSettings() {
     { id: 'agent', label: 'AI Agent Config', icon: Zap },
     { id: 'billing', label: 'Subscription', icon: Shield },
   ];
+
+  if (loading) {
+    return (
+      <div className="p-12 text-center text-app-muted font-bold">
+        Loading settings...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -61,28 +122,58 @@ export default function StudentSettings() {
             className="p-8 rounded-[40px] glass border-app-border card-shadow space-y-8"
           >
             {activePart === 'account' && (
-              <>
+              <form onSubmit={handleSaveSettings} className="space-y-6">
                 <h3 className="text-2xl font-display font-bold">Personal Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-app-muted ml-1">Full Name</label>
-                    <input type="text" defaultValue="Rishi Kumar" className="w-full bg-app-bg/50 border border-app-border rounded-xl px-4 py-3 text-sm focus:border-brand-blue outline-none transition-all" />
+                    <input 
+                      type="text" 
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                      className="w-full bg-app-bg/50 border border-app-border rounded-xl px-4 py-3 text-sm focus:border-brand-blue outline-none transition-all text-app-text" 
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-app-muted ml-1">Email Address</label>
-                    <input type="email" defaultValue="rishi@example.com" className="w-full bg-app-bg/50 border border-app-border rounded-xl px-4 py-3 text-sm focus:border-brand-blue outline-none transition-all" />
+                    <input 
+                      type="email" 
+                      value={studentData?.email || userProfile?.email || ''} 
+                      disabled 
+                      className="w-full bg-app-bg/20 border border-app-border/40 rounded-xl px-4 py-3 text-sm outline-none cursor-not-allowed text-app-muted" 
+                    />
                   </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-app-muted ml-1">Profile Bio</label>
-                    <textarea defaultValue="Frontend Engineer & UI UX Designer with 4 years of experience." rows={4} className="w-full bg-app-bg/50 border border-app-border rounded-xl px-4 py-3 text-sm focus:border-brand-blue outline-none transition-all resize-none" />
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-app-muted ml-1">Phone Number</label>
+                    <input 
+                      type="text" 
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className="w-full bg-app-bg/50 border border-app-border rounded-xl px-4 py-3 text-sm focus:border-brand-blue outline-none transition-all text-app-text" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-app-muted ml-1">Roll Number</label>
+                    <input 
+                      type="text" 
+                      value={studentData?.rollNumber || ''} 
+                      disabled 
+                      className="w-full bg-app-bg/20 border border-app-border/40 rounded-xl px-4 py-3 text-sm outline-none cursor-not-allowed text-app-muted" 
+                    />
                   </div>
                 </div>
                 <div className="pt-6 border-t border-app-border flex justify-end">
-                  <button className="px-8 py-3 premium-gradient text-white rounded-xl text-sm font-bold shadow-lg shadow-brand-blue/20">
-                    Save Changes
+                  <button 
+                    type="submit" 
+                    disabled={saving}
+                    className="px-8 py-3 bg-brand-blue hover:bg-brand-blue-dark disabled:bg-brand-blue/50 text-white rounded-xl text-sm font-bold shadow-lg shadow-brand-blue/20 flex items-center gap-1.5"
+                  >
+                    {saving ? "Saving..." : "Save Changes"}
                   </button>
                 </div>
-              </>
+              </form>
             )}
 
             {activePart === 'notifications' && (

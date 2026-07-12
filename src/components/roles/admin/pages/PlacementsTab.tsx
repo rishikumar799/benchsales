@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   ShieldCheck, 
@@ -11,6 +11,12 @@ import {
   Sparkles,
   Building2
 } from 'lucide-react';
+import { db } from '../../../../firebase/firebase';
+import { useAuth } from '../../../../context/AuthContext';
+import { 
+  collection, 
+  onSnapshot 
+} from 'firebase/firestore';
 
 interface PlacementRecord {
   id: string;
@@ -26,21 +32,46 @@ interface PlacementRecord {
 }
 
 export default function PlacementsTab() {
-  const [records] = useState<PlacementRecord[]>([
-    { id: '1', student: 'Rahul Kumar', avatar: 'https://picsum.photos/seed/rahul/100/100', company: 'TCS', role: 'Software Engineer', pkg: '7.00 LPA', officer: 'Priya Sharma', joiningDate: '15 Jul 2026', status: 'Confirmed', dept: 'CSE' },
-    { id: '2', student: 'Anjali Sharma', avatar: 'https://picsum.photos/seed/anjali/100/100', company: 'Infosys', role: 'System Engineer', pkg: '6.50 LPA', officer: 'Rahul Verma', joiningDate: '10 Jul 2026', status: 'Confirmed', dept: 'ECE' },
-    { id: '3', student: 'Vivek Singh', avatar: 'https://picsum.photos/seed/vivek/100/100', company: 'Wipro', role: 'Associate Engineer', pkg: '5.80 LPA', officer: 'Neha Patel', joiningDate: '20 Jul 2026', status: 'Confirmed', dept: 'CSE' },
-    { id: '4', student: 'Pooja Verma', avatar: 'https://picsum.photos/seed/pooja/100/100', company: 'Accenture', role: 'Data Analyst', pkg: '7.90 LPA', officer: 'Amit Singh', joiningDate: '12 Jul 2026', status: 'Confirmed', dept: 'ECE' },
-    { id: '5', student: 'Neha Mehta', avatar: 'https://picsum.photos/seed/nehap/100/100', company: 'Capgemini', role: 'Analyst', pkg: '6.00 LPA', officer: 'Kavita Joshi', joiningDate: '18 Jul 2026', status: 'Confirmed', dept: 'CSE' },
-    { id: '6', student: 'Arjun Patel', avatar: 'https://picsum.photos/seed/arjun/100/100', company: 'TCS', role: 'Software Engineer', pkg: '8.50 LPA', officer: 'Priya Sharma', joiningDate: '15 Jul 2026', status: 'Confirmed', dept: 'ME' },
-    { id: '7', student: 'Rohit Jain', avatar: 'https://picsum.photos/seed/rohit123/100/100', company: 'Amazon', role: 'SDE', pkg: '12.00 LPA', officer: 'Amit Singh', joiningDate: '01 Aug 2026', status: 'Confirmed', dept: 'CSE' },
-  ]);
+  const { userProfile } = useAuth();
+  const organizationId = userProfile?.organizationId;
 
+  const [records, setRecords] = useState<PlacementRecord[]>([]);
   const [search, setSearch] = useState('');
   const [selectedDept, setSelectedDept] = useState('All');
   const [selectedCompany, setSelectedCompany] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
+
+  // Real-time Firestore Listener
+  useEffect(() => {
+    if (!organizationId) return;
+
+    const placementsCol = collection(db, 'organizations_universities', organizationId, 'placements');
+    const unsub = onSnapshot(placementsCol, (snap) => {
+      const list = snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          student: data.student || '',
+          avatar: data.avatar || `https://picsum.photos/seed/${doc.id}/100/100`,
+          company: data.company || '',
+          role: data.role || 'Software Engineer',
+          pkg: data.pkg || data.package || '4.50 LPA',
+          officer: data.officer || '',
+          joiningDate: data.joiningDate || '15 Jul 2026',
+          status: data.status || 'Confirmed',
+          dept: data.dept || 'CSE'
+        } as PlacementRecord;
+      });
+      setRecords(list);
+    });
+
+    return () => unsub();
+  }, [organizationId]);
+
+  // Unique list of companies and departments for filters
+  const uniqueCompanies = Array.from(new Set(records.map(r => r.company).filter(Boolean)));
+  const uniqueDepts = Array.from(new Set(records.map(r => r.dept).filter(Boolean)));
 
   // Filters logic
   const filteredRecords = records.filter(rec => {
@@ -57,7 +88,7 @@ export default function PlacementsTab() {
   const paginatedRecords = filteredRecords.slice(startIndex, startIndex + itemsPerPage);
 
   const handleExport = () => {
-    alert('Generating consolidated Excel report sheet of 1,268 placed scholars for 2026 Batch...');
+    alert(`Generating consolidated Excel report sheet of ${records.length} placed scholars for Batch 2026...`);
   };
 
   return (
@@ -105,13 +136,12 @@ export default function PlacementsTab() {
                 setSelectedDept(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-muted focus:outline-none"
+              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-muted focus:outline-none cursor-pointer"
             >
               <option value="All">All Departments</option>
-              <option value="CSE">CSE</option>
-              <option value="ECE">ECE</option>
-              <option value="IT">IT</option>
-              <option value="ME">ME</option>
+              {uniqueDepts.map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
             </select>
           </div>
 
@@ -123,14 +153,12 @@ export default function PlacementsTab() {
                 setSelectedCompany(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-muted focus:outline-none"
+              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-muted focus:outline-none cursor-pointer"
             >
               <option value="All">All Companies</option>
-              <option value="TCS">TCS</option>
-              <option value="Infosys">Infosys</option>
-              <option value="Wipro">Wipro</option>
-              <option value="Amazon">Amazon</option>
-              <option value="Accenture">Accenture</option>
+              {uniqueCompanies.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -145,7 +173,7 @@ export default function PlacementsTab() {
                 <th className="pl-6 py-3">Student Name</th>
                 <th className="py-3">Company</th>
                 <th className="py-3">Role</th>
-                <th className="py-3 text-center">Package (LPA)</th>
+                <th className="py-3 text-center">Package</th>
                 <th className="py-3">Placement Officer</th>
                 <th className="py-3">Joining Date</th>
                 <th className="pr-6 py-3 text-right">Status</th>
@@ -169,7 +197,7 @@ export default function PlacementsTab() {
                             <span>{rec.student}</span>
                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-app-bg border border-app-border font-mono font-bold text-app-muted">{rec.dept}</span>
                           </div>
-                          <span className="text-[10px] text-app-muted font-bold block mt-0.5">St. Xavier's University</span>
+                          <span className="text-[10px] text-app-muted font-bold block mt-0.5">{userProfile?.organizationName || "St. Xavier's University"}</span>
                         </div>
                       </div>
                     </td>
@@ -244,7 +272,7 @@ export default function PlacementsTab() {
                 <button
                   key={idx}
                   onClick={() => setCurrentPage(idx + 1)}
-                  className={`w-8 h-8 rounded-xl text-xs font-extrabold cursor-pointer ${
+                  className={`w-8 h-8 rounded-xl text-xs font-extrabold cursor-pointer transition-all ${
                     currentPage === idx + 1 
                       ? 'bg-brand-blue text-white shadow-md' 
                       : 'border border-app-border text-app-muted hover:bg-app-surface hover:text-app-text'

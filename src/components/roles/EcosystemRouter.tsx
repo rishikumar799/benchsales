@@ -31,6 +31,9 @@ import {
   BriefcaseBusiness 
 } from 'lucide-react';
 import { UserRole } from '../../types';
+import { auth, db } from '../../firebase/firebase';
+import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, setDoc, deleteDoc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { useAuth } from '../../context/AuthContext';
 
 // Candidate custom page imports
 import DashboardTab from './candidate/pages/DashboardTab';
@@ -58,6 +61,7 @@ import ManagerRecruitersTab from './manager/pages/RecruitersTab';
 import ManagerSubmissionsTab from './manager/pages/SubmissionsTab';
 import ManagerAnalyticsTab from './manager/pages/AnalyticsTab';
 import ManagerProfileTab from './manager/pages/ProfileTab';
+import { recruiterStorage } from './recruiter/utils/recruiterStorage';
 
 // University Student custom page imports
 import StudentDashboardTab from './student/pages/DashboardTab';
@@ -67,6 +71,7 @@ import StudentResumeBuilderTab from './student/pages/ResumeBuilderTab';
 import StudentApplicationsTab from './student/pages/ApplicationsTab';
 import StudentDocumentsTab from './student/pages/DocumentsTab';
 import StudentProfileTab from './student/pages/ProfileTab';
+import StudentSettings from './student/pages/Settings';
 
 // Corporate Employee custom page imports
 import EmployeeDashboardTab from './employee/pages/EmployeeDashboardTab';
@@ -139,6 +144,90 @@ import CandidatePreviewModal from './recruiter/components/CandidatePreviewModal'
 import SubmitProfileModal from './recruiter/components/SubmitProfileModal';
 import RequestMoreModal from './recruiter/components/RequestMoreModal';
 
+const RECRUITER_INFOS: Record<string, { name: string; email: string; phone: string; status: string }> = {
+  'rec-1': { name: 'Rahul Singh', email: 'rahul.singh@example.com', phone: '+91 98765 43210', status: 'Active' },
+  'rec-2': { name: 'Priya Sharma', email: 'priya.sharma@example.com', phone: '+91 98765 43211', status: 'Active' },
+  'rec-3': { name: 'Akash Verma', email: 'akash.verma@example.com', phone: '+91 98765 43212', status: 'Active' },
+  'rec-4': { name: 'Neha Patel', email: 'neha.patel@example.com', phone: '+91 98765 43213', status: 'Active' },
+  'rec-5': { name: 'Karthik Nair', email: 'karthik.nair@example.com', phone: '+91 98765 43214', status: 'Active' },
+  'rec-6': { name: 'Vikas Mehta', email: 'vikas.mehta@example.com', phone: '+91 98765 43215', status: 'Inactive' },
+  'rec-7': { name: 'Simran Kaur', email: 'simran.kaur@example.com', phone: '+91 98765 43216', status: 'Active' }
+};
+
+const logJobActivity = async (jobId: string, action: string, description: string) => {
+  try {
+    const activityCol = collection(db, 'marketplace_jobs', jobId, 'activity');
+    const actRef = doc(activityCol);
+    await setDoc(actRef, {
+      action,
+      performedBy: auth.currentUser?.displayName || auth.currentUser?.email || 'System BDM',
+      performedByRole: 'marketplace_bdm',
+      timestamp: serverTimestamp(),
+      description
+    });
+  } catch (err) {
+    console.error("Error logging job activity:", err);
+  }
+};
+
+const addJobTimelineEvent = async (jobId: string, event: string, description: string) => {
+  try {
+    const timelineCol = collection(db, 'marketplace_jobs', jobId, 'timeline');
+    const timeRef = doc(timelineCol);
+    await setDoc(timeRef, {
+      event,
+      timestamp: serverTimestamp(),
+      description
+    });
+  } catch (err) {
+    console.error("Error adding timeline event:", err);
+  }
+};
+
+const syncAssignedRecruitersSubcollection = async (jobId: string, recruiterIds: string[], previousRecruiters: string[]) => {
+  try {
+    const bdmName = auth.currentUser?.displayName || auth.currentUser?.email || 'System BDM';
+    
+    // 1. Add new recruiters
+    for (const rid of recruiterIds) {
+      if (!previousRecruiters.includes(rid)) {
+        const recInfo = RECRUITER_INFOS[rid] || {
+          name: 'Recruiter Partner',
+          email: `${rid}@example.com`,
+          phone: '+91 98765 00000',
+          status: 'Active'
+        };
+        const recRef = doc(db, 'marketplace_jobs', jobId, 'assigned_recruiters', rid);
+        await setDoc(recRef, {
+          uid: rid,
+          name: recInfo.name,
+          email: recInfo.email,
+          phone: recInfo.phone,
+          assignedBy: bdmName,
+          assignedAt: serverTimestamp(),
+          status: recInfo.status
+        });
+        
+        // Log activity & timeline
+        await logJobActivity(jobId, 'Recruiter Assigned', `${recInfo.name} was assigned to this requirement.`);
+      }
+    }
+
+    // 2. Remove unassigned recruiters
+    for (const rid of previousRecruiters) {
+      if (!recruiterIds.includes(rid)) {
+        const recRef = doc(db, 'marketplace_jobs', jobId, 'assigned_recruiters', rid);
+        await deleteDoc(recRef);
+        
+        const recInfo = RECRUITER_INFOS[rid] || { name: rid };
+        await logJobActivity(jobId, 'Recruiter Removed', `${recInfo.name} was unassigned from this requirement.`);
+      }
+    }
+  } catch (err) {
+    console.error("Error syncing assigned recruiters subcollection:", err);
+  }
+};
+
 interface EcosystemRouterProps {
   role: UserRole;
   activeTab: string;
@@ -151,6 +240,7 @@ interface EcosystemRouterProps {
 // ==========================================
 
 export default function EcosystemRouter({ role, activeTab, setActiveTab }: EcosystemRouterProps) {
+  const { userProfile, createPlacementOfficerUser } = useAuth();
   // Common states
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -654,19 +744,49 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
   ]);
 
   // University Admin Placement Officers state
-  const [adminOfficers, setAdminOfficers] = useState([
-    { id: '1', name: 'Priya Sharma', dept: 'Training & Placement', email: 'priya.sharma@ssu.edu.in', phone: '+91 98124 53210', opportunities: 24, placements: 186, status: 'Active', avatar: 'https://picsum.photos/seed/priyasharma/100/100' },
-    { id: '2', name: 'Rahul Verma', dept: 'Placement Cell', email: 'rahul.verma@ssu.edu.in', phone: '+91 98124 53211', opportunities: 18, placements: 142, status: 'Active', avatar: 'https://picsum.photos/seed/rahulv/100/100' },
-    { id: '3', name: 'Neha Patel', dept: 'Placement Cell', email: 'neha.patel@ssu.edu.in', phone: '+91 98124 53212', opportunities: 15, placements: 118, status: 'Active', avatar: 'https://picsum.photos/seed/nehap/100/100' },
-    { id: '4', name: 'Amit Singh', dept: 'Engineering Dept.', email: 'amit.singh@ssu.edu.in', phone: '+91 98124 53213', opportunities: 12, placements: 96, status: 'Active', avatar: 'https://picsum.photos/seed/amits/100/100' },
-    { id: '5', name: 'Kavita Joshi', dept: 'Management Dept.', email: 'kavita.joshi@ssu.edu.in', phone: '+91 98124 53214', opportunities: 10, placements: 78, status: 'Active', avatar: 'https://picsum.photos/seed/kavitaj/100/100' },
-    { id: '6', name: 'Vikram Mehta', dept: 'Computer Applications', email: 'vikram.mehta@ssu.edu.in', phone: '+91 98124 53215', opportunities: 8, placements: 64, status: 'Inactive', avatar: 'https://picsum.photos/seed/vikramm/100/100' },
-    { id: '7', name: 'Sneha Reddy', dept: 'Sciences', email: 'sneha.reddy@ssu.edu.in', phone: '+91 98124 53216', opportunities: 6, placements: 48, status: 'Active', avatar: 'https://picsum.photos/seed/snehared/100/100' },
-    { id: '8', name: 'Deepak Rao', dept: 'Commerce', email: 'deepak.rao@ssu.edu.in', phone: '+91 98124 53217', opportunities: 5, placements: 42, status: 'Active', avatar: 'https://picsum.photos/seed/deepakr/100/100' },
-  ]);
+  const [adminOfficers, setAdminOfficers] = useState<any[]>([]);
+
+  // Firestore listener for Placement Officers
+  React.useEffect(() => {
+    if (role !== 'u_admin' || !userProfile?.organizationId) {
+      return;
+    }
+
+    const colRef = collection(db, 'organizations_universities', userProfile.organizationId, 'placement_officers');
+    const unsubscribe = onSnapshot(colRef, (snapshot) => {
+      const officers = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.fullName || '',
+          fullName: data.fullName || '',
+          dept: data.department || '',
+          department: data.department || '',
+          designation: data.designation || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          opportunities: data.opportunities || 0,
+          placements: data.placements || 0,
+          status: data.status || 'Active',
+          avatar: data.avatar || `https://picsum.photos/seed/${(data.fullName || 'officer').replace(/\s+/g, '')}/100/100`,
+          createdAt: data.createdAt || ''
+        };
+      });
+      setAdminOfficers(officers);
+    }, (error) => {
+      console.error("Error fetching placement officers from Firestore: ", error);
+    });
+
+    return () => unsubscribe();
+  }, [role, userProfile?.organizationId]);
 
   const [isAdminCreatingOfficer, setIsAdminCreatingOfficer] = useState(false);
   const [selectedAdminOfficer, setSelectedAdminOfficer] = useState<any | null>(null);
+  const [isEditingSelectedOfficer, setIsEditingSelectedOfficer] = useState(false);
+  const [editOfficerName, setEditOfficerName] = useState('');
+  const [editOfficerPhone, setEditOfficerPhone] = useState('');
+  const [editOfficerDept, setEditOfficerDept] = useState('');
+  const [editOfficerDesignation, setEditOfficerDesignation] = useState('');
 
   // Company Ecosystem states
   const [corpPositions, setCorpPositions] = useState([
@@ -699,6 +819,100 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
   // HANDLERS
   // ==========================================
 
+  React.useEffect(() => {
+    const syncJobs = () => {
+      const dbJobs = recruiterStorage.getJobs();
+      setMManagerJobs(dbJobs.map(job => ({
+        id: job.id,
+        title: job.title,
+        client: job.company,
+        experience: job.experience,
+        skills: Array.isArray(job.skills) ? job.skills.join(', ') : String(job.skills),
+        location: job.location,
+        openings: job.positions,
+        recruitersCount: job.jobType === 'assigned' ? 3 : 5, 
+        submissionsCount: recruiterStorage.getSubmissions().filter(s => s.jobId === job.id).length, 
+        status: job.accessStatus === 'none' ? 'Paused' as const : 'Active' as const, 
+        assignmentMode: job.jobType === 'assigned' ? 'restricted' as const : 'open' as const,
+        assignedRecruiters: job.jobType === 'assigned' ? ['rec-1', 'rec-2'] : []
+      })));
+    };
+
+    syncJobs();
+    window.addEventListener('storage', syncJobs);
+    return () => window.removeEventListener('storage', syncJobs);
+  }, []);
+
+  React.useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'marketplace_submissions'), async (snapshot) => {
+      try {
+        const allSubs = snapshot.docs.map(d => ({ id: d.id, ...d.data() as any }));
+        
+        const subsByJob: Record<string, any[]> = {};
+        allSubs.forEach(s => {
+          if (s.jobId) {
+            if (!subsByJob[s.jobId]) subsByJob[s.jobId] = [];
+            subsByJob[s.jobId].push(s);
+          }
+        });
+
+        const jobsSnap = await getDocs(collection(db, 'marketplace_jobs'));
+        for (const jobDoc of jobsSnap.docs) {
+          const jobId = jobDoc.id;
+          const jobData = jobDoc.data();
+          const jobSubs = subsByJob[jobId] || [];
+
+          const submissionCount = jobSubs.length;
+          const shortlistedCount = jobSubs.filter(s => s.status === 'Shortlisted').length;
+          const hiredCount = jobSubs.filter(s => s.status === 'Selected' || s.status === 'Joined' || s.status === 'Hired').length;
+          const recruiterCount = jobData.assignedRecruiters?.length || 0;
+
+          if (
+            jobData.submissionCount !== submissionCount ||
+            jobData.shortlistedCount !== shortlistedCount ||
+            jobData.hiredCount !== hiredCount ||
+            jobData.recruiterCount !== recruiterCount
+          ) {
+            await updateDoc(jobDoc.ref, {
+              submissionCount,
+              shortlistedCount,
+              hiredCount,
+              recruiterCount
+            });
+
+            const bdmUid = jobData.createdBy;
+            if (bdmUid) {
+              const bdmJobRef = doc(db, 'marketplace_bdms', bdmUid, 'jobs', jobId);
+              const bdmJobSnap = await getDoc(bdmJobRef);
+              if (bdmJobSnap.exists()) {
+                await updateDoc(bdmJobRef, {
+                  updatedAt: serverTimestamp()
+                });
+              }
+            }
+          }
+
+          for (const s of jobSubs) {
+            const subRef = doc(db, 'marketplace_jobs', jobId, 'submissions', s.id);
+            const subSnap = await getDoc(subRef);
+            if (!subSnap.exists()) {
+              await setDoc(subRef, s);
+            } else {
+              const currentSubData = subSnap.data();
+              if (currentSubData.status !== s.status) {
+                await setDoc(subRef, s);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error in submissions-to-jobs auto-sync:", err);
+      }
+    });
+
+    return () => unsub();
+  }, []);
+
   const handleCreateRequirement = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newReqTitle || !newReqClient) {
@@ -722,68 +936,291 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
     setTimeout(() => setSuccessMsg(''), 4000);
   };
 
-  const handleMManagerSubmitJob = (jobData: any) => {
-    if (jobData.id) {
-      // Edit mode
-      setMManagerJobs(prev => prev.map(job => {
-        if (job.id === jobData.id) {
-          return {
-            ...job,
-            title: jobData.title,
-            client: jobData.client,
-            experience: jobData.experience,
-            skills: jobData.skills,
-            location: jobData.location,
-            openings: jobData.openings,
-            status: jobData.status,
-            assignmentMode: jobData.assignmentMode || 'open',
-            assignedRecruiters: jobData.assignedRecruiters || [],
-            recruitersCount: jobData.assignmentMode === 'restricted' ? (jobData.assignedRecruiters?.length || 0) : job.recruitersCount
-          };
+  const handleMManagerSubmitJob = async (jobData: any) => {
+    try {
+      const bdmUid = auth.currentUser?.uid || 'anonymous-bdm';
+      const dbStatus = jobData.status === 'Paused' ? 'paused' : 'open';
+
+      if (jobData.id) {
+        // Edit mode using updateDoc()
+        const jobId = jobData.id;
+        const jobRef = doc(db, 'marketplace_jobs', jobId);
+        
+        // Fetch existing job to find old assignments
+        const jobSnap = await getDoc(jobRef);
+        const existingData = jobSnap.exists() ? jobSnap.data() : null;
+        const previousRecruiters = existingData?.assignedRecruiters || [];
+        const oldStatus = existingData?.status || 'open';
+
+        await updateDoc(jobRef, {
+          title: jobData.title,
+          companyName: jobData.client,
+          experience: jobData.experience,
+          skills: typeof jobData.skills === 'string' ? jobData.skills : (Array.isArray(jobData.skills) ? jobData.skills.join(', ') : ''),
+          location: jobData.location,
+          openings: jobData.openings,
+          employmentType: jobData.employmentType || 'Full Time',
+          salary: jobData.salaryRange || '6 - 10 LPA',
+          description: jobData.description || '',
+          requirements: jobData.responsibilities || '',
+          status: dbStatus,
+          assignmentMode: jobData.assignmentMode || 'open',
+          assignedRecruiters: jobData.assignedRecruiters || [],
+          updatedAt: serverTimestamp()
+        });
+
+        // Sync BDM lightweight reference
+        const bdmJobRef = doc(db, 'marketplace_bdms', bdmUid, 'jobs', jobId);
+        await setDoc(bdmJobRef, {
+          jobId,
+          title: jobData.title,
+          company: jobData.client || 'Unknown',
+          companyName: jobData.client || 'Unknown',
+          status: dbStatus,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        // Sync recruiters subcollection
+        await syncAssignedRecruitersSubcollection(jobId, jobData.assignedRecruiters || [], previousRecruiters);
+
+        // General Edit logs
+        await logJobActivity(jobId, 'Job Edited', 'Job requirement details were updated');
+        await addJobTimelineEvent(jobId, 'Updated', 'Job requirement details updated.');
+
+        // Status change logs
+        if (oldStatus !== dbStatus) {
+          if (dbStatus === 'paused') {
+            await logJobActivity(jobId, 'Job Paused', 'Sourcing was paused');
+            await addJobTimelineEvent(jobId, 'Paused', 'Sourcing paused.');
+          } else if (dbStatus === 'open') {
+            await logJobActivity(jobId, 'Job Opened', 'Sourcing was reopened');
+            await addJobTimelineEvent(jobId, 'Reopened', 'Sourcing reopened.');
+          }
         }
-        return job;
-      }));
-      setSuccessMsg('Requirement Saved and Sync\'d Successfully!');
-    } else {
-      // Create mode
-      const newJob = {
-        id: `job-${mManagerJobs.length + 1}`,
-        title: jobData.title,
-        client: jobData.client,
-        experience: jobData.experience,
-        skills: jobData.skills,
-        location: jobData.location,
-        openings: jobData.openings,
-        recruitersCount: jobData.assignmentMode === 'restricted' ? (jobData.assignedRecruiters?.length || 0) : 5, // default to 5 if open
-        submissionsCount: 0,
-        status: jobData.status,
-        assignmentMode: jobData.assignmentMode || 'open',
-        assignedRecruiters: jobData.assignedRecruiters || []
-      };
-      setMManagerJobs([newJob, ...mManagerJobs]);
-      setSuccessMsg('Requirement Published on Marketplace Sourcing Partners!');
+
+        setSuccessMsg('Requirement Saved and Sync\'d Successfully!');
+      } else {
+        // Create mode using generated ID (Master doc first, then BDM reference)
+        const colRef = collection(db, 'marketplace_jobs');
+        const jobDocRef = doc(colRef);
+        const jobId = jobDocRef.id;
+
+        await setDoc(jobDocRef, {
+          id: jobId,
+          jobId,
+          title: jobData.title,
+          companyName: jobData.client,
+          companyId: 'company-1',
+          experience: jobData.experience,
+          skills: typeof jobData.skills === 'string' ? jobData.skills : (Array.isArray(jobData.skills) ? jobData.skills.join(', ') : ''),
+          location: jobData.location,
+          openings: jobData.openings,
+          employmentType: jobData.employmentType || 'Full Time',
+          salary: jobData.salaryRange || '6 - 10 LPA',
+          description: jobData.description || '',
+          requirements: jobData.responsibilities || '',
+          status: dbStatus,
+          visibility: 'public',
+          assignmentMode: jobData.assignmentMode || 'open',
+          assignedRecruiters: jobData.assignedRecruiters || [],
+          createdBy: bdmUid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          recruiterCount: jobData.assignedRecruiters?.length || 0,
+          submissionCount: 0,
+          shortlistedCount: 0,
+          hiredCount: 0
+        });
+
+        // Create lightweight BDM reference
+        const bdmJobRef = doc(db, 'marketplace_bdms', bdmUid, 'jobs', jobId);
+        await setDoc(bdmJobRef, {
+          jobId,
+          title: jobData.title,
+          company: jobData.client || 'Unknown',
+          companyName: jobData.client || 'Unknown',
+          status: dbStatus,
+          updatedAt: serverTimestamp()
+        });
+
+        // Initialize subcollection entries and logs
+        await logJobActivity(jobId, 'Job Created', 'Job listing was created');
+        await addJobTimelineEvent(jobId, 'Created', 'Job listing published.');
+
+        // Sync recruiter subcollection if there are initial recruiters
+        if (jobData.assignedRecruiters && jobData.assignedRecruiters.length > 0) {
+          await syncAssignedRecruitersSubcollection(jobId, jobData.assignedRecruiters, []);
+        }
+
+        setSuccessMsg('Requirement Published on Marketplace Sourcing Partners!');
+      }
+    } catch (err) {
+      console.error('Error submitting job:', err);
     }
     setEditingMManagerJob(null);
     setActiveTab?.('jobs');
     setTimeout(() => setSuccessMsg(''), 4000);
   };
 
-  const handleMManagerToggleStatus = (id: string) => {
-    setMManagerJobs(prev => prev.map(j => {
-      if (j.id === id) {
-        return { ...j, status: j.status === 'Active' ? 'Paused' : 'Active' };
+  const handleMManagerToggleStatus = async (id: string, currentStatus?: string) => {
+    try {
+      const jobRef = doc(db, 'marketplace_jobs', id);
+      const jobSnap = await getDoc(jobRef);
+      const jobData = jobSnap.exists() ? jobSnap.data() : null;
+      const bdmUid = jobData?.createdBy || auth.currentUser?.uid || 'anonymous-bdm';
+
+      // Toggle status between paused and open
+      const isCurrentlyActive = currentStatus === 'Active' || currentStatus === 'OPEN' || currentStatus === 'open';
+      const newStatus = isCurrentlyActive ? 'paused' : 'open';
+
+      await updateDoc(jobRef, {
+        status: newStatus,
+        updatedAt: serverTimestamp()
+      });
+
+      // Update BDM ref with setDoc merge
+      const bdmJobRef = doc(db, 'marketplace_bdms', bdmUid, 'jobs', id);
+      await setDoc(bdmJobRef, {
+        status: newStatus,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      // Activity and Timeline Logging
+      if (newStatus === 'paused') {
+        await logJobActivity(id, 'Job Paused', 'Sourcing was paused');
+        await addJobTimelineEvent(id, 'Paused', 'Sourcing paused.');
+      } else {
+        await logJobActivity(id, 'Job Opened', 'Sourcing was reopened');
+        await addJobTimelineEvent(id, 'Reopened', 'Sourcing reopened.');
       }
-      return j;
-    }));
+
+      setSuccessMsg(`Sourcing successfully ${newStatus === 'open' ? 'resumed' : 'paused'}.`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+      console.error('Error toggling status:', err);
+    }
   };
 
-  const handleMManagerDeleteJob = (id: string) => {
-    setMManagerJobs(prev => prev.filter(j => j.id !== id));
+  const handleMManagerDeleteJob = async (id: string) => {
+    try {
+      const jobRef = doc(db, 'marketplace_jobs', id);
+      const jobSnap = await getDoc(jobRef);
+      const jobData = jobSnap.exists() ? jobSnap.data() : null;
+      const bdmUid = jobData?.createdBy || auth.currentUser?.uid || 'anonymous-bdm';
+
+      // 1. Cascade-delete subcollections FIRST while master document still exists
+      const subcollections = ['assigned_recruiters', 'recruiters', 'submissions', 'activity', 'timeline'];
+      for (const sub of subcollections) {
+        const colRef = collection(db, 'marketplace_jobs', id, sub);
+        const snapshot = await getDocs(colRef);
+        const deletePromises = snapshot.docs.map(docSnap => deleteDoc(docSnap.ref));
+        await Promise.all(deletePromises);
+      }
+
+      // 2. Delete BDM lightweight reference
+      const bdmJobRef = doc(db, 'marketplace_bdms', bdmUid, 'jobs', id);
+      await deleteDoc(bdmJobRef);
+
+      // 3. Delete master document last
+      await deleteDoc(jobRef);
+
+      setSuccessMsg('Requirement permanently deleted from system successfully!');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+      console.error('Error permanently deleting job:', err);
+    }
   };
 
-  const handleStudentApplyJob = (jobTitle: string, company: string) => {
-    setSuccessMsg(`Application to ${jobTitle} at ${company} submitted and sync'd with Placement cell!`);
-    setTimeout(() => setSuccessMsg(''), 4000);
+  const handleStudentApplyJob = async (jobTitle: string, company: string, opportunityId?: string) => {
+    try {
+      const organizationId = userProfile?.organizationId;
+      const studentId = userProfile?.uid || auth.currentUser?.uid;
+
+      if (!organizationId || !studentId) {
+        alert("Unable to apply: Missing student profile or organization ID.");
+        return;
+      }
+
+      if (!opportunityId) {
+        alert("Unable to apply: Missing opportunity details.");
+        return;
+      }
+
+      // 1. Check for duplicates under: organizations_universities/{organizationId}/applications
+      const appsCol = collection(db, 'organizations_universities', organizationId, 'applications');
+      const q = query(
+        appsCol,
+        where('studentId', '==', studentId),
+        where('opportunityId', '==', opportunityId)
+      );
+      const querySnap = await getDocs(q);
+      if (!querySnap.empty) {
+        alert("You have already applied for this opportunity.");
+        return;
+      }
+
+      // 2. Load student details
+      const studentDocRef = doc(db, 'organizations_universities', organizationId, 'students', studentId);
+      const studentSnap = await getDoc(studentDocRef);
+      if (!studentSnap.exists()) {
+        alert("Please complete your profile details before applying.");
+        return;
+      }
+      const studentData = studentSnap.data();
+
+      // 3. Load opportunity details
+      const oppDocRef = doc(db, 'organizations_universities', organizationId, 'opportunities', opportunityId);
+      const oppSnap = await getDoc(oppDocRef);
+      if (!oppSnap.exists()) {
+        alert("Opportunity not found or is closed.");
+        return;
+      }
+      const oppData = oppSnap.data();
+
+      // 4. Generate new application document ID
+      const appDocRef = doc(appsCol);
+      const applicationId = appDocRef.id;
+
+      // 5. Build application details
+      const newApp = {
+        applicationId,
+        studentId,
+        studentName: studentData.fullName || studentData.name || userProfile?.fullName || 'Student',
+        studentEmail: studentData.email || userProfile?.email || '',
+        studentDepartment: studentData.department || '',
+        studentBranch: studentData.branch || '',
+        studentCgpa: studentData.cgpa || '',
+        studentYear: studentData.year || '',
+        
+        opportunityId,
+        opportunityTitle: oppData.title || jobTitle,
+        
+        companyId: oppData.companyId || 'company-1',
+        companyName: oppData.companyName || company,
+        
+        placementOfficerUid: oppData.createdBy || '',
+        status: 'applied',
+        timeline: [
+          {
+            status: 'applied',
+            remarks: 'Application submitted successfully via student portal.',
+            updatedAt: new Date().toISOString()
+          }
+        ],
+        remarks: 'Applied successfully via student portal',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      // 6. Write to Firestore
+      await setDoc(appDocRef, newApp);
+
+      setSuccessMsg(`Application to ${newApp.opportunityTitle} at ${newApp.companyName} submitted successfully!`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      console.error('Error applying for job:', err);
+      alert(`Failed to submit application: ${err.message}`);
+    }
   };
 
   const handleTailorResume = (e: React.FormEvent) => {
@@ -1095,8 +1532,19 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
               {isAdminCreatingOfficer ? (
                 <AdminAddOfficerTab 
                   onBack={() => setIsAdminCreatingOfficer(false)} 
-                  onSubmit={(newOff) => {
-                    setAdminOfficers([newOff, ...adminOfficers]);
+                  onSubmit={async (newOff) => {
+                    if (!userProfile?.organizationId) {
+                      throw new Error("University profile or Organization ID not found.");
+                    }
+                    await createPlacementOfficerUser(
+                      userProfile.organizationId,
+                      newOff.name,
+                      newOff.email,
+                      newOff.phone,
+                      newOff.designation,
+                      newOff.dept,
+                      newOff.password
+                    );
                     setIsAdminCreatingOfficer(false);
                   }} 
                 />
@@ -1104,7 +1552,10 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                 <div className="space-y-6 animate-fade-in">
                   <div className="flex items-center gap-3">
                     <button 
-                      onClick={() => setSelectedAdminOfficer(null)} 
+                      onClick={() => {
+                        setSelectedAdminOfficer(null);
+                        setIsEditingSelectedOfficer(false);
+                      }} 
                       className="p-2 border border-app-border rounded-xl hover:bg-app-surface text-app-muted hover:text-app-text transition-colors cursor-pointer"
                     >
                       <ArrowLeft className="w-4 h-4" />
@@ -1122,29 +1573,140 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                       className="w-20 h-20 rounded-full object-cover border-2 border-app-border shrink-0" 
                       referrerPolicy="no-referrer"
                     />
-                    <div className="space-y-2.5">
-                      <h3 className="text-lg font-display font-black text-app-text">{selectedAdminOfficer.name}</h3>
-                      <div className="text-xs text-app-muted font-bold">Cell: <strong className="text-brand-blue">{selectedAdminOfficer.dept}</strong></div>
-                      <div className="text-xs text-app-muted font-bold">Email: <strong className="text-app-text">{selectedAdminOfficer.email}</strong></div>
-                      <div className="text-xs text-app-muted font-bold">Phone: <strong className="text-app-text">{selectedAdminOfficer.phone}</strong></div>
-                      
-                      <div className="flex flex-wrap gap-4 pt-1">
-                        <span className="text-xs font-bold text-app-muted">
-                          Drives Created: <strong className="text-brand-violet">{selectedAdminOfficer.opportunities}</strong>
-                        </span>
-                        <span className="text-xs font-bold text-app-muted">
-                          Endorsed Hires: <strong className="text-emerald-500">{selectedAdminOfficer.placements}</strong>
-                        </span>
-                      </div>
+                    <div className="space-y-2.5 flex-1">
+                      {isEditingSelectedOfficer ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[10px] font-extrabold uppercase text-app-muted">Full Name</label>
+                              <input 
+                                type="text"
+                                value={editOfficerName}
+                                onChange={(e) => setEditOfficerName(e.target.value)}
+                                className="w-full bg-app-bg border border-app-border rounded-xl py-2 px-3 text-xs font-semibold focus:outline-none focus:border-brand-blue"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-extrabold uppercase text-app-muted">Phone</label>
+                              <input 
+                                type="text"
+                                value={editOfficerPhone}
+                                onChange={(e) => setEditOfficerPhone(e.target.value)}
+                                className="w-full bg-app-bg border border-app-border rounded-xl py-2 px-3 text-xs font-semibold focus:outline-none focus:border-brand-blue"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[10px] font-extrabold uppercase text-app-muted">Department</label>
+                              <input 
+                                type="text"
+                                value={editOfficerDept}
+                                onChange={(e) => setEditOfficerDept(e.target.value)}
+                                className="w-full bg-app-bg border border-app-border rounded-xl py-2 px-3 text-xs font-semibold focus:outline-none focus:border-brand-blue"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-extrabold uppercase text-app-muted">Designation</label>
+                              <input 
+                                type="text"
+                                value={editOfficerDesignation}
+                                onChange={(e) => setEditOfficerDesignation(e.target.value)}
+                                className="w-full bg-app-bg border border-app-border rounded-xl py-2 px-3 text-xs font-semibold focus:outline-none focus:border-brand-blue"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-2 pt-2">
+                            <button 
+                              onClick={() => setIsEditingSelectedOfficer(false)}
+                              className="px-4 py-2 border border-app-border rounded-xl text-xs font-bold text-app-muted hover:bg-app-bg"
+                            >
+                              Cancel
+                            </button>
+                            <button 
+                              onClick={async () => {
+                                if (userProfile?.organizationId) {
+                                  const docRef = doc(db, 'organizations_universities', userProfile.organizationId, 'placement_officers', selectedAdminOfficer.id);
+                                  await updateDoc(docRef, {
+                                    fullName: editOfficerName,
+                                    name: editOfficerName,
+                                    phone: editOfficerPhone,
+                                    department: editOfficerDept,
+                                    dept: editOfficerDept,
+                                    designation: editOfficerDesignation
+                                  });
+                                  setSelectedAdminOfficer({
+                                    ...selectedAdminOfficer,
+                                    name: editOfficerName,
+                                    fullName: editOfficerName,
+                                    phone: editOfficerPhone,
+                                    dept: editOfficerDept,
+                                    department: editOfficerDept,
+                                    designation: editOfficerDesignation
+                                  });
+                                  setIsEditingSelectedOfficer(false);
+                                }
+                              }}
+                              className="px-4 py-2 bg-brand-blue text-white rounded-xl text-xs font-bold"
+                            >
+                              Save Changes
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <h3 className="text-lg font-display font-black text-app-text">{selectedAdminOfficer.name}</h3>
+                          <div className="text-xs text-app-muted font-bold">Cell: <strong className="text-brand-blue">{selectedAdminOfficer.dept}</strong></div>
+                          <div className="text-xs text-app-muted font-bold">Email: <strong className="text-app-text">{selectedAdminOfficer.email}</strong></div>
+                          <div className="text-xs text-app-muted font-bold">Phone: <strong className="text-app-text">{selectedAdminOfficer.phone}</strong></div>
+                          
+                          <div className="flex flex-wrap gap-4 pt-1">
+                            <span className="text-xs font-bold text-app-muted">
+                              Drives Created: <strong className="text-brand-violet">{selectedAdminOfficer.opportunities}</strong>
+                            </span>
+                            <span className="text-xs font-bold text-app-muted">
+                              Endorsed Hires: <strong className="text-emerald-500">{selectedAdminOfficer.placements}</strong>
+                            </span>
+                          </div>
 
-                      <div className="pt-2">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase border tracking-wider ${
-                          selectedAdminOfficer.status === 'Active' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-red-500/10 border-red-500/20 text-red-500'
-                        }`}>
-                          <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                          <span>{selectedAdminOfficer.status} Status</span>
-                        </span>
-                      </div>
+                          <div className="pt-2 flex flex-wrap items-center gap-3">
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase border tracking-wider ${
+                              selectedAdminOfficer.status === 'Active' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-red-500/10 border-red-500/20 text-red-500'
+                            }`}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                              <span>{selectedAdminOfficer.status} Status</span>
+                            </span>
+
+                            <button 
+                              onClick={() => {
+                                setEditOfficerName(selectedAdminOfficer.name);
+                                setEditOfficerPhone(selectedAdminOfficer.phone);
+                                setEditOfficerDept(selectedAdminOfficer.dept);
+                                setEditOfficerDesignation(selectedAdminOfficer.designation || '');
+                                setIsEditingSelectedOfficer(true);
+                              }}
+                              className="px-3 py-1 bg-brand-blue/10 hover:bg-brand-blue/20 text-brand-blue text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                            >
+                              Edit Profile
+                            </button>
+
+                            <button 
+                              onClick={async () => {
+                                if (confirm(`Are you sure you want to delete ${selectedAdminOfficer.name}?`)) {
+                                  if (userProfile?.organizationId) {
+                                    const docRef = doc(db, 'organizations_universities', userProfile.organizationId, 'placement_officers', selectedAdminOfficer.id);
+                                    await deleteDoc(docRef);
+                                    setSelectedAdminOfficer(null);
+                                  }
+                                }
+                              }}
+                              className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                            >
+                              Delete Officer
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1152,8 +1714,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                 <AdminOfficersTab 
                   officersList={adminOfficers}
                   onAddOfficer={() => setIsAdminCreatingOfficer(true)}
-                  onStatusChange={(id, newStatus) => {
-                    setAdminOfficers(adminOfficers.map(o => o.id === id ? { ...o, status: newStatus } : o));
+                  onStatusChange={async (id, newStatus) => {
+                    if (userProfile?.organizationId) {
+                      const docRef = doc(db, 'organizations_universities', userProfile.organizationId, 'placement_officers', id);
+                      await updateDoc(docRef, { status: newStatus });
+                    }
                   }}
                   onViewOfficer={(off) => setSelectedAdminOfficer(off)}
                 />
@@ -1284,6 +1849,10 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
 
           {activeTab === 'profile' && (
             <StudentProfileTab />
+          )}
+
+          {activeTab === 'settings' && (
+            <StudentSettings />
           )}
         </div>
       )}

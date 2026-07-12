@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   Briefcase, 
@@ -12,69 +12,126 @@ import {
   ChevronRight,
   ChevronDown
 } from 'lucide-react';
+import { db, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
+import { collection, doc, onSnapshot } from 'firebase/firestore';
+import { useAuth } from '../../../../context/AuthContext';
 
 interface OpportunitiesTabProps {
-  onApplyJob: (jobTitle: string, company: string) => void;
+  onApplyJob: (jobTitle: string, company: string, opportunityId?: string) => void;
 }
 
 export default function OpportunitiesTab({ onApplyJob }: OpportunitiesTabProps) {
+  const { userProfile } = useAuth();
+  const studentId = userProfile?.uid;
+  const organizationId = userProfile?.organizationId;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedJobType, setSelectedJobType] = useState('All');
   const [selectedLocation, setSelectedLocation] = useState('All');
 
-  // Exact dataset matching Column 2 image
-  const opportunities = [
-    {
-      company: 'TCS',
-      fullName: 'Tata Consultancy Services',
-      title: 'Software Engineer',
-      type: 'Campus Drive',
-      duration: 'Full Time',
-      package: '4.5 LPA',
-      location: 'Hyderabad',
-      eligibility: 'B.Tech - 2026',
-      match: 'Excellent',
-      date: 'Posted on 10 May 2026',
-    },
-    {
-      company: 'Infosys',
-      fullName: 'Infosys Limited',
-      title: 'System Engineer',
-      type: 'Campus Drive',
-      duration: 'Full Time',
-      package: '4.0 LPA',
-      location: 'Bangalore',
-      eligibility: 'B.Tech / MCA - 2026',
-      match: 'Excellent',
-      date: 'Posted on 09 May 2026',
-    },
-    {
-      company: 'Wipro',
-      fullName: 'Wipro Technologies',
-      title: 'Project Engineer',
-      type: 'Off-Campus',
-      duration: 'Full Time',
-      package: '3.6 LPA',
-      location: 'Chennai',
-      eligibility: 'Any Degree - 2026',
-      match: 'Very Good',
-      date: 'Posted on 08 May 2026',
-    },
-    {
-      company: 'Accenture',
-      fullName: 'Accenture Solutions',
-      title: 'Software Engineer',
-      type: 'Campus Drive',
-      duration: 'Full Time',
-      package: '4.5 LPA',
-      location: 'Pune',
-      eligibility: 'B.Tech - 2026',
-      match: 'Excellent',
-      date: 'Posted on 07 May 2026',
-    },
-  ];
+  const [studentData, setStudentData] = useState<any>(null);
+  const [opportunities, setOpportunities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredOpportunities = opportunities.filter((opp) => {
+  // 1. Listen to Student Profile document for eligibility matching
+  useEffect(() => {
+    if (!organizationId || !studentId) return;
+    const studentDocRef = doc(db, 'organizations_universities', organizationId, 'students', studentId);
+    const unsubscribe = onSnapshot(studentDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setStudentData(snapshot.data());
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `organizations_universities/${organizationId}/students/${studentId}`);
+    });
+    return () => unsubscribe();
+  }, [organizationId, studentId]);
+
+  // 2. Listen to Opportunities in real-time
+  useEffect(() => {
+    if (!organizationId) return;
+    const oppsCol = collection(db, 'organizations_universities', organizationId, 'opportunities');
+    const unsubscribe = onSnapshot(oppsCol, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      setOpportunities(list);
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, `organizations_universities/${organizationId}/opportunities`);
+    });
+    return () => unsubscribe();
+  }, [organizationId]);
+
+  // 3. Eligibility checking helper
+  const isEligible = (opp: any) => {
+    if (!studentData) return true; // Default to true if profile is loading
+
+    // Status check - only display open opportunities
+    if (opp.status && opp.status !== 'open') return false;
+
+    // CGPA check
+    if (opp.minimumCgpa) {
+      const minCgpa = parseFloat(opp.minimumCgpa);
+      const studentCgpa = parseFloat(studentData.cgpa || '0');
+      if (studentCgpa < minCgpa) return false;
+    }
+
+    // Department check
+    if (opp.eligibleDepartments && Array.isArray(opp.eligibleDepartments) && opp.eligibleDepartments.length > 0) {
+      const lowerDepts = opp.eligibleDepartments.map((d: string) => d.toLowerCase());
+      if (!lowerDepts.includes('all') && studentData.department) {
+        if (!lowerDepts.includes(studentData.department.toLowerCase())) return false;
+      }
+    }
+
+    // Branch check
+    if (opp.eligibleBranches && Array.isArray(opp.eligibleBranches) && opp.eligibleBranches.length > 0) {
+      const lowerBranches = opp.eligibleBranches.map((b: string) => b.toLowerCase());
+      if (!lowerBranches.includes('all') && studentData.branch) {
+        if (!lowerBranches.includes(studentData.branch.toLowerCase())) return false;
+      }
+    }
+
+    return true;
+  };
+
+  const getMatchScore = (opp: any) => {
+    if (!studentData || !opp) return 'Excellent';
+    const requiredSkills = opp.skills || [];
+    if (requiredSkills.length === 0) return 'Excellent';
+    const studentSkills = studentData.skills || [];
+    const matched = requiredSkills.filter((s: string) => 
+      studentSkills.some((sk: string) => sk.toLowerCase().includes(s.toLowerCase()))
+    );
+    const pct = (matched.length / requiredSkills.length) * 100;
+    if (pct >= 85) return 'Excellent';
+    if (pct >= 65) return 'Very Good';
+    if (pct >= 45) return 'Good';
+    return 'Fair';
+  };
+
+  // 4. Map and Filter
+  const mappedOpportunities = opportunities.map(opp => ({
+    id: opp.id,
+    company: opp.companyName || 'JOB',
+    fullName: opp.companyName || 'Company Solutions',
+    title: opp.title || 'Software Engineer',
+    type: opp.employmentType || 'Campus Drive',
+    duration: 'Full Time',
+    package: opp.salary || 'Competitive',
+    location: opp.location || 'Remote',
+    eligibility: opp.eligibleDepartments ? opp.eligibleDepartments.join(' / ') : 'All Batches',
+    match: getMatchScore(opp),
+    date: opp.createdAt ? `Posted on ${new Date(opp.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Posted recently',
+    raw: opp
+  }));
+
+  // Only display eligible opportunities
+  const eligibleOpps = mappedOpportunities.filter(o => isEligible(o.raw));
+
+  const filteredOpportunities = eligibleOpps.filter((opp) => {
     const matchesSearch = opp.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           opp.company.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           opp.location.toLowerCase().includes(searchTerm.toLowerCase());
@@ -177,7 +234,7 @@ export default function OpportunitiesTab({ onApplyJob }: OpportunitiesTabProps) 
         {filteredOpportunities.length > 0 ? (
           filteredOpportunities.map((opp, index) => (
             <motion.div
-              key={index}
+              key={opp.id || index}
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.08 }}
@@ -187,7 +244,7 @@ export default function OpportunitiesTab({ onApplyJob }: OpportunitiesTabProps) 
                 {/* Header info */}
                 <div className="flex flex-wrap items-start justify-between sm:justify-start gap-3">
                   <div className="w-14 h-14 rounded-2xl bg-brand-blue/10 text-brand-blue flex items-center justify-center font-display font-extrabold text-xl shadow-inner border border-brand-blue/10">
-                    {opp.company}
+                    {opp.company ? opp.company.substring(0, 3).toUpperCase() : 'JOB'}
                   </div>
                   <div>
                     <h3 className="font-display font-bold text-lg text-app-text-active">{opp.title}</h3>
@@ -236,13 +293,13 @@ export default function OpportunitiesTab({ onApplyJob }: OpportunitiesTabProps) 
               {/* Action buttons on the far right */}
               <div className="flex sm:flex-col md:flex-row w-full md:w-auto items-stretch gap-2 shrink-0 md:pl-6 md:border-l border-app-border/40">
                 <button 
-                  onClick={() => alert(`Details for ${opp.title} at ${opp.company}: Requires ${opp.eligibility} at ${opp.location}. Package: ${opp.package}.`)}
+                  onClick={() => alert(`Details for ${opp.title} at ${opp.company}:\nLocation: ${opp.location}\nSalary: ${opp.package}\nRequirements: ${opp.raw.requirements || "None specified"}`)}
                   className="flex-1 md:flex-none px-4 py-3 bg-app-surface/80 hover:bg-app-surface text-app-text font-bold rounded-xl text-xs border border-app-border whitespace-nowrap transition-all"
                 >
                   View Details
                 </button>
                 <button 
-                  onClick={() => onApplyJob(opp.title, opp.company)}
+                  onClick={() => onApplyJob(opp.title, opp.company, opp.id)}
                   className="flex-1 md:flex-none px-5 py-3 bg-brand-blue hover:bg-brand-blue-dark text-white font-bold rounded-xl text-xs whitespace-nowrap transition-all flex items-center justify-center gap-1 hover:scale-[1.02] shadow-sm shadow-brand-blue/25"
                 >
                   Apply
@@ -252,7 +309,7 @@ export default function OpportunitiesTab({ onApplyJob }: OpportunitiesTabProps) 
           ))
         ) : (
           <div className="p-12 text-center text-app-muted rounded-2xl bg-app-surface/20 border border-app-border">
-            No opportunities matched your current filter selection. Try adjusting your fields.
+            {loading ? "Loading opportunities..." : "No opportunities matched your current eligibility. Try adjusting your profile academic details."}
           </div>
         )}
       </div>
@@ -260,7 +317,7 @@ export default function OpportunitiesTab({ onApplyJob }: OpportunitiesTabProps) 
       {/* Pagination Footer precisely matched to Column 2 */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-app-border/40">
         <span className="text-xs font-semibold text-app-muted">
-          Showing 1 to {filteredOpportunities.length} of 42 opportunities
+          Showing 1 to {filteredOpportunities.length} of {filteredOpportunities.length} opportunities
         </span>
         
         <div className="flex items-center gap-1">
@@ -269,14 +326,6 @@ export default function OpportunitiesTab({ onApplyJob }: OpportunitiesTabProps) 
           </button>
           
           <button className="w-9 h-9 bg-brand-blue text-white rounded-lg font-bold text-xs">1</button>
-          <button className="w-9 h-9 bg-app-surface border border-app-border text-app-muted hover:text-app-text rounded-lg font-bold text-xs transition-colors">2</button>
-          <button className="w-9 h-9 bg-app-surface border border-app-border text-app-muted hover:text-app-text rounded-lg font-bold text-xs transition-colors">3</button>
-          <button className="w-9 h-9 bg-app-surface border border-app-border text-app-muted hover:text-app-text rounded-lg font-bold text-xs transition-colors">4</button>
-          <button className="w-9 h-9 bg-app-surface border border-app-border text-app-muted hover:text-app-text rounded-lg font-bold text-xs transition-colors">5</button>
-          
-          <span className="text-xs text-app-muted px-1">...</span>
-          
-          <button className="w-9 h-9 bg-app-surface border border-app-border text-app-muted hover:text-app-text rounded-lg font-bold text-xs transition-colors">11</button>
           
           <button className="p-2.5 bg-app-surface border border-app-border rounded-lg text-app-muted hover:text-app-text transition-colors">
             <ChevronRight className="w-4 h-4" />

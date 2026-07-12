@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Send, 
@@ -10,6 +10,17 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { CandidateProfile } from '../pages/CandidatePoolTab';
+import { db, auth, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  getDoc, 
+  doc, 
+  setDoc, 
+  onSnapshot 
+} from 'firebase/firestore';
 
 interface SubmitProfileModalProps {
   candidate: CandidateProfile | null;
@@ -27,29 +38,132 @@ export default function SubmitProfileModal({
   
   if (!isOpen || !candidate) return null;
 
-  // Selected job requirement
-  const [selectedJob, setSelectedJob] = useState('Frontend Developer - ABC Tech Pvt Ltd');
+  const [selectedJob, setSelectedJob] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [recruiterName, setRecruiterName] = useState('Rohit Kumar');
+  const [candidateProfile, setCandidateProfile] = useState<any | null>(null);
 
-  // Available jobs options from image #2
-  const requirementJobs = [
-    'Frontend Developer - ABC Tech Pvt Ltd',
-    'Java Developer - Infoswift Solutions',
-    'Backend Developer - TechWave Systems',
-    'QA Engineer - X Corp',
-    'DevOps Engineer - CloudMatrix'
-  ];
+  // Load real active jobs, current recruiter profile, and candidate details from Firestore
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
 
-  const handleSubmit = (e: React.FormEvent) => {
+    // 1. Fetch Open Jobs from Firestore
+    const qJobs = query(collection(db, 'marketplace_jobs'), where('status', '==', 'open'));
+    getDocs(qJobs).then((snap) => {
+      const list: any[] = [];
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          title: data.title || 'N/A',
+          company: data.company || data.companyName || 'N/A',
+          companyId: data.companyId || 'company-default-id',
+          bdm: data.bdm || 'John Mathew',
+          bdmUid: data.bdmUid || data.assignedBdmUid || 'bdm-default-uid',
+          ...data
+        });
+      });
+      setJobs(list);
+      if (list.length > 0) {
+        setSelectedJob(`${list[0].title} - ${list[0].company}`);
+      }
+    }).catch(err => {
+      console.error("Error loading open jobs in modal:", err);
+    });
+
+    // 2. Fetch Recruiter profile details from Firestore
+    const recruiterRef = doc(db, 'marketplace_recruiters', user.uid);
+    getDoc(recruiterRef).then((docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setRecruiterName(data?.profile?.fullName || user.displayName || 'Rohit Kumar');
+      } else {
+        setRecruiterName(user.displayName || 'Rohit Kumar');
+      }
+    }).catch(err => {
+      console.warn("Recruiter profile not found, defaulting name:", err);
+      setRecruiterName(user.displayName || 'Rohit Kumar');
+    });
+
+    // 3. Fetch Candidate's real profile from marketplace_jobseekers/{candidate.id}
+    const candidateRef = doc(db, 'marketplace_jobseekers', candidate.id);
+    getDoc(candidateRef).then((docSnap) => {
+      if (docSnap.exists()) {
+        setCandidateProfile(docSnap.data());
+      }
+    }).catch(err => {
+      console.error("Error fetching full candidate profile:", err);
+    });
+
+  }, [candidate.id]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedJob) return;
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
     setSubmitting(true);
     
-    setTimeout(() => {
-      setSubmitting(false);
-      onSubmitSuccess(candidate.name, selectedJob.split(' - ')[0]);
-      onClose();
-    }, 1500);
+    const [jobTitle, companyName] = selectedJob.split(' - ');
+    const targetJob = jobs.find(j => j.title === jobTitle && j.company === companyName);
+    
+    if (targetJob) {
+      const subId = `SUB-${Date.now().toString().slice(-6)}`;
+      const submissionRef = doc(db, 'marketplace_submissions', subId);
+
+      // Extract real email/phone from the database profile, if available
+      const prof = candidateProfile?.profile || {};
+      const candidateEmail = prof.email || candidateProfile?.email || candidate.id + '@example.com';
+      const candidatePhone = prof.phone || prof.phoneNumber || candidateProfile?.phone || candidateProfile?.phoneNumber || 'N/A';
+
+      const newSubmission = {
+        submissionId: subId,
+        id: subId, // for double compatibility
+        jobId: targetJob.id,
+        jobTitle: targetJob.title,
+        candidateUid: candidate.id,
+        candidateId: candidate.id, // for double compatibility
+        candidateName: candidate.name,
+        candidateEmail: candidateEmail,
+        candidatePhone: candidatePhone,
+        recruiterUid: currentUser.uid,
+        recruiterName: recruiterName,
+        submittedBy: recruiterName, // for double compatibility
+        bdmUid: targetJob.bdmUid || targetJob.assignedBdmUid || 'bdm-default-uid',
+        companyId: targetJob.companyId || 'company-default-id',
+        companyName: targetJob.company || 'N/A',
+        status: 'submitted', // lowercase as requested
+        submittedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        candidateResume: `${candidate.name.replace(' ', '_')}_Resume.pdf`,
+        submissionDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        assignedBdm: targetJob.bdm || 'John Mathew',
+        lastUpdated: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        notes: notes || 'Submitted directly from candidate profile.',
+        timeline: [
+          {
+            action: 'Submitted',
+            performedBy: recruiterName,
+            performedByRole: 'Marketplace Recruiter',
+            timestamp: new Date().toISOString()
+          }
+        ]
+      };
+
+      try {
+        await setDoc(submissionRef, newSubmission);
+        onSubmitSuccess(candidate.name, targetJob.title);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `marketplace_submissions/${subId}`);
+      }
+    }
+    
+    setSubmitting(false);
+    onClose();
   };
 
   return (
@@ -130,9 +244,10 @@ export default function SubmitProfileModal({
                   className="w-full bg-app-surface border border-app-border rounded-xl p-3.5 text-sm font-semibold text-app-text focus:outline-none focus:border-brand-blue outline-none cursor-pointer"
                   required
                 >
-                  {requirementJobs.map((job, idx) => (
-                    <option key={idx} value={job}>{job}</option>
-                  ))}
+                  {jobs.map((job, idx) => {
+                    const val = `${job.title} - ${job.company}`;
+                    return <option key={idx} value={val}>{val}</option>;
+                  })}
                 </select>
                 <p className="text-[10px] text-app-muted font-bold">Only open requirements with approved recruiter access are shown.</p>
               </div>

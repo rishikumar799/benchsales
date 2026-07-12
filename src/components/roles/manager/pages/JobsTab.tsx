@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { db } from '../../../../firebase/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { 
   Search, 
   MapPin, 
@@ -165,7 +167,7 @@ const RECRUITER_DATA_MOCK = [
 
 interface JobsTabProps {
   jobsList: JobType[];
-  onToggleStatus: (id: string) => void;
+  onToggleStatus: (id: string, currentStatus?: string) => void;
   onDeleteJob: (id: string) => void;
   onCreateJobClick: () => void;
   onEditJobClick: (job: JobType) => void;
@@ -179,9 +181,80 @@ export default function JobsTab({
   onEditJobClick 
 }: JobsTabProps) {
   
+  const [realtimeJobs, setRealtimeJobs] = useState<JobType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let subsData: any[] = [];
+    const unsubSubs = onSnapshot(collection(db, 'marketplace_submissions'), (snapshot) => {
+      subsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }, (err) => {
+      console.error("Error loading submissions:", err);
+    });
+
+    const q = collection(db, 'marketplace_jobs');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      try {
+        const jobs = snapshot.docs.map(docSnap => {
+          const data = docSnap.data();
+          
+          // Calculate dynamic stats
+          const jobSubs = subsData.filter(s => s.jobId === docSnap.id);
+          const uniqueRecs = new Set(jobSubs.map(s => s.recruiterId || s.submittedBy || ''));
+          
+          return {
+            id: docSnap.id,
+            title: data.title || '',
+            client: data.companyName || data.client || 'Unknown Client',
+            experience: data.experience || '3 - 5 Years',
+            skills: typeof data.skills === 'string' ? data.skills : (Array.isArray(data.skills) ? data.skills.join(', ') : ''),
+            location: data.location || 'Remote',
+            openings: data.openings || '10 Positions',
+            recruitersCount: data.assignedRecruiters?.length || uniqueRecs.size || 0,
+            submissionsCount: jobSubs.length || data.submissionsCount || 0,
+            status: (data.status === 'Paused' || data.status === 'PAUSED' || data.status === 'paused') ? 'Paused' : 'Active',
+            assignmentMode: data.assignmentMode || 'open',
+            assignedRecruiters: data.assignedRecruiters || [],
+          } as JobType;
+        });
+
+        // Filter out archived jobs
+        const nonArchivedJobs = jobs.filter(j => {
+          const rawJob = snapshot.docs.find(d => d.id === j.id)?.data();
+          return rawJob?.status !== 'archived';
+        });
+
+        // Sort newest first based on createdAt
+        nonArchivedJobs.sort((a, b) => {
+          const docA = snapshot.docs.find(d => d.id === a.id);
+          const docB = snapshot.docs.find(d => d.id === b.id);
+          const timeA = docA?.data()?.createdAt?.seconds || 0;
+          const timeB = docB?.data()?.createdAt?.seconds || 0;
+          return timeB - timeA;
+        });
+
+        setRealtimeJobs(nonArchivedJobs);
+        setLoading(false);
+      } catch (err: any) {
+        setError(err.message || String(err));
+        setLoading(false);
+      }
+    }, (err) => {
+      setError(err.message);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
+      unsubSubs();
+    };
+  }, []);
+
   // Recruiter Assignment Modals state
   const [selectedJobForRecruiters, setSelectedJobForRecruiters] = useState<JobType | null>(null);
   const [selectedRecruiterForDetails, setSelectedRecruiterForDetails] = useState<any | null>(null);
+  const [jobIdToDelete, setJobIdToDelete] = useState<string | null>(null);
 
   // Filtering states
   const [searchQuery, setSearchQuery] = useState('');
@@ -190,11 +263,11 @@ export default function JobsTab({
   const [locationFilter, setLocationFilter] = useState('All');
 
   // Extract unique filter dropdown values
-  const uniqueClients = Array.from(new Set(jobsList.map(j => j.client)));
-  const uniqueLocations = Array.from(new Set(jobsList.map(j => j.location)));
+  const uniqueClients = Array.from(new Set(realtimeJobs.map(j => j.client).filter(Boolean)));
+  const uniqueLocations = Array.from(new Set(realtimeJobs.map(j => j.location).filter(Boolean)));
 
   // Filter implementation
-  const filteredJobs = jobsList.filter(job => {
+  const filteredJobs = realtimeJobs.filter(job => {
     const matchesSearch = job.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           job.skills.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           job.client.toLowerCase().includes(searchQuery.toLowerCase());
@@ -286,7 +359,17 @@ export default function JobsTab({
 
       {/* Jobs Listings Table / Cards */}
       <div className="space-y-4">
-        {filteredJobs.length > 0 ? (
+        {loading ? (
+          <div className="p-12 text-center rounded-[32px] glass border border-app-border card-shadow flex flex-col items-center justify-center">
+            <div className="animate-spin w-8 h-8 border-4 border-brand-blue border-t-transparent rounded-full mb-4"></div>
+            <p className="text-sm font-semibold text-app-muted">Loading sourcing requirements from Firestore...</p>
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center rounded-[32px] glass border border-rose-500/20 card-shadow bg-rose-500/5">
+            <div className="text-rose-500 font-extrabold text-lg mb-2">Firestore Sync Error</div>
+            <p className="text-sm text-app-muted">{error}</p>
+          </div>
+        ) : filteredJobs.length > 0 ? (
           filteredJobs.map((job) => (
             <div 
               key={job.id}
@@ -350,7 +433,7 @@ export default function JobsTab({
                     <div className="flex -space-x-2 overflow-hidden">
                       {[1, 2, 3].slice(0, Math.min(job.recruitersCount, 3)).map((val, idx) => (
                         <img 
-                          key={idx}
+                           key={idx}
                           className="inline-block h-6.5 w-6.5 rounded-full ring-2 ring-app-bg object-cover"
                           src={`https://picsum.photos/seed/rec${idx + 5}/50/50`}
                           alt="Recruiter"
@@ -389,7 +472,7 @@ export default function JobsTab({
                 </button>
 
                 <button 
-                  onClick={() => onToggleStatus(job.id)}
+                  onClick={() => onToggleStatus(job.id, job.status)}
                   className={`p-3 border rounded-xl transition-all ${
                     job.status === 'Active' 
                       ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500 hover:bg-yellow-500 hover:text-white'
@@ -401,7 +484,7 @@ export default function JobsTab({
                 </button>
 
                 <button 
-                  onClick={() => onDeleteJob(job.id)}
+                  onClick={() => setJobIdToDelete(job.id)}
                   className="p-3 bg-red-500/10 hover:bg-red-500 border border-red-500/20 text-red-500 hover:text-white rounded-xl transition-all"
                   title="Remove requirement"
                 >
@@ -683,6 +766,37 @@ export default function JobsTab({
                 className="px-5 py-2.5 bg-brand-blue hover:bg-brand-blue/90 rounded-xl text-xs font-extrabold text-white transition-all"
               >
                 Return to Workspace
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Delete Confirmation Modal */}
+      {jobIdToDelete && (
+        <div id="delete-confirm-modal" className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+          <div className="bg-app-bg border border-app-border rounded-[24px] w-full max-w-md p-6 card-shadow animate-fade-in text-center">
+            <h2 id="delete-confirm-title" className="text-xl font-display font-bold text-app-text mb-2">Delete Job</h2>
+            <p id="delete-confirm-msg" className="text-sm text-app-muted mb-6 leading-relaxed">
+              Are you sure you want to permanently delete this job? This action cannot be undone.
+            </p>
+            <div className="flex justify-center gap-3">
+              <button
+                id="delete-cancel-btn"
+                onClick={() => setJobIdToDelete(null)}
+                className="px-5 py-2.5 rounded-xl border border-app-border text-app-text font-semibold hover:bg-app-surface transition-all text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                id="delete-confirm-btn"
+                onClick={() => {
+                  onDeleteJob(jobIdToDelete);
+                  setJobIdToDelete(null);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold transition-all text-xs"
+              >
+                Delete Permanently
               </button>
             </div>
           </div>

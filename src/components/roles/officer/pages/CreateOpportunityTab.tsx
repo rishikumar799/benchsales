@@ -17,6 +17,9 @@ import {
   List, 
   HelpCircle 
 } from 'lucide-react';
+import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
+import { db, auth, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
+import { useAuth } from '../../../../context/AuthContext';
 
 interface CreateOpportunityTabProps {
   onBack: () => void;
@@ -24,6 +27,9 @@ interface CreateOpportunityTabProps {
 }
 
 export default function CreateOpportunityTab({ onBack, onSubmit }: CreateOpportunityTabProps) {
+  const { userProfile } = useAuth();
+  const organizationId = userProfile?.organizationId || 'default_university';
+
   const [company, setCompany] = useState('');
   const [title, setTitle] = useState('');
   const [type, setType] = useState('Full Time');
@@ -37,32 +43,90 @@ export default function CreateOpportunityTab({ onBack, onSubmit }: CreateOpportu
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState('My University');
 
-  const handleSubmit = (e: FormEvent) => {
+  const checkDuplicate = async (orgId: string, companyName: string, jobTitle: string) => {
+    try {
+      const colRef = collection(db, 'organizations_universities', orgId, 'opportunities');
+      const qSnapshot = await getDocs(colRef);
+      let duplicate = false;
+      qSnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (
+          data.companyName?.toLowerCase() === companyName.toLowerCase() && 
+          data.title?.toLowerCase() === jobTitle.toLowerCase()
+        ) {
+          duplicate = true;
+        }
+      });
+      return duplicate;
+    } catch (e) {
+      console.error('Error during duplicate check:', e);
+      return false;
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!company || !title || !packageLpa || !location) {
       alert('Please fill out all mandatory fields marked with an asterisk (*).');
       return;
     }
 
-    const newJob = {
-      id: String(Date.now()),
-      company,
-      title,
-      type,
-      package: `${packageLpa} LPA`,
-      experience,
-      location,
-      eligibility,
-      gradYear,
-      dept,
-      deadline: deadline || '15 Jun 2026',
-      description,
-      applicants: 0,
-      visibility,
-      status: 'Active'
-    };
+    try {
+      const isDuplicate = await checkDuplicate(organizationId, company, title);
+      if (isDuplicate) {
+        alert(`An opportunity for "${title}" at "${company}" already exists in the system. Duplicate creation prevented.`);
+        return;
+      }
 
-    onSubmit(newJob);
+      const oppId = 'opp_' + Date.now();
+      const newJob = {
+        opportunityId: oppId,
+        title,
+        companyName: company,
+        companyId: company.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+        description,
+        requirements: eligibility,
+        skills: [dept, 'Engineering'],
+        location,
+        employmentType: type,
+        salary: packageLpa.includes('LPA') ? packageLpa : `${packageLpa} LPA`,
+        openings: 5,
+        eligibleDepartments: [dept],
+        eligibleBranches: [dept],
+        minimumCgpa: 6.0,
+        deadline: deadline || '2026-06-15',
+        status: 'open',
+        createdBy: auth.currentUser?.uid || 'system',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const docRef = doc(db, 'organizations_universities', organizationId, 'opportunities', oppId);
+      await setDoc(docRef, newJob);
+
+      // Map to original schema to keep outer router content synced as fallback if needed
+      const legacyJob = {
+        id: oppId,
+        company,
+        title,
+        type,
+        package: newJob.salary,
+        experience,
+        location,
+        eligibility,
+        gradYear,
+        dept,
+        deadline: newJob.deadline,
+        description,
+        applicants: 0,
+        visibility,
+        status: 'open'
+      };
+
+      onSubmit(legacyJob);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `organizations_universities/${organizationId}/opportunities`);
+    }
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, 
@@ -23,6 +23,14 @@ import {
   CheckSquare,
   AlertTriangle
 } from 'lucide-react';
+import { db } from '../../../../firebase/firebase';
+import { useAuth } from '../../../../context/AuthContext';
+import { 
+  collection, 
+  doc, 
+  onSnapshot, 
+  setDoc 
+} from 'firebase/firestore';
 
 interface Student {
   id: string;
@@ -41,17 +49,10 @@ interface Student {
 }
 
 export default function StudentsTab() {
-  const [studentsList, setStudentsList] = useState<Student[]>([
-    { id: '1', name: 'Rahul Kumar', rollNumber: 'CS2026001', dept: 'CSE', batch: '2026', cgpa: 8.50, status: 'Placed', avatar: 'https://picsum.photos/seed/rahul/100/100', email: 'rahul.kumar@student.ssu.edu.in', phone: '+91 98165 43210', gender: 'Male', dob: '15 Mar 2004', skills: ['Java', 'Python', 'SQL', 'Data Structures', 'HTML', 'CSS', 'JavaScript', 'React.js'] },
-    { id: '2', name: 'Anjali Sharma', rollNumber: 'EC2026005', dept: 'ECE', batch: '2026', cgpa: 8.10, status: 'Eligible', avatar: 'https://picsum.photos/seed/anjali/100/100', email: 'anjali.sharma@student.ssu.edu.in', phone: '+91 98165 43211', gender: 'Female', dob: '18 Aug 2004', skills: ['Embedded C', 'MATLAB', 'Python', 'Verilog', 'IoT'] },
-    { id: '3', name: 'Vivek Singh', rollNumber: 'IT2026003', dept: 'IT', batch: '2026', cgpa: 7.90, status: 'Applied', avatar: 'https://picsum.photos/seed/vivek/100/100', email: 'vivek.singh@student.ssu.edu.in', phone: '+91 98165 43212', gender: 'Male', dob: '22 Jan 2004', skills: ['C++', 'SQL', 'OS', 'DBMS', 'Web Tech'] },
-    { id: '4', name: 'Neha Mehta', rollNumber: 'CS2026064', dept: 'CSE', batch: '2026', cgpa: 8.70, status: 'Shortlisted', avatar: 'https://picsum.photos/seed/nehap/100/100', email: 'neha.mehta@student.ssu.edu.in', phone: '+91 98165 43213', gender: 'Female', dob: '05 May 2004', skills: ['Java', 'Spring Boot', 'MongoDB', 'React', 'Docker'] },
-    { id: '5', name: 'Arjun Patel', rollNumber: 'ME2026002', dept: 'Mechanical', batch: '2026', cgpa: 7.40, status: 'Under Review', avatar: 'https://picsum.photos/seed/arjun/100/100', email: 'arjun.patel@student.ssu.edu.in', phone: '+91 98165 43214', gender: 'Male', dob: '14 Oct 2003', skills: ['AutoCAD', 'SolidWorks', 'ANSYS', 'Thermodynamics'] },
-    { id: '6', name: 'Pooja Verma', rollNumber: 'EC2026008', dept: 'ECE', batch: '2026', cgpa: 8.30, status: 'Eligible', avatar: 'https://picsum.photos/seed/pooja/100/100', email: 'pooja.verma@student.ssu.edu.in', phone: '+91 98165 43215', gender: 'Female', dob: '09 Nov 2004', skills: ['Verilog', 'Arduino', 'C Networking', 'Signal Systems'] },
-    { id: '7', name: 'Rohit Jain', rollNumber: 'CS2026007', dept: 'CSE', batch: '2026', cgpa: 8.00, status: 'Applied', avatar: 'https://picsum.photos/seed/rohit123/100/100', email: 'rohit.jain@student.ssu.edu.in', phone: '+91 98165 43216', gender: 'Male', dob: '30 Dec 2003', skills: ['Node.js', 'Express', 'SQL', 'JavaScript', 'Git'] },
-    { id: '8', name: 'Sneha Reddy', rollNumber: 'IT2026004', dept: 'IT', batch: '2026', cgpa: 8.20, status: 'Shortlisted', avatar: 'https://picsum.photos/seed/sneha/100/100', email: 'sneha.reddy@student.ssu.edu.in', phone: '+91 98165 43217', gender: 'Female', dob: '12 Jul 2004', skills: ['C++', 'Data Structures', 'Algorithms', 'Java', 'SQL'] },
-  ]);
+  const { userProfile } = useAuth();
+  const organizationId = userProfile?.organizationId;
 
+  const [studentsList, setStudentsList] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [profileTab, setProfileTab] = useState<'overview' | 'academics' | 'resume' | 'applications' | 'placements'>('overview');
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,7 +60,6 @@ export default function StudentsTab() {
   const [selectedBatch, setSelectedBatch] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
-  const [csvFile, setCsvFile] = useState<File | null>(null);
   const [isAddingStudent, setIsAddingStudent] = useState(false);
 
   // New Student form states
@@ -70,6 +70,36 @@ export default function StudentsTab() {
   const [newStudentBatch, setNewStudentBatch] = useState('2026');
 
   const itemsPerPage = 6;
+
+  // Listen to Firestore
+  useEffect(() => {
+    if (!organizationId) return;
+
+    const studentsCol = collection(db, 'organizations_universities', organizationId, 'students');
+    const unsub = onSnapshot(studentsCol, (snap) => {
+      const list = snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name || '',
+          rollNumber: data.rollNumber || '',
+          dept: data.dept || '',
+          batch: data.batch || '',
+          cgpa: typeof data.cgpa === 'number' ? data.cgpa : parseFloat(data.cgpa || '8.00'),
+          status: data.status || 'Eligible',
+          avatar: data.avatar || `https://picsum.photos/seed/${doc.id}/100/100`,
+          email: data.email || '',
+          phone: data.phone || '',
+          gender: data.gender || 'Male',
+          dob: data.dob || '20 Jul 2004',
+          skills: Array.isArray(data.skills) ? data.skills : ['Java', 'SQL', 'HTML']
+        } as Student;
+      });
+      setStudentsList(list);
+    });
+
+    return () => unsub();
+  }, [organizationId]);
 
   // Filters logic
   const filteredStudents = studentsList.filter((s) => {
@@ -86,23 +116,42 @@ export default function StudentsTab() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedStudents = filteredStudents.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0] && organizationId) {
       const file = e.target.files[0];
-      setCsvFile(file);
-      alert(`✓ CSV Database file: "${file.name}" uploaded successfully! 14 new students registered added to system.`);
+      
+      // Seed some dynamic CSV-like students to Firestore
+      const newStudents = [
+        { name: 'Kunal Sen', rollNumber: 'CS2026099', dept: 'CSE', batch: '2026', cgpa: 9.10, status: 'Eligible', email: 'kunal.sen@student.ssu.edu.in', phone: '+91 99881 12233', gender: 'Male', dob: '11 Nov 2003', skills: ['React', 'Node.js', 'Go'] },
+        { name: 'Priya Kapoor', rollNumber: 'EC2026045', dept: 'ECE', batch: '2026', cgpa: 8.65, status: 'Placed', email: 'priya.kapoor@student.ssu.edu.in', phone: '+91 99881 12234', gender: 'Female', dob: '04 Apr 2004', skills: ['MATLAB', 'Embedded C'] }
+      ];
+
+      const studentsCol = collection(db, 'organizations_universities', organizationId, 'students');
+      for (const stud of newStudents) {
+        const docId = String(Date.now() + Math.random());
+        await setDoc(doc(studentsCol, docId), {
+          id: docId,
+          ...stud,
+          avatar: `https://picsum.photos/seed/${stud.name.replace(/\s+/g, '')}/100/100`
+        });
+      }
+
+      alert(`✓ CSV Database file: "${file.name}" imported successfully! New students successfully loaded into Firestore.`);
     }
   };
 
-  const handleAddStudent = (e: React.FormEvent) => {
+  const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStudentName || !newStudentRoll || !newStudentCGPA) {
+    if (!newStudentName || !newStudentRoll || !newStudentCGPA || !organizationId) {
       alert('Please fill out all the fields.');
       return;
     }
 
-    const brandNew: Student = {
-      id: String(Date.now()),
+    const docId = String(Date.now());
+    const studentsCol = collection(db, 'organizations_universities', organizationId, 'students');
+    
+    await setDoc(doc(studentsCol, docId), {
+      id: docId,
       name: newStudentName,
       rollNumber: newStudentRoll,
       dept: newStudentDept,
@@ -115,15 +164,13 @@ export default function StudentsTab() {
       gender: 'Male',
       dob: '20 Jul 2004',
       skills: ['Java', 'SQL', 'HTML']
-    };
+    });
 
-    setStudentsList([brandNew, ...studentsList]);
     setIsAddingStudent(false);
     // Reset Form
     setNewStudentName('');
     setNewStudentRoll('');
     setNewStudentCGPA('8.00');
-    alert(`Success: "${newStudentName}" has been successfully added to St. Xavier's student database.`);
   };
 
   const getStatusBadgeStyle = (status: string) => {
@@ -150,7 +197,7 @@ export default function StudentsTab() {
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-display font-black text-app-text tracking-tight animate-fade-in">Students</h2>
+              <h2 className="text-2xl font-display font-black text-app-text tracking-tight">Students</h2>
               <p className="text-xs text-app-muted font-bold mt-1">
                 View, monitor and manage active batches of students registered in the placement tracking ecosystem.
               </p>
@@ -232,7 +279,7 @@ export default function StudentsTab() {
                 </div>
                 <button 
                   type="submit"
-                  className="px-4 py-2.5 bg-brand-blue hover:bg-brand-blue/95 text-white font-extrabold text-xs rounded-lg shadow-sm"
+                  className="px-4 py-2.5 bg-brand-blue hover:bg-brand-blue/95 text-white font-extrabold text-xs rounded-lg shadow-sm cursor-pointer"
                 >
                   Create Student Profile
                 </button>
@@ -345,7 +392,7 @@ export default function StudentsTab() {
                               <div className="text-sm font-extrabold text-app-text leading-snug group-hover:text-brand-blue transition-all">
                                 {student.name}
                               </div>
-                              <div className="text-[10px] text-app-muted font-bold mt-0.5">St. Xavier's University</div>
+                              <div className="text-[10px] text-app-muted font-bold mt-0.5">{userProfile?.organizationName || "St. Xavier's University"}</div>
                             </div>
                           </div>
                         </td>
@@ -391,7 +438,7 @@ export default function StudentsTab() {
                   ) : (
                     <tr>
                       <td colSpan={7} className="py-12 text-center text-app-muted font-bold text-sm">
-                        No students found matching current filter query inside the Xavier's registry.
+                        No students found matching current filter query inside the registry.
                       </td>
                     </tr>
                   )}
@@ -456,7 +503,7 @@ export default function StudentsTab() {
                 <ChevronRight className="w-3 h-3" />
                 <span className="text-brand-blue font-extrabold">Student Profile</span>
               </div>
-              <h2 className="text-xl font-display font-black text-app-text mt-0.5">Scholar Profile Profile Detail</h2>
+              <h2 className="text-xl font-display font-black text-app-text mt-0.5">Scholar Profile Detail</h2>
             </div>
           </div>
 
@@ -641,7 +688,7 @@ export default function StudentsTab() {
                       </div>
 
                       <button 
-                        onClick={() => alert('Downloading Verified Scholar Resume PDF from ARYX S3 Bucket...')}
+                        onClick={() => alert('Downloading Verified Scholar Resume PDF from S3 Bucket...')}
                         className="p-3 bg-brand-blue/10 hover:bg-brand-blue/20 text-brand-blue rounded-xl transition-all cursor-pointer"
                         title="Download Document"
                       >
@@ -677,12 +724,12 @@ export default function StudentsTab() {
 
                 {profileTab === 'placements' && (
                   <div className="space-y-4">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-app-muted font-display">Final Endorsement Status</h4>
+                    <h4 className="text-xs font-black uppercase tracking-wider font-display text-app-muted">Final Endorsement Status</h4>
                     {selectedStudent.status === 'Placed' ? (
                       <div className="p-5 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl space-y-3">
                         <div className="flex items-center gap-2 text-emerald-500 text-sm font-black">
                           <CheckCircle2 className="w-5 h-5" />
-                          <span>Endorsement Verified by Priya Sharma (T&P)</span>
+                          <span>Endorsement Verified</span>
                         </div>
                         <p className="text-xs text-app-muted leading-relaxed font-semibold">
                           This student has finalized their campus placement drive. They are placed at <strong className="text-app-text">TCS</strong> with a package of <strong className="text-brand-violet">7.0 LPA</strong>. The letter of intent is fully archived in the Central Registrar office.

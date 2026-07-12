@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, 
   Mail, 
@@ -9,10 +9,14 @@ import {
   Sliders,
   Sparkles
 } from 'lucide-react';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { db } from '../../../../firebase/firebase';
+import { useAuth } from '../../../../context/AuthContext';
 
 export default function ProfileTab() {
+  const { user, loading } = useAuth();
   
-  // High fidelity states matching user info from image #7
+  // States matching recruiter profile fields
   const [fullName, setFullName] = useState('Rohit Kumar');
   const [email, setEmail] = useState('rohit.kumar@aryaxai.com');
   const [phone, setPhone] = useState('+91 98765 43210');
@@ -30,15 +34,89 @@ export default function ProfileTab() {
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  const handleSaveChanges = (e: React.FormEvent) => {
+  // Subscribe to real-time updates from marketplace_recruiters/{uid}
+  useEffect(() => {
+    if (!user) return;
+    
+    const recruiterDocRef = doc(db, 'marketplace_recruiters', user.uid);
+    const unsubscribe = onSnapshot(recruiterDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        const profileData = data?.profile || {};
+        
+        setFullName(profileData.fullName || user.displayName || 'Rohit Kumar');
+        setEmail(profileData.email || user.email || 'rohit.kumar@aryaxai.com');
+        setPhone(profileData.phone || profileData.phoneNumber || '+91 98765 43210');
+        setLocation(profileData.location || 'Bangalore, India');
+        setRecruiterId(profileData.recruiterId || 'REC-2026-045');
+        setReportingManager(profileData.reportingManager || 'John Mathew (BDM)');
+        setTeam(profileData.team || 'Frontend Recruitment');
+        setExperience(profileData.experience || '3 Years');
+        setPreferredRoles(profileData.preferredRoles || 'Frontend, Full Stack, Backend');
+        setPreferredLocations(profileData.preferredLocations || 'Bangalore, Remote');
+        setNotificationEmail(profileData.notificationEmail || user.email || 'rohit.kumar@aryaxai.com');
+      }
+    }, (error) => {
+      console.error("Error loading recruiter profile from Firestore:", error);
+    });
+    
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+    
+    try {
+      const recruiterDocRef = doc(db, 'marketplace_recruiters', user.uid);
+      await setDoc(recruiterDocRef, {
+        profile: {
+          uid: user.uid,
+          fullName,
+          email,
+          phone,
+          phoneNumber: phone,
+          location,
+          recruiterId,
+          reportingManager,
+          team,
+          experience,
+          preferredRoles,
+          preferredLocations,
+          notificationEmail,
+          status: 'approved',
+          updatedAt: new Date().toISOString()
+        }
+      }, { merge: true });
+      
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
-    }, 1200);
+    } catch (error) {
+      console.error("Error updating recruiter profile:", error);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <div className="w-12 h-12 border-4 border-brand-blue border-t-transparent rounded-full animate-spin" />
+        <p className="text-app-muted text-sm font-semibold">Loading profile...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-6 glass border border-app-border rounded-[32px] space-y-4">
+        <User className="w-16 h-16 text-app-muted" />
+        <h3 className="text-xl font-display font-bold text-app-text">Access Denied</h3>
+        <p className="text-app-muted max-w-md">Please sign in to view and manage your recruiter profile.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -60,8 +138,8 @@ export default function ProfileTab() {
             <div className="relative pt-12 space-y-4">
               <div className="w-28 h-28 rounded-full border-4 border-app-bg bg-brand-blue/10 p-1 mx-auto shadow-2xl">
                 <img 
-                  src="https://picsum.photos/seed/rohit/150/150" 
-                  alt="Rohit Kumar" 
+                  src={`https://picsum.photos/seed/${fullName || 'rohit'}/150/150`}
+                  alt={fullName} 
                   className="w-full h-full rounded-full object-cover"
                   referrerPolicy="no-referrer"
                 />
@@ -73,7 +151,7 @@ export default function ProfileTab() {
                   ID: {recruiterId}
                 </div>
               </div>
-              <p className="text-xs text-app-muted mt-1">Member since May 2006</p>
+              <p className="text-xs text-app-muted mt-1">Member since May 2026</p>
             </div>
 
             <div className="mt-8 pt-8 border-t border-app-border/40 text-left space-y-4 text-xs font-semibold text-app-text">
@@ -115,6 +193,7 @@ export default function ProfileTab() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     className="w-full bg-app-surface border border-app-border rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-brand-blue text-app-text"
+                    required
                   />
                 </div>
                 <div>
@@ -124,6 +203,7 @@ export default function ProfileTab() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-app-surface border border-app-border rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-brand-blue text-app-text"
+                    required
                   />
                 </div>
                 <div>
@@ -235,7 +315,7 @@ export default function ProfileTab() {
               <button 
                 type="submit" 
                 disabled={saving}
-                className="px-8 py-3.5 bg-brand-violet text-white font-extrabold rounded-2xl text-sm shadow-xl shadow-brand-violet/15 hover:scale-[1.02] active:scale-95 transition-all shrink-0"
+                className="px-8 py-3.5 bg-brand-violet text-white font-extrabold rounded-2xl text-sm shadow-xl shadow-brand-violet/15 hover:scale-[1.02] active:scale-95 transition-all shrink-0 cursor-pointer"
               >
                 {saving ? 'Saving changes...' : 'Save Changes'}
               </button>

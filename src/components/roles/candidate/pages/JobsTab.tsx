@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
@@ -20,6 +20,18 @@ import {
   Eye
 } from 'lucide-react';
 
+import { db } from '../../../../firebase/firebase';
+import { useAuth } from '../../../../context/AuthContext';
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  onSnapshot, 
+  query, 
+  where, 
+  serverTimestamp 
+} from 'firebase/firestore';
+
 interface Job {
   id: string;
   role: string;
@@ -31,79 +43,104 @@ interface Job {
   location: string;
   experience: string;
   salary: string;
+  employmentType: string;
+  openings: string | number;
   skills: string[];
   whyMatch: { skill: string; pct: number }[];
   missingSkills: { skill: string; gap: number }[];
+  description: string;
+  requirements: string;
+  recruiterCount: number;
+  submissionCount: number;
+  createdAt: any;
+  updatedAt: any;
+  assignedRecruiters?: string[];
+  createdBy?: string;
+  companyId?: string;
+  companyName?: string;
 }
 
-const JOB_DESCRIPTIONS: Record<string, string> = {
-  'job-1': `Google is looking for a talented Frontend Developer to join our Core Developer Platforms and Chrome UX team. In this role, you will build next-generation user interfaces that are fast, accessible, and delight millions of users. 
+// Helper utilities for computing display-only elements cleanly
+const getLogoBg = (company: string) => {
+  const colors = [
+    'bg-red-500', 'bg-blue-600', 'bg-orange-500', 'bg-amber-600', 
+    'bg-emerald-600', 'bg-violet-600', 'bg-indigo-600', 'bg-pink-600'
+  ];
+  let hash = 0;
+  for (let i = 0; i < company.length; i++) {
+    hash = company.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
 
-Key Responsibilities:
-- Design, implement, and maintain highly responsive web interfaces using React, TypeScript, and modern front-end tooling.
-- Collaborate closely with product managers, UX designers, and backend engineering teams to transform wireframes into production code.
-- Optimize web applications for maximum speed, responsiveness, and cross-browser scalability.
-- Write clean, maintainable, and thoroughly tested software components.
+const getRelativeTime = (ts: any) => {
+  if (!ts) return '1 day ago';
+  let date: Date;
+  if (typeof ts.toDate === 'function') {
+    date = ts.toDate();
+  } else if (ts.seconds) {
+    date = new Date(ts.seconds * 1000);
+  } else {
+    date = new Date(ts);
+  }
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays <= 0) {
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours <= 0) return 'Just now';
+    return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  }
+  return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+};
 
-Preferred Qualifications:
-- 3+ years of professional front-end web development experience.
-- Deep expertise in modern JavaScript frameworks, specifically React.js.
-- Strong knowledge of web standards, accessibility (WCAG), CSS grid/flexbox layouts, and browser render performance.`,
+const getMatchScore = (jobId: string) => {
+  let hash = 0;
+  for (let i = 0; i < jobId.length; i++) {
+    hash = jobId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return 85 + (Math.abs(hash) % 15);
+};
 
-  'job-2': `Microsoft Azure team is hiring a Full Stack Developer to build cloud-native administrative consoles and distributed backend logic. You will leverage modern frontend frameworks alongside Node.js and MongoDB to build robust services that power developers worldwide.
+const getWhyMatch = (skills: string[]) => {
+  return skills.slice(0, 3).map((s, idx) => ({
+    skill: s,
+    pct: 95 - idx * 5
+  }));
+};
 
-Key Responsibilities:
-- Build and optimize responsive, user-friendly control dashboards using React.
-- Design, build, and maintain scalable, reliable REST and GraphQL APIs with Node.js/Express.
-- Partner with database architects to structure high-performance schemas in MongoDB and Azure Cosmos DB.
-- Implement security best practices, telemetry hooks, and automated CI/CD deployment routines.
+const getMissingSkills = (skills: string[]) => {
+  const allPossible = ['Docker', 'AWS', 'Kubernetes', 'CI/CD', 'System Design'];
+  return allPossible
+    .filter(s => !skills.includes(s))
+    .slice(0, 2)
+    .map((s, idx) => ({
+      skill: s,
+      gap: 20 + idx * 10
+    }));
+};
 
-Preferred Qualifications:
-- 2-5 years of full stack experience.
-- Command of Node.js ecosystem, asynchronous programming, and databases.
-- Experience with Azure cloud services, Docker containerization, or Kubernetes.`,
-
-  'job-3': `Amazon is seeking a Senior React Developer to join our AWS team and work on developer tools. You will lead the design and implementation of highly interactive browser-based software that empowers engineers to deploy and manage global infrastructures.
-
-Key Responsibilities:
-- Architect and develop high-performance components using React, Redux, and modern styling libraries like Tailwind CSS.
-- Create beautiful, highly reusable UI components matching the AWS design framework.
-- Integrate complex REST endpoints, manage client-side state, and handle high-throughput client data structures.
-- Mentor junior engineers and champion front-end engineering excellence.
-
-Preferred Qualifications:
-- 2-4 years of experience building scalable single page applications.
-- Strong knowledge of state management patterns (Redux, Zustand, Context API).
-- Experience with AWS services (EC2, S3, CloudFront) is a big plus.`,
-
-  'job-4': `Swiggy is seeking a Software Engineer to join our Bangalore Core Customer Experience team. You will build highly responsive customer-facing delivery and checkout portals, optimizing every millisecond of user journeys.
-
-Key Responsibilities:
-- Develop highly optimized food and grocery checkout flows using React, Redux, and Tailwind CSS.
-- Optimize mobile-web views to maintain incredibly low load times and highly interactive page experiences.
-- Collaborate with design and product teams to run A/B experiments and feature rollouts.
-- Deliver robust, cross-platform web structures.
-
-Preferred Qualifications:
-- 1-3 years of professional experience in modern JavaScript application frameworks.
-- Strong command of HTML5, CSS3, ES6 syntax, and web rendering cycles.
-- Experience with real-time location services, WebSockets, or PWA development is a plus.`
+const formatTimestamp = (ts: any) => {
+  if (!ts) return 'N/A';
+  if (typeof ts.toDate === 'function') {
+    return ts.toDate().toLocaleDateString();
+  }
+  if (ts.seconds) {
+    return new Date(ts.seconds * 1000).toLocaleDateString();
+  }
+  return new Date(ts).toLocaleDateString();
 };
 
 export default function JobsTab() {
+  const { userProfile } = useAuth();
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [myApplications, setMyApplications] = useState<any[]>([]);
+  const [candidateData, setCandidateData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('All');
-  const [appliedJobs, setAppliedJobs] = useState<string[]>(() => {
-    const saved = localStorage.getItem('aryx_submitted_applications');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.map((app: any) => app.jobId);
-      } catch (e) {}
-    }
-    return [];
-  });
-  const [savedJobs, setSavedJobs] = useState<string[]>([]);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
   const [selectedJobForDetails, setSelectedJobForDetails] = useState<Job | null>(null);
   const [showResumeInlineDetails, setShowResumeInlineDetails] = useState(false);
@@ -111,17 +148,7 @@ export default function JobsTab() {
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [isSubmitSuccess, setIsSubmitSuccess] = useState(false);
 
-  const getAppliedResumeForJob = (jobId: string) => {
-    const saved = localStorage.getItem('aryx_submitted_applications');
-    if (saved) {
-      try {
-        const apps = JSON.parse(saved);
-        const matchedApp = apps.find((app: any) => app.jobId === jobId);
-        return matchedApp?.resumeName || null;
-      } catch (e) {}
-    }
-    return null;
-  };
+  // Sync Resume Builder default name if present
   const [existingResumeName] = useState(() => {
     const savedUploaded = localStorage.getItem('aryx_uploaded_resume');
     if (savedUploaded) {
@@ -132,179 +159,220 @@ export default function JobsTab() {
     return "Primary Resume (from Resume Builder)";
   });
 
-  const jobsData: Job[] = [
-    {
-      id: 'job-1',
-      role: 'Frontend Developer',
-      company: 'Google',
-      logo: 'G',
-      logoBg: 'bg-red-500',
-      posted: '2 days ago',
-      match: 96,
-      location: 'Hyderabad',
-      experience: '3-5 Yrs',
-      salary: '₹8 - 12 LPA',
-      skills: ['React', 'JavaScript', 'TypeScript', 'HTML/CSS'],
-      whyMatch: [
-        { skill: 'React', pct: 95 },
-        { skill: 'JavaScript', pct: 92 },
-        { skill: 'TypeScript', pct: 88 },
-        { skill: 'HTML/CSS', pct: 85 }
-      ],
-      missingSkills: [
-        { skill: 'AWS', gap: 30 },
-        { skill: 'Docker', gap: 20 },
-        { skill: 'Kubernetes', gap: 10 }
-      ]
-    },
-    {
-      id: 'job-2',
-      role: 'Full Stack Developer',
-      company: 'Microsoft',
-      logo: 'M',
-      logoBg: 'bg-blue-600',
-      posted: '1 day ago',
-      match: 91,
-      location: 'Remote',
-      experience: '2-5 Yrs',
-      salary: '₹12 - 18 LPA',
-      skills: ['React', 'Node.js', 'MongoDB', 'JavaScript'],
-      whyMatch: [
-        { skill: 'React', pct: 95 },
-        { skill: 'JavaScript', pct: 90 },
-        { skill: 'Node.js', pct: 86 },
-        { skill: 'MongoDB', pct: 82 }
-      ],
-      missingSkills: [
-        { skill: 'System Design', gap: 40 },
-        { skill: 'GraphQL', gap: 15 }
-      ]
-    },
-    {
-      id: 'job-3',
-      role: 'React Developer',
-      company: 'Amazon',
-      logo: 'A',
-      logoBg: 'bg-orange-500',
-      posted: '3 days ago',
-      match: 92,
-      location: 'Bangalore',
-      experience: '2-4 Yrs',
-      salary: '₹7 - 11 LPA',
-      skills: ['React', 'Redux', 'JavaScript', 'Tailwind'],
-      whyMatch: [
-        { skill: 'React', pct: 95 },
-        { skill: 'Redux', pct: 89 },
-        { skill: 'JavaScript', pct: 92 },
-        { skill: 'Tailwind CSS', pct: 90 }
-      ],
-      missingSkills: [
-        { skill: 'AWS Cloud', gap: 50 },
-        { skill: 'Next.js', gap: 30 }
-      ]
-    },
-    {
-      id: 'job-4',
-      role: 'Software Engineer',
-      company: 'Swiggy',
-      logo: 'S',
-      logoBg: 'bg-amber-600',
-      posted: '3 days ago',
-      match: 88,
-      location: 'Hyderabad',
-      experience: '1-3 Yrs',
-      salary: '₹6 - 10 LPA',
-      skills: ['React', 'Redux', 'JavaScript', 'HTML/CSS'],
-      whyMatch: [
-        { skill: 'React', pct: 92 },
-        { skill: 'Redux', pct: 80 },
-        { skill: 'JavaScript', pct: 88 },
-        { skill: 'HTML/CSS', pct: 85 }
-      ],
-      missingSkills: [
-        { skill: 'Node.js', gap: 25 },
-        { skill: 'Docker Environment', gap: 20 }
-      ]
-    }
-  ];
+  // 1. Subscribe to open jobs in real-time
+  useEffect(() => {
+    const qJobs = query(collection(db, 'marketplace_jobs'), where('status', '==', 'open'));
+    const unsubscribeJobs = onSnapshot(qJobs, (snapshot) => {
+      const fetchedJobs = snapshot.docs.map(docSnap => ({
+        id: docSnap.id,
+        ...docSnap.data()
+      }));
+      setJobs(fetchedJobs);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error listening to jobs:", error);
+      setLoading(false);
+    });
 
-  const [activeJobId, setActiveJobId] = useState<string>(jobsData[0].id);
-  const activeJob = jobsData.find(j => j.id === activeJobId) || jobsData[0];
+    return () => unsubscribeJobs();
+  }, []);
+
+  // 2. Subscribe to candidate data (saved jobs list) in real-time
+  useEffect(() => {
+    if (!userProfile?.uid) return;
+
+    const docRef = doc(db, 'marketplace_jobseekers', userProfile.uid);
+    const unsubscribeCandidate = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setCandidateData(docSnap.data());
+      } else {
+        setCandidateData({});
+      }
+    }, (error) => {
+      console.error("Error listening to candidate profile:", error);
+    });
+
+    return () => unsubscribeCandidate();
+  }, [userProfile?.uid]);
+
+  // 3. Subscribe to candidate applications in real-time
+  useEffect(() => {
+    if (!userProfile?.uid) return;
+
+    const qApps = query(
+      collection(db, 'marketplace_applications'),
+      where('candidateUid', '==', userProfile.uid)
+    );
+    const unsubscribeApps = onSnapshot(qApps, (snapshot) => {
+      const fetchedApps = snapshot.docs.map(docSnap => ({
+        id: docSnap.id,
+        ...docSnap.data()
+      }));
+      setMyApplications(fetchedApps);
+    }, (error) => {
+      console.error("Error listening to applications:", error);
+    });
+
+    return () => unsubscribeApps();
+  }, [userProfile?.uid]);
+
+  const savedJobIds: string[] = candidateData?.saved_jobs || [];
+  const appliedJobIds: string[] = myApplications.map(app => app.jobId);
+
+  const getAppliedResumeForJob = (jobId: string) => {
+    const matchedApp = myApplications.find(app => app.jobId === jobId);
+    return matchedApp?.resumeName || "Primary Resume (from Resume Builder)";
+  };
+
+  const toggleSave = async (id: string) => {
+    if (!userProfile?.uid) return;
+    let nextSaved: string[];
+    if (savedJobIds.includes(id)) {
+      nextSaved = savedJobIds.filter(jobId => jobId !== id);
+    } else {
+      nextSaved = [...savedJobIds, id];
+    }
+    
+    try {
+      const seekerRef = doc(db, 'marketplace_jobseekers', userProfile.uid);
+      await setDoc(seekerRef, { saved_jobs: nextSaved }, { merge: true });
+    } catch (err) {
+      console.error("Error saving job:", err);
+    }
+  };
 
   const handleApplyClick = (job: Job) => {
-    if (appliedJobs.includes(job.id)) {
-      // Already applied, open details
+    if (appliedJobIds.includes(job.id)) {
       setSelectedJobForDetails(job);
     } else {
       setSelectedJobForApply(job);
     }
   };
 
-  const handleFinalApplySubmit = (e: React.FormEvent) => {
+  const handleFinalApplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedJobForApply) return;
+    if (!selectedJobForApply || !userProfile?.uid) return;
     
     const resumeName = applyResumeOption === 'upload' 
       ? (uploadedFileName || "My_Uploaded_Resume.pdf")
       : existingResumeName;
       
-    const newApplication = {
-      role: selectedJobForApply.role,
-      company: selectedJobForApply.company,
-      time: 'Just now',
-      status: 'Applied',
-      color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
-      jobId: selectedJobForApply.id,
-      resumeName: resumeName,
-      jobDescription: JOB_DESCRIPTIONS[selectedJobForApply.id] || "Complete job description under evaluation.",
-      logoBg: selectedJobForApply.logoBg,
-      logo: selectedJobForApply.logo
-    };
-    
-    // Load existing applications, prepend new one
-    const saved = localStorage.getItem('aryx_submitted_applications');
-    let currentApps = [];
-    if (saved) {
-      try {
-        currentApps = JSON.parse(saved);
-      } catch (e) {}
-    } else {
-      currentApps = [
-        { role: 'UI/UX Designer', company: 'Figma', time: '5 hours ago', status: 'Applied', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20', jobId: 'figma-1', resumeName: 'Primary Resume (from Resume Builder)', jobDescription: 'Core UI/UX systems design at Figma' },
-        { role: 'Backend Developer', company: 'Flipkart', time: '1 day ago', status: 'Applied', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20', jobId: 'flipkart-1', resumeName: 'Primary Resume (from Resume Builder)', jobDescription: 'High-throughput inventory API construction' },
-        { role: 'React Developer', company: 'Swiggy', time: '1 day ago', status: 'Submitted', color: 'text-blue-500 bg-blue-500/10 border-blue-500/20', jobId: 'swiggy-1', resumeName: 'SDE Custom Resume.pdf', jobDescription: 'React food portals scaling' }
-      ];
-    }
-    
-    const nextApps = [newApplication, ...currentApps.filter((a: any) => a.jobId !== selectedJobForApply.id)];
-    localStorage.setItem('aryx_submitted_applications', JSON.stringify(nextApps));
-    
-    // Update state
-    setAppliedJobs(nextApps.map((a: any) => a.jobId));
-    setIsSubmitSuccess(true);
-    
-    setTimeout(() => {
-      setIsSubmitSuccess(false);
+    const jobId = selectedJobForApply.id;
+
+    // Prevent duplicate applications
+    const alreadyApplied = appliedJobIds.includes(jobId);
+    if (alreadyApplied) {
+      alert("You have already applied to this job.");
       setSelectedJobForApply(null);
-      setUploadedFileName('');
-    }, 1500);
-  };
+      return;
+    }
 
-  const toggleSave = (id: string) => {
-    if (savedJobs.includes(id)) {
-      setSavedJobs(prev => prev.filter(jId => jId !== id));
-    } else {
-      setSavedJobs(prev => [...prev, id]);
+    try {
+      const appCol = collection(db, 'marketplace_applications');
+      const appDocRef = doc(appCol);
+      const applicationId = appDocRef.id;
+
+      const applicationData = {
+        applicationId,
+        candidateUid: userProfile.uid,
+        candidateName: userProfile.fullName || userProfile.displayName || 'Anonymous Seeker',
+        candidateEmail: userProfile.email || '',
+        jobId,
+        jobTitle: selectedJobForApply.role || selectedJobForApply.title || '',
+        companyId: selectedJobForApply.companyId || 'company-1',
+        companyName: selectedJobForApply.company || selectedJobForApply.companyName || 'Unknown Company',
+        recruiterUid: (selectedJobForApply.assignedRecruiters && selectedJobForApply.assignedRecruiters.length > 0)
+          ? selectedJobForApply.assignedRecruiters[0]
+          : 'recruiter-1',
+        recruiterName: 'Rohan Sen',
+        bdmUid: selectedJobForApply.createdBy || 'bdm-1',
+        status: 'submitted',
+        appliedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        resumeName,
+        jobDescription: selectedJobForApply.description || 'No description available.',
+        timeline: [
+          { status: 'submitted', timestamp: new Date().toISOString(), notes: 'Application submitted successfully.' }
+        ]
+      };
+
+      await setDoc(appDocRef, applicationData);
+
+      setIsSubmitSuccess(true);
+      
+      setTimeout(() => {
+        setIsSubmitSuccess(false);
+        setSelectedJobForApply(null);
+        setUploadedFileName('');
+      }, 1500);
+
+    } catch (err) {
+      console.error("Error submitting application:", err);
     }
   };
 
-  const filteredJobs = jobsData.filter(job => {
+  // Map and filter jobs
+  const mappedJobs: Job[] = jobs.map(job => {
+    const company = job.companyName || job.company || job.client || 'Unknown Company';
+    const role = job.title || job.role || 'Software Engineer';
+    const skillsArray = typeof job.skills === 'string'
+      ? job.skills.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : (Array.isArray(job.skills) ? job.skills : []);
+
+    return {
+      ...job,
+      id: job.id,
+      role,
+      company,
+      logo: company.charAt(0).toUpperCase(),
+      logoBg: getLogoBg(company),
+      posted: getRelativeTime(job.createdAt),
+      match: getMatchScore(job.id),
+      location: job.location || 'Remote',
+      experience: job.experience || '2-4 Yrs',
+      salary: job.salary || '₹6 - 10 LPA',
+      employmentType: job.employmentType || 'Full-time',
+      openings: job.openings || '1 Position',
+      skills: skillsArray,
+      whyMatch: getWhyMatch(skillsArray),
+      missingSkills: getMissingSkills(skillsArray),
+      description: job.description || 'No description available.',
+      requirements: job.requirements || job.responsibilities || 'No requirements available.',
+      recruiterCount: job.recruiterCount || job.assignedRecruiters?.length || 0,
+      submissionCount: job.submissionCount || job.submissionsCount || 0,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    };
+  });
+
+  const filteredJobs = mappedJobs.filter(job => {
     const matchesSearch = job.role.toLowerCase().includes(search.toLowerCase()) || 
                           job.company.toLowerCase().includes(search.toLowerCase()) ||
                           job.skills.some(s => s.toLowerCase().includes(search.toLowerCase()));
     const matchesLocation = selectedLocation === 'All' || job.location === selectedLocation;
     return matchesSearch && matchesLocation;
   });
+
+  // Extract locations dynamically
+  const uniqueLocations = ['All', ...Array.from(new Set(mappedJobs.map(j => j.location).filter(Boolean)))];
+
+  // Keep track of active job selection safely
+  useEffect(() => {
+    if (filteredJobs.length > 0 && !activeJobId) {
+      setActiveJobId(filteredJobs[0].id);
+    }
+  }, [jobs, activeJobId, filteredJobs]);
+
+  const activeJob = filteredJobs.find(j => j.id === activeJobId) || filteredJobs[0];
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <div className="w-10 h-10 border-4 border-brand-blue border-t-transparent rounded-full animate-spin" />
+        <p className="text-app-muted text-xs font-semibold">Syncing with Marketplace Jobs...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-12">
@@ -314,7 +382,7 @@ export default function JobsTab() {
         <p className="text-app-muted text-sm mt-1">Discover the best opportunities matching your skills and experience.</p>
       </div>
 
-      {/* Filter and search bar layout from page 2 */}
+      {/* Filter and search bar layout */}
       <div className="flex flex-col md:flex-row gap-4 p-4 rounded-2xl bg-app-surface border border-app-border card-shadow">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-app-muted" />
@@ -333,29 +401,14 @@ export default function JobsTab() {
             onChange={(e) => setSelectedLocation(e.target.value)}
             className="bg-app-bg border border-app-border rounded-xl py-2.5 px-4 text-xs font-semibold text-app-text focus:outline-none"
           >
-            <option value="All">All Locations</option>
-            <option value="Remote">Remote</option>
-            <option value="Hyderabad">Hyderabad</option>
-            <option value="Bangalore">Bangalore</option>
-          </select>
-
-          <select className="bg-app-bg border border-app-border rounded-xl py-2.5 px-4 text-xs font-semibold text-app-text focus:outline-none">
-            <option>Experience Level</option>
-            <option>1-3 Years</option>
-            <option>2-5 Years</option>
-            <option>3-5 Years</option>
-          </select>
-
-          <select className="bg-app-bg border border-app-border rounded-xl py-2.5 px-4 text-xs font-semibold text-app-text focus:outline-none">
-            <option>Salary Package</option>
-            <option>₹6-10 LPA</option>
-            <option>₹10-15 LPA</option>
-            <option>₹15+ LPA</option>
+            {uniqueLocations.map((loc, idx) => (
+              <option key={idx} value={loc}>{loc === 'All' ? 'All Locations' : loc}</option>
+            ))}
           </select>
 
           <button className="bg-app-bg hover:bg-app-surface border border-app-border p-2.5 rounded-xl text-app-muted hover:text-app-text flex items-center gap-1.5 transition-colors">
             <SlidersHorizontal className="w-4 h-4" />
-            <span className="text-xs font-semibold hidden sm:inline">Filters</span>
+            <span className="text-xs font-semibold">Active Filter</span>
           </button>
         </div>
       </div>
@@ -370,16 +423,16 @@ export default function JobsTab() {
                   key={job.id}
                   layout
                   onClick={() => setActiveJobId(job.id)}
-                  className={`p-6 rounded-[24px] border transition-all cursor-pointer card-shadow flex flex-col md:flex-row justify-between gap-6 ${
+                  className={`p-6 rounded-[24px] border transition-all cursor-pointer card-shadow flex flex-col justify-between gap-4 ${
                     activeJobId === job.id 
                       ? 'border-brand-blue bg-brand-blue/5' 
                       : 'border-app-border bg-app-surface hover:border-brand-blue/30'
                   }`}
                 >
-                  <div className="flex-1 space-y-4">
-                    <div className="flex items-start justify-between">
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-4">
                       <div className="flex gap-4">
-                        <div className={`w-12 h-12 rounded-xl ${job.logoBg} flex items-center justify-center text-white font-display font-extrabold text-base shadow-sm`}>
+                        <div className={`w-12 h-12 rounded-xl ${job.logoBg} flex items-center justify-center text-white font-display font-extrabold text-base shadow-sm shrink-0`}>
                           {job.logo}
                         </div>
                         <div>
@@ -400,38 +453,52 @@ export default function JobsTab() {
                           </div>
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold text-app-muted font-mono">{job.posted}</span>
+                      <span className="text-[10px] font-bold text-app-muted font-mono shrink-0">{job.posted}</span>
                     </div>
 
-                    <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs font-bold text-app-muted">
-                      <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> {job.location}</span>
-                      <span className="flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5" /> {job.experience}</span>
-                      <span className="flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5" /> {job.salary}</span>
+                    <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-app-muted">
+                      <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-brand-blue" /> {job.location}</span>
+                      <span className="flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5 text-brand-blue" /> {job.experience}</span>
+                      <span className="flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5 text-brand-blue" /> {job.salary}</span>
+                      <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-brand-blue" /> {job.employmentType}</span>
                     </div>
 
-                    <div className="flex flex-wrap gap-2 pt-2">
+                    <div className="flex flex-wrap gap-2 pt-1">
                       {job.skills.map((sk, idx) => (
                         <span key={idx} className="bg-app-bg border border-app-border rounded-lg px-2.5 py-1 text-[10px] font-semibold text-app-text">
                           {sk}
                         </span>
                       ))}
                     </div>
+
+                    {/* Metadata block showing remaining required fields */}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] text-app-muted font-semibold pt-3 border-t border-app-border/40">
+                      <span>Openings: <strong className="text-app-text font-bold">{job.openings}</strong></span>
+                      <span>•</span>
+                      <span>Recruiters: <strong className="text-app-text font-bold">{job.recruiterCount}</strong></span>
+                      <span>•</span>
+                      <span>Submissions: <strong className="text-app-text font-bold">{job.submissionCount}</strong></span>
+                      <span>•</span>
+                      <span>Created: <strong className="text-app-text font-bold">{formatTimestamp(job.createdAt)}</strong></span>
+                      <span>•</span>
+                      <span>Updated: <strong className="text-app-text font-bold">{formatTimestamp(job.updatedAt)}</strong></span>
+                    </div>
                   </div>
 
-                  <div className="flex md:flex-col justify-between items-end gap-4 shrink-0 min-w-[120px] pt-4 md:pt-0 border-t md:border-t-0 border-app-border/40">
-                    <div className="text-left md:text-right">
-                      <span className="text-[10px] font-bold text-app-muted uppercase tracking-wider block">AI Match</span>
-                      <span className="text-xl font-display font-black text-brand-blue block mt-0.5">{job.match}% Match</span>
+                  <div className="flex justify-between items-center gap-4 pt-4 border-t border-app-border/40">
+                    <div>
+                      <span className="text-[10px] font-bold text-app-muted uppercase tracking-wider block">AI Match Index</span>
+                      <span className="text-base font-display font-black text-brand-blue block">{job.match}% Match</span>
                     </div>
 
-                    <div className="flex gap-2 w-full md:w-auto">
+                    <div className="flex gap-2">
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleSave(job.id);
                         }}
                         className={`p-2.5 rounded-xl border flex items-center justify-center transition-all ${
-                          savedJobs.includes(job.id)
+                          savedJobIds.includes(job.id)
                             ? 'bg-amber-500/10 border-amber-500/20 text-amber-500'
                             : 'bg-app-bg hover:bg-app-surface border-app-border text-app-muted hover:text-app-text'
                         }`}
@@ -444,13 +511,13 @@ export default function JobsTab() {
                           e.stopPropagation();
                           handleApplyClick(job);
                         }}
-                        className={`px-4 py-2.5 font-bold text-xs rounded-xl transition-all grow md:grow-0 text-center uppercase tracking-wide min-w-[90px] cursor-pointer ${
-                          appliedJobs.includes(job.id)
-                            ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                        className={`px-4 py-2.5 font-bold text-xs rounded-xl transition-all uppercase tracking-wide min-w-[90px] cursor-pointer ${
+                          appliedJobIds.includes(job.id)
+                            ? 'bg-emerald-500 text-white hover:bg-emerald-600 font-bold'
                             : 'bg-brand-blue text-white hover:bg-brand-blue/90 font-bold shadow-lg shadow-brand-blue/15'
                         }`}
                       >
-                        {appliedJobs.includes(job.id) ? 'Applied' : 'Apply'}
+                        {appliedJobIds.includes(job.id) ? 'Applied' : 'Apply'}
                       </button>
                     </div>
                   </div>
@@ -467,60 +534,67 @@ export default function JobsTab() {
           </AnimatePresence>
         </div>
 
-        {/* Right side match analysis from frame 2 */}
+        {/* Right side match analysis */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="p-6 rounded-[28px] bg-app-surface border border-app-border card-shadow space-y-6">
-            <div>
-              <h3 className="text-base font-bold text-app-text">AI Match Insights</h3>
-              <p className="text-[11px] text-app-muted font-semibold mt-0.5">Why does <strong className="text-brand-blue">{activeJob.company}</strong> match your index?</p>
-            </div>
+          {activeJob ? (
+            <div className="p-6 rounded-[28px] bg-app-surface border border-app-border card-shadow space-y-6">
+              <div>
+                <h3 className="text-base font-bold text-app-text">AI Match Insights</h3>
+                <p className="text-[11px] text-app-muted font-semibold mt-0.5">Why does <strong className="text-brand-blue">{activeJob.company}</strong> match your index?</p>
+              </div>
 
-            {/* Standard Skill alignment bars */}
-            <div className="space-y-4">
-              {activeJob.whyMatch.map((match, idx) => (
-                <div key={idx} className="space-y-1.5">
-                  <div className="flex justify-between items-center text-xs font-bold text-app-text">
-                    <span>{match.skill}</span>
-                    <span className="text-emerald-500 font-mono">{match.pct}%</span>
-                  </div>
-                  <div className="h-2 w-full bg-app-bg rounded-full overflow-hidden border border-app-border/40">
-                    <div 
-                      className="h-full bg-emerald-500/80 rounded-full transition-all duration-500"
-                      style={{ width: `${match.pct}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Missing skills blocks */}
-            <div className="space-y-3 pt-2 border-t border-app-border/40">
-              <span className="text-[11px] font-bold text-app-muted uppercase tracking-wider block">Missing Skills</span>
-              <div className="space-y-2">
-                {activeJob.missingSkills.map((sk, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs font-semibold bg-app-bg border border-app-border rounded-xl p-2.5">
-                    <span className="text-app-text">{sk.skill}</span>
-                    <span className="text-xs font-bold text-red-500 bg-red-500/10 px-2.5 py-0.5 rounded-lg">~{sk.gap}% Match Gap</span>
+              {/* Standard Skill alignment bars */}
+              <div className="space-y-4">
+                {activeJob.whyMatch.map((match, idx) => (
+                  <div key={idx} className="space-y-1.5">
+                    <div className="flex justify-between items-center text-xs font-bold text-app-text">
+                      <span>{match.skill}</span>
+                      <span className="text-emerald-500 font-mono">{match.pct}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-app-bg rounded-full overflow-hidden border border-app-border/40">
+                      <div 
+                        className="h-full bg-emerald-500/80 rounded-full transition-all duration-500"
+                        style={{ width: `${match.pct}%` }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
 
-            {/* Improve score alert box */}
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-brand-violet to-brand-blue text-white relative overflow-hidden shadow-lg space-y-3">
-              <div className="absolute right-0 bottom-0 w-24 h-24 bg-white/5 rounded-full blur-xl pointer-events-none" />
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-300" />
-                <span className="font-bold text-sm tracking-tight text-white">Improve Your Match Score</span>
+              {/* Missing skills blocks */}
+              <div className="space-y-3 pt-2 border-t border-app-border/40">
+                <span className="text-[11px] font-bold text-app-muted uppercase tracking-wider block">Missing Skills</span>
+                <div className="space-y-2">
+                  {activeJob.missingSkills.map((sk, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs font-semibold bg-app-bg border border-app-border rounded-xl p-2.5">
+                      <span className="text-app-text">{sk.skill}</span>
+                      <span className="text-xs font-bold text-red-500 bg-red-500/10 px-2.5 py-0.5 rounded-lg">~{sk.gap}% Match Gap</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <p className="text-[11px] leading-relaxed text-white/80 font-medium">
-                Add recommended portfolio elements or certs to bridge the gap with recruiters.
-              </p>
-              <button className="w-full py-2.5 bg-white text-brand-violet text-xs font-extrabold rounded-xl shadow-md hover:scale-[1.02] active:scale-95 transition-all uppercase tracking-wider">
-                Boost Score
-              </button>
+
+              {/* Improve score alert box */}
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-brand-violet to-brand-blue text-white relative overflow-hidden shadow-lg space-y-3">
+                <div className="absolute right-0 bottom-0 w-24 h-24 bg-white/5 rounded-full blur-xl pointer-events-none" />
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-amber-300" />
+                  <span className="font-bold text-sm tracking-tight text-white">Improve Your Match Score</span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-white/80 font-medium">
+                  Add recommended portfolio elements or certs to bridge the gap with recruiters.
+                </p>
+                <button className="w-full py-2.5 bg-white text-brand-violet text-xs font-extrabold rounded-xl shadow-md hover:scale-[1.02] active:scale-95 transition-all uppercase tracking-wider">
+                  Boost Score
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-6 rounded-[28px] bg-app-surface border border-app-border card-shadow text-center py-12">
+              <Building className="w-10 h-10 text-app-muted mx-auto mb-3 opacity-60" />
+              <p className="text-app-muted text-xs font-semibold">Select a job to view match insights.</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -569,10 +643,37 @@ export default function JobsTab() {
                   </div>
                 </div>
 
+                {/* Additional detailed metrics */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-app-surface border border-app-border text-xs font-bold text-app-muted">
+                  <div className="space-y-1">
+                    <span className="block uppercase tracking-wider text-[9px]">Employment Type</span>
+                    <span className="text-app-text font-semibold">{selectedJobForDetails.employmentType}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="block uppercase tracking-wider text-[9px]">Openings</span>
+                    <span className="text-app-text font-semibold">{selectedJobForDetails.openings}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="block uppercase tracking-wider text-[9px]">Recruiter Count</span>
+                    <span className="text-app-text font-semibold">{selectedJobForDetails.recruiterCount}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="block uppercase tracking-wider text-[9px]">Submission Count</span>
+                    <span className="text-app-text font-semibold">{selectedJobForDetails.submissionCount}</span>
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   <h4 className="font-bold text-app-text text-xs uppercase tracking-wider">Complete Job Description</h4>
                   <div className="text-xs text-app-muted leading-relaxed whitespace-pre-line bg-app-surface/40 p-4 rounded-2xl border border-app-border/40 font-medium">
-                    {JOB_DESCRIPTIONS[selectedJobForDetails.id] || "No full description available."}
+                    {selectedJobForDetails.description}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="font-bold text-app-text text-xs uppercase tracking-wider">Requirements / Responsibilities</h4>
+                  <div className="text-xs text-app-muted leading-relaxed whitespace-pre-line bg-app-surface/40 p-4 rounded-2xl border border-app-border/40 font-medium">
+                    {selectedJobForDetails.requirements}
                   </div>
                 </div>
 
@@ -587,8 +688,13 @@ export default function JobsTab() {
                   </div>
                 </div>
 
+                <div className="flex justify-between text-[11px] text-app-muted border-t border-app-border/30 pt-3">
+                  <span>Created: {formatTimestamp(selectedJobForDetails.createdAt)}</span>
+                  <span>Updated: {formatTimestamp(selectedJobForDetails.updatedAt)}</span>
+                </div>
+
                 {/* Submitted Resume Info */}
-                {appliedJobs.includes(selectedJobForDetails.id) && (
+                {appliedJobIds.includes(selectedJobForDetails.id) && (
                   <div className="space-y-3 pt-4 border-t border-app-border/40">
                     <h4 className="font-bold text-app-text text-xs uppercase tracking-wider">Your Submitted Application</h4>
                     <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/15 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
@@ -598,7 +704,7 @@ export default function JobsTab() {
                         </div>
                         <div className="truncate">
                           <p className="text-xs font-bold text-app-text truncate">
-                            {getAppliedResumeForJob(selectedJobForDetails.id) || "Primary Resume (from Resume Builder)"}
+                            {getAppliedResumeForJob(selectedJobForDetails.id)}
                           </p>
                           <p className="text-[9px] text-emerald-500 font-bold uppercase mt-0.5">Applied Successfully</p>
                         </div>
@@ -626,8 +732,8 @@ export default function JobsTab() {
                         </div>
                         <div className="space-y-3 text-xs leading-relaxed text-app-muted">
                           <div className="text-center space-y-1">
-                            <h2 className="text-sm font-bold text-app-text">Rishi Kumar</h2>
-                            <p className="text-[10px]">Hyderabad, Telangana | rishi.kumar@example.com | +91 98765 43210</p>
+                            <h2 className="text-sm font-bold text-app-text">{userProfile?.fullName || 'Candidate Seeker'}</h2>
+                            <p className="text-[10px]">{userProfile?.email || 'rishi.kumar@example.com'}</p>
                           </div>
                           <div className="space-y-1">
                             <h3 className="font-bold text-app-text border-b border-app-border/30 pb-0.5">Education</h3>
@@ -659,7 +765,7 @@ export default function JobsTab() {
                 >
                   Close
                 </button>
-                {appliedJobs.includes(selectedJobForDetails.id) ? (
+                {appliedJobIds.includes(selectedJobForDetails.id) ? (
                   <button
                     disabled
                     className="px-6 py-2.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-bold rounded-xl cursor-not-allowed"

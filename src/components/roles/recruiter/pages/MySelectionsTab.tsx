@@ -1,24 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  CheckCircle2, 
   Trash2, 
   Briefcase, 
   MapPin, 
-  FileText, 
   User, 
   Mail, 
   Phone, 
-  Send,
-  HelpCircle,
+  Calendar, 
+  GraduationCap, 
+  Eye, 
+  RefreshCw, 
+  Search, 
+  Sparkles, 
+  AlertCircle, 
+  X, 
+  Bookmark, 
+  FileText,
   Clock,
-  Edit2,
-  Check,
-  X,
-  Sparkles,
-  Download,
-  Eye
+  ExternalLink,
+  HelpCircle,
+  CheckCircle2
 } from 'lucide-react';
-import { recruiterStorage, CandidateSelection, RecruiterJob } from '../utils/recruiterStorage';
+import { db, auth, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { 
+  collection, 
+  onSnapshot, 
+  doc, 
+  deleteDoc, 
+  getDoc,
+  getDocFromServer
+} from 'firebase/firestore';
 
 interface MySelectionsTabProps {
   selectedCandidateIds: string[];
@@ -29,390 +41,553 @@ interface MySelectionsTabProps {
 }
 
 export default function MySelectionsTab({ 
-  selectedCandidateIds, 
   onDeselect,
-  onNavigate
+  onNavigate,
+  onSubmitProfile
 }: MySelectionsTabProps) {
+  
+  // Auth & user state
+  const [currentUser, setCurrentUser] = useState(auth.currentUser);
 
-  const [selections, setSelections] = useState<CandidateSelection[]>([]);
-  const [jobs, setJobs] = useState<RecruiterJob[]>([]);
-  const [editSelectionModal, setEditSelectionModal] = useState<CandidateSelection | null>(null);
-  const [editJobId, setEditJobId] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  // Selections list from subcollection
+  const [selections, setSelections] = useState<any[]>([]);
+  // Jobseeker profiles list to join with selections in realtime
+  const [profiles, setProfiles] = useState<Record<string, any>>({});
+  
+  const [loading, setLoading] = useState(true);
+  const [toastMsg, setToastMsg] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Load from localStorage on mount and sync
-  const loadData = () => {
-    setSelections(recruiterStorage.getSelections());
-    setJobs(recruiterStorage.getJobs());
-  };
+  // Search and local filtering
+  const [searchQuery, setSearchQuery] = useState('');
 
+  // Profile Preview Modal state
+  const [previewUid, setPreviewUid] = useState<string | null>(null);
+  const [previewProfile, setPreviewProfile] = useState<any | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
+  // Track auth state
   useEffect(() => {
-    loadData();
-    window.addEventListener('storage', loadData);
-    return () => window.removeEventListener('storage', loadData);
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsub();
   }, []);
 
-  // Filter accessible jobs for edit dropdown
-  const accessibleJobs = jobs.filter(j => j.jobType === 'open' || j.accessStatus === 'approved');
+  // Listen to Firestore selections and candidate profiles in realtime
+  useEffect(() => {
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
 
-  // Recruiter info
-  const recruiterInfo = {
-    name: 'Rohit Kumar',
-    role: 'Recruiter',
-    id: 'REC-2026-045',
-    since: 'Member since May 2026',
-    email: 'rohit.kumar@aryaxai.com',
-    phone: '+91 98765 43210',
-    location: 'Bangalore, India',
-    bdm: 'John Mathew (BDM)',
-    team: 'Frontend Recruitment',
-    recExp: '3 Years',
-    preferredRoles: 'Frontend, Full Stack, Backend',
-    preferredLocations: 'Bangalore, Remote'
-  };
+    const uid = currentUser.uid;
 
-  // Submit action: triggers the live BDM Submission process
-  const handleSubmitToBdm = (sel: CandidateSelection) => {
-    // 1. Remove from selections
-    const remainingSelections = selections.filter(s => s.id !== sel.id);
-    recruiterStorage.setSelections(remainingSelections);
-    setSelections(remainingSelections);
-
-    // 2. Trigger parent deselect to sync counter
-    onDeselect(sel.candidateId);
-
-    // 3. Create a live candidate submission record
-    const currentSubmissions = recruiterStorage.getSubmissions();
-    const newSubmission = {
-      id: `SUB-${Date.now().toString().slice(-6)}`,
-      jobId: sel.jobId,
-      jobTitle: sel.jobTitle,
-      companyName: sel.companyName,
-      candidateId: sel.candidateId,
-      candidateName: sel.candidateName,
-      candidateResume: `${sel.candidateName.replace(' ', '_')}_Resume.pdf`,
-      submissionDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-      submittedBy: recruiterInfo.name,
-      assignedBdm: 'John Mathew',
-      status: 'Submitted' as const,
-      lastUpdated: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-      notes: sel.notes || 'Submitted from curated selections queue.'
-    };
-
-    recruiterStorage.setSubmissions([newSubmission, ...currentSubmissions]);
-
-    // Show success message
-    setSuccessMessage(`Successfully submitted ${sel.candidateName} for ${sel.jobTitle} to BDM John Mathew!`);
-    setTimeout(() => setSuccessMessage(''), 5000);
-  };
-
-  // Remove selection from queue
-  const handleRemoveSelection = (selId: string, candId: string) => {
-    const remaining = selections.filter(s => s.id !== selId);
-    recruiterStorage.setSelections(remaining);
-    setSelections(remaining);
-    onDeselect(candId);
-  };
-
-  // Save edited job for a selection
-  const handleSaveEditJob = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editSelectionModal || !editJobId) return;
-
-    const selectedJob = accessibleJobs.find(j => j.id === editJobId);
-    if (selectedJob) {
-      const updatedSelections = selections.map(s => {
-        if (s.id === editSelectionModal.id) {
-          return {
-            ...s,
-            jobId: selectedJob.id,
-            jobTitle: selectedJob.title,
-            companyName: selectedJob.company
-          };
-        }
-        return s;
+    // 1. Listen to saved candidates subcollection for this recruiter
+    const savedColRef = collection(db, 'marketplace_recruiters', uid, 'saved_candidates');
+    const unsubSaved = onSnapshot(savedColRef, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          candidateUid: data.candidateUid || docSnap.id,
+          fullName: data.fullName || 'Anonymous Candidate',
+          email: data.email || 'N/A',
+          skills: data.skills || [],
+          savedAt: data.savedAt || null
+        });
       });
-      recruiterStorage.setSelections(updatedSelections);
-      setSelections(updatedSelections);
-      setEditSelectionModal(null);
-      setSuccessMessage(`Successfully updated job alignment to ${selectedJob.title}!`);
-      setTimeout(() => setSuccessMessage(''), 3000);
+      setSelections(list);
+      setLoading(false);
+    }, (err) => {
+      console.error("Error listening to saved candidates:", err);
+      setLoading(false);
+    });
+
+    // 2. Listen to all marketplace_jobseekers to dynamically enrich candidates profile data
+    const jobseekersColRef = collection(db, 'marketplace_jobseekers');
+    const unsubProfiles = onSnapshot(jobseekersColRef, (snapshot) => {
+      const map: Record<string, any> = {};
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const profile = data.profile || {};
+        map[docSnap.id] = {
+          id: docSnap.id,
+          fullName: profile.fullName || data.name || 'Anonymous',
+          email: profile.email || data.email || 'No Email',
+          phone: profile.phoneNumber || profile.phone || data.phone || data.phoneNumber || 'N/A',
+          location: profile.location || data.location || 'Remote',
+          experience: profile.experience || data.experience || 'Entry Level',
+          skills: profile.skills || data.skills || [],
+          availability: profile.availability || data.availability || 'Available',
+          currentStatus: profile.status || data.status || 'Active',
+          education: profile.education || data.education || profile.details?.education || 'N/A',
+          details: profile.details || data.details || {
+            role: profile.role || data.role || 'Software Engineer',
+            years: 2,
+            currentCompany: 'N/A',
+            currentRole: 'N/A',
+            availabilityDetails: 'Immediate'
+          }
+        };
+      });
+      setProfiles(map);
+    }, (err) => {
+      console.error("Error listening to jobseeker profiles:", err);
+    });
+
+    return () => {
+      unsubSaved();
+      unsubProfiles();
+    };
+  }, [currentUser]);
+
+  // Preview full candidate profile details from marketplace_jobseekers in realtime
+  useEffect(() => {
+    if (!previewUid) {
+      setPreviewProfile(null);
+      return;
+    }
+
+    setLoadingPreview(true);
+    const docRef = doc(db, 'marketplace_jobseekers', previewUid);
+    const unsub = onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setPreviewProfile({ id: snapshot.id, ...snapshot.data() });
+      } else {
+        setPreviewProfile(null);
+      }
+      setLoadingPreview(false);
+    }, (err) => {
+      console.error("Error loading full profile preview:", err);
+      setLoadingPreview(false);
+    });
+
+    return () => unsub();
+  }, [previewUid]);
+
+  // Remove a selection (Deletes ONLY from marketplace_recruiters/{recruiterUid}/saved_candidates/{candidateUid})
+  const handleRemoveSelection = async (candidateUid: string, candidateName: string) => {
+    if (!currentUser) return;
+    const uid = currentUser.uid;
+    const saveDocRef = doc(db, 'marketplace_recruiters', uid, 'saved_candidates', candidateUid);
+
+    try {
+      await deleteDoc(saveDocRef);
+      onDeselect(candidateUid); // trigger parent deselect to sync counter
+      setToastMsg(`Removed ${candidateName} from your selections.`);
+      setTimeout(() => setToastMsg(''), 5000);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `marketplace_recruiters/${uid}/saved_candidates/${candidateUid}`);
     }
   };
 
+  // Perform a manual connection/refresh sync
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await getDocFromServer(doc(db, 'test', 'connection'));
+      setToastMsg("Selections database synchronized in real-time!");
+    } catch (err) {
+      console.warn("Offline or direct connection test failed, using cache data.");
+    }
+    setTimeout(() => {
+      setIsRefreshing(false);
+      setTimeout(() => setToastMsg(''), 4000);
+    }, 1000);
+  };
+
+  // Merge selection documents with full jobseeker profiles
+  const mergedSelections = selections.map(sel => {
+    const prof = profiles[sel.candidateUid] || {};
+    return {
+      id: sel.id,
+      candidateUid: sel.candidateUid,
+      fullName: prof.fullName || sel.fullName,
+      email: prof.email || sel.email,
+      phone: prof.phone || 'N/A',
+      location: prof.location || 'Remote',
+      experience: prof.experience || 'Entry Level',
+      skills: prof.skills && prof.skills.length > 0 ? prof.skills : sel.skills,
+      availability: prof.availability || 'Available',
+      savedAt: sel.savedAt,
+      education: prof.education || 'N/A',
+      currentStatus: prof.currentStatus || 'Active',
+      role: prof.details?.role || 'Software Engineer'
+    };
+  });
+
+  // Local client search filter
+  const filteredSelections = mergedSelections.filter(sel => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      sel.fullName.toLowerCase().includes(query) ||
+      sel.email.toLowerCase().includes(query) ||
+      sel.location.toLowerCase().includes(query) ||
+      sel.skills.some((sk: string) => sk.toLowerCase().includes(query))
+    );
+  });
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in text-app-text">
       
-      {/* Toast Alert */}
-      {successMessage && (
-        <div className="fixed bottom-6 right-6 bg-[#0B1528] border-2 border-emerald-500 text-app-text px-6 py-4 rounded-2xl shadow-2xl z-50 animate-slide-in flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-emerald-500 animate-bounce" />
-          <span className="font-bold text-sm">{successMessage}</span>
+      {/* Toast alert */}
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 bg-[#0B1528] border-2 border-brand-blue text-app-text px-6 py-4 rounded-2xl shadow-2xl z-50 animate-slide-in flex items-center gap-3">
+          <Sparkles className="w-5 h-5 text-brand-blue animate-pulse" />
+          <span className="font-bold text-sm">{toastMsg}</span>
         </div>
       )}
 
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-display font-bold text-app-text font-display">Selected Candidates Queue</h1>
-        <p className="text-app-muted mt-1">Review your Selected Candidates Queue. Edit alignment, remove, or submit queued candidates to start the live BDM review process.</p>
+      {/* Header and Stats */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-display font-bold text-app-text flex items-center gap-2">
+            My Selections
+            <span className="w-2.5 h-2.5 bg-brand-blue rounded-full animate-ping" title="Realtime Firestore Live" />
+          </h1>
+          <p className="text-app-muted mt-1">
+            Review and manage your shortlisted candidate profiles. Fully synchronized in realtime with Firestore.
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <button 
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="p-3 bg-app-surface hover:bg-app-surface/80 border border-app-border rounded-xl text-app-muted hover:text-app-text transition-all flex items-center gap-2 text-xs font-bold"
+            title="Force refresh selections sync"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-brand-blue' : ''}`} />
+            <span>Sync</span>
+          </button>
+          <span className="px-4 py-2.5 bg-[#1E293B] border border-app-border rounded-xl text-xs font-bold shrink-0 shadow-lg text-slate-200">
+            {selections.length} Selected Candidates
+          </span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-        
-        {/* Left Column: Recruiter Card Panel */}
-        <div className="xl:col-span-4 space-y-6">
-          <div className="p-6 rounded-[28px] glass border border-app-border card-shadow relative overflow-hidden">
-            {/* Header backdrop gradient */}
-            <div className="absolute top-0 inset-x-0 h-28 bg-gradient-to-r from-brand-blue/20 to-brand-violet/20" />
-            
-            <div className="relative pt-8 flex flex-col items-center text-center">
-              <div className="w-24 h-24 rounded-full border-4 border-app-bg bg-brand-blue/10 p-0.5 shadow-xl">
-                <img 
-                  src="https://picsum.photos/seed/rohit/150/150" 
-                  alt="Rohit Kumar" 
-                  className="w-full h-full rounded-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-              <h3 className="font-display font-extrabold text-xl text-app-text mt-4">{recruiterInfo.name}</h3>
-              <p className="text-brand-blue font-bold text-sm tracking-wider uppercase mt-1">{recruiterInfo.role}</p>
-              <span className="text-xs text-brand-violet font-semibold bg-brand-violet/10 border border-brand-violet/20 px-3 py-1 rounded-full mt-2 font-mono">
-                ID: {recruiterInfo.id}
-              </span>
-              <p className="text-xs text-app-muted mt-2">{recruiterInfo.since}</p>
-            </div>
-
-            {/* Direct Contact specs */}
-            <div className="mt-8 pt-6 border-t border-app-border/60 space-y-4 text-xs font-semibold text-app-text">
-              <div className="flex items-center gap-3">
-                <Mail className="w-4 h-4 text-app-muted shrink-0" />
-                <span>{recruiterInfo.email}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Phone className="w-4 h-4 text-app-muted shrink-0" />
-                <span>{recruiterInfo.phone}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <MapPin className="w-4 h-4 text-app-muted shrink-0" />
-                <span>{recruiterInfo.location}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Stats on current recruitment limits */}
-          <div className="p-6 rounded-[24px] bg-brand-blue/5 border border-brand-blue/20 card-shadow">
-            <h4 className="font-display font-extrabold text-sm text-app-text mb-4">Sourcing Limits</h4>
-            <div className="space-y-3 text-xs">
-              <div className="flex justify-between items-center text-app-muted font-bold">
-                <span>Selected Queue Size</span>
-                <span className="text-app-text">{selections.length} / 18 Cap</span>
-              </div>
-              <div className="w-full bg-app-surface border border-app-border rounded-full h-2">
-                <div 
-                  className="bg-brand-blue h-2 rounded-full transition-all duration-500" 
-                  style={{ width: `${Math.min((selections.length / 18) * 100, 100)}%` }}
-                />
-              </div>
-              <p className="text-[10px] text-app-muted mt-2 leading-relaxed">
-                You can select up to 18 candidates at once of your allocated pool to pipeline into active submissions.
-              </p>
-            </div>
-          </div>
+      {/* Search Input bar */}
+      <div className="p-4 rounded-2xl glass border border-app-border">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-app-muted" />
+          <input 
+            type="text" 
+            placeholder="Filter selections by candidate name, email, skills, or location..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-app-surface border border-app-border rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:border-brand-blue outline-none text-app-text"
+          />
         </div>
+      </div>
 
-        {/* Right Column: Selections Queue List (Table & Controls) */}
-        <div className="xl:col-span-8 p-6 rounded-[28px] glass border border-app-border card-shadow space-y-6">
-          <div className="flex justify-between items-center border-b border-app-border pb-4">
-            <div>
-              <h3 className="font-display font-bold text-lg text-app-text">
-                Selected Candidates Queue
-              </h3>
-              <p className="text-xs text-app-muted mt-0.5">Pipeline candidates into active job submittals.</p>
-            </div>
-            <span className="text-xs font-bold text-app-muted bg-app-bg px-3 py-1.5 rounded-full border border-app-border font-mono">
-              Total Drafts: {selections.length}
-            </span>
-          </div>
-
-          {selections.length > 0 ? (
-            <div className="space-y-4">
-              {selections.map((sel) => (
-                <div 
-                  key={sel.id} 
-                  className="p-5 rounded-2xl bg-app-surface/60 border border-app-border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-brand-blue/30 transition-all group relative"
-                >
-                  <div className="flex items-center gap-4 flex-1">
-                    {/* Circle Avatar */}
-                    <div className="w-12 h-12 rounded-full bg-brand-blue/10 border border-brand-blue/20 flex items-center justify-center text-brand-blue text-sm font-extrabold font-mono shrink-0">
-                      {sel.candidateName.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-extrabold text-base text-app-text">{sel.candidateName}</h4>
-                        <span className="text-[10px] bg-brand-violet/15 text-brand-violet px-2.5 py-0.5 rounded-full font-extrabold font-mono uppercase tracking-wider">
-                          {sel.status}
-                        </span>
-                      </div>
-                      
-                      {/* Job specifications */}
-                      <div className="flex flex-wrap items-center gap-x-2 text-xs text-app-muted font-bold">
-                        <Briefcase className="w-3.5 h-3.5 text-app-muted shrink-0" />
-                        <span className="text-app-text">{sel.jobTitle}</span>
-                        <span>at</span>
-                        <span className="text-app-muted">{sel.companyName}</span>
-                      </div>
-
-                      {/* Date & Resume info */}
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-app-muted font-semibold mt-1.5">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-app-muted" /> Selected: {sel.selectionDate}
-                        </span>
-                        
-                        {/* Resume representation */}
-                        <span className="flex items-center gap-1 text-brand-blue font-bold cursor-pointer hover:underline">
-                          <FileText className="w-3.5 h-3.5" /> {sel.candidateName.replace(' ', '_')}_Resume.pdf 
-                          <Download className="w-3 h-3 text-brand-blue" />
-                        </span>
-                      </div>
-                    </div>
+      {/* Selections grid panel */}
+      {loading ? (
+        <div className="py-20 flex justify-center items-center">
+          <div className="w-10 h-10 border-4 border-brand-blue border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : filteredSelections.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredSelections.map((sel) => (
+            <div 
+              key={sel.id} 
+              id={`selection-card-${sel.candidateUid}`}
+              className="p-6 rounded-[24px] glass border border-app-border/80 hover:border-brand-blue/40 transition-all duration-300 flex flex-col justify-between space-y-4 hover:shadow-lg hover:shadow-brand-blue/5 relative group"
+            >
+              {/* Upper segment */}
+              <div className="space-y-3.5">
+                <div className="flex justify-between items-start">
+                  <div className="w-14 h-14 rounded-full bg-brand-blue/10 border-2 border-brand-blue/30 flex items-center justify-center text-brand-blue text-lg font-extrabold font-mono shrink-0">
+                    {sel.fullName.split(' ').map((n: string) => n[0]).join('')}
                   </div>
+                  <span className="inline-flex items-center text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                    {sel.availability}
+                  </span>
+                </div>
 
-                  {/* Actions segment */}
-                  <div className="flex flex-wrap items-center gap-2 w-full md:w-auto mt-4 md:mt-0 pt-3 md:pt-0 border-t md:border-t-0 border-app-border/40 shrink-0">
-                    <button 
-                      onClick={() => alert(`Previewing Resume for ${sel.candidateName}`)}
-                      className="px-3 py-2 bg-app-surface text-app-muted hover:text-brand-blue border border-app-border rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"
-                      title="Preview Resume"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Preview Resume</span>
-                    </button>
+                <div>
+                  <h3 className="font-display font-bold text-lg text-app-text tracking-tight group-hover:text-brand-blue transition-colors">
+                    {sel.fullName}
+                  </h3>
+                  <span className="text-xs font-semibold text-app-muted block mt-0.5">{sel.role}</span>
+                </div>
 
-                    <button 
-                      onClick={() => {
-                        setEditSelectionModal(sel);
-                        setEditJobId(sel.jobId);
-                      }}
-                      className="px-3 py-2 bg-app-surface text-app-muted hover:text-brand-blue border border-app-border rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"
-                      title="Change Job"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                      <span>Change Job</span>
-                    </button>
-
-                    <button 
-                      onClick={() => handleRemoveSelection(sel.id, sel.candidateId)}
-                      className="px-3 py-2 text-red-500 hover:text-white bg-red-500/10 hover:bg-red-500 rounded-xl border border-red-500/10 text-xs font-semibold transition-all flex items-center gap-1.5"
-                      title="Remove from queue"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Remove</span>
-                    </button>
-                    
-                    <button 
-                      onClick={() => handleSubmitToBdm(sel)}
-                      className="px-4 py-2 bg-brand-blue text-white font-extrabold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-brand-blue/15 hover:scale-[1.02] active:scale-95 transition-all"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Submit</span>
-                    </button>
+                {/* Display parameter items */}
+                <div className="pt-2 border-t border-app-border/45 space-y-2 text-xs">
+                  <div className="flex items-center gap-2 text-app-muted">
+                    <Mail className="w-3.5 h-3.5 text-brand-blue shrink-0" />
+                    <span className="truncate">{sel.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-app-muted">
+                    <Phone className="w-3.5 h-3.5 text-brand-blue shrink-0" />
+                    <span>{sel.phone}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-app-muted">
+                    <MapPin className="w-3.5 h-3.5 text-brand-blue shrink-0" />
+                    <span>{sel.location}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-app-muted">
+                    <Briefcase className="w-3.5 h-3.5 text-brand-blue shrink-0" />
+                    <span className="font-bold text-app-text">{sel.experience} Experience</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-app-muted">
+                    <Calendar className="w-3.5 h-3.5 text-brand-blue shrink-0" />
+                    <span>Saved: {sel.savedAt ? new Date(sel.savedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16 space-y-4">
-              <div className="w-16 h-16 rounded-full bg-brand-blue/10 flex items-center justify-center mx-auto text-brand-blue">
-                <CheckCircle2 className="w-8 h-8" />
+
+                {/* Candidate Skills */}
+                <div className="flex flex-wrap gap-1.5 pt-2">
+                  {sel.skills.map((skill: string, sIdx: number) => (
+                    <span key={sIdx} className="text-[10px] font-mono font-extrabold border bg-indigo-500/5 text-indigo-400 border-indigo-500/10 px-2 py-0.5 rounded-lg">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <div className="max-w-md mx-auto">
-                <p className="font-display font-bold text-lg text-app-text">Your selected roster queue is empty</p>
-                <p className="text-xs text-app-muted mt-2 leading-relaxed">
-                  Go to the <strong>Candidate Pool</strong> tab, select candidates and align them to jobs to add them here.
-                </p>
+
+              {/* Lower actions segment */}
+              <div className="pt-4 border-t border-app-border/40 flex items-center justify-between gap-2">
                 <button 
-                  onClick={() => onNavigate('candidates')}
-                  className="mt-5 px-5 py-3 bg-brand-blue text-white rounded-xl text-xs font-extrabold shadow-lg shadow-brand-blue/15"
+                  onClick={() => setPreviewUid(sel.candidateUid)}
+                  className="px-3 py-2 bg-app-surface hover:bg-app-bg text-app-muted hover:text-brand-blue rounded-xl border border-app-border text-xs font-bold transition-all flex items-center gap-1.5 flex-1 justify-center"
+                  title="Open Full Candidate Profile"
                 >
-                  Open Candidate Pool
+                  <Eye className="w-4 h-4" />
+                  <span>Profile</span>
+                </button>
+
+                {onSubmitProfile && (
+                  <button 
+                    onClick={() => {
+                      const targetCandidate = {
+                        id: sel.candidateUid,
+                        name: sel.fullName,
+                        experience: sel.experience,
+                        skills: sel.skills,
+                        availability: sel.availability,
+                        details: {
+                          role: sel.role,
+                          skillsFull: sel.skills,
+                          years: parseInt(sel.experience) || 2,
+                          currentCompany: 'N/A',
+                          currentRole: sel.role,
+                          availabilityDetails: sel.availability
+                        }
+                      };
+                      onSubmitProfile(targetCandidate);
+                    }}
+                    className="px-3 py-2 bg-brand-blue hover:bg-brand-blue/85 text-white rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 flex-1 justify-center shadow-md shadow-brand-blue/15"
+                    title="Submit profile to a job requirement"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Submit</span>
+                  </button>
+                )}
+
+                <button 
+                  onClick={() => handleRemoveSelection(sel.candidateUid, sel.fullName)}
+                  className="p-2 text-red-500 hover:text-white bg-red-500/10 hover:bg-red-500 rounded-xl border border-red-500/10 transition-all flex items-center justify-center shrink-0"
+                  title="Remove candidate selection"
+                >
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>
-          )}
-
-          {/* Work Info table */}
-          <div className="mt-8 pt-8 border-t border-app-border/60">
-            <h4 className="font-display font-extrabold text-sm text-app-text mb-4">Sourcing Verticals</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold">
-              <div className="p-4 rounded-xl bg-app-surface border border-app-border flex justify-between items-center">
-                <span className="text-app-muted">Preferred Verticals:</span>
-                <span className="text-app-text">{recruiterInfo.preferredRoles}</span>
-              </div>
-              <div className="p-4 rounded-xl bg-app-surface border border-app-border flex justify-between items-center">
-                <span className="text-app-muted">Reporting Manager:</span>
-                <span className="text-app-text">{recruiterInfo.bdm}</span>
-              </div>
-            </div>
-          </div>
-
+          ))}
         </div>
-
-      </div>
+      ) : (
+        <div className="p-12 text-center rounded-[32px] glass border border-app-border">
+          <AlertCircle className="w-12 h-12 text-app-muted mx-auto mb-3" />
+          <h3 className="font-semibold text-app-text text-sm">No selected candidates found</h3>
+          <p className="text-xs text-app-muted mt-1">
+            {searchQuery ? "No matches found for your search query." : "Navigate to the Candidate Pool tab to add candidates to your selections roster."}
+          </p>
+          {!searchQuery && (
+            <button 
+              onClick={() => onNavigate('candidates')}
+              className="mt-5 px-5 py-2.5 bg-brand-blue text-white rounded-xl text-xs font-extrabold shadow-lg"
+            >
+              Go to Candidate Pool
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ---------------------------------------------------- */}
-      {/* EDIT ALIGNMENT POPUP */}
+      {/* CANDIDATE PROFILE PREVIEW MODAL */}
       {/* ---------------------------------------------------- */}
-      {editSelectionModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#090D1A] border border-app-border rounded-3xl overflow-hidden shadow-2xl animate-scale-up text-app-text">
+      {previewUid && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="w-full max-w-2xl bg-[#090D1A] border border-app-border rounded-[32px] overflow-hidden shadow-2xl text-app-text my-8">
             
-            <div className="h-16 border-b border-app-border/40 px-6 flex items-center justify-between bg-app-surface/20">
-              <h3 className="font-display font-extrabold text-base text-app-text">
-                Edit Alignment - {editSelectionModal.candidateName}
-              </h3>
+            {/* Header backdrop */}
+            <div className="h-32 bg-gradient-to-r from-brand-blue/20 to-brand-violet/20 relative p-6 flex justify-between items-start">
+              <div>
+                <span className="text-[10px] font-extrabold bg-brand-blue/20 text-brand-blue px-2.5 py-1 rounded-full uppercase tracking-wider">
+                  Realtime Candidate Dossier
+                </span>
+              </div>
               <button 
-                onClick={() => setEditSelectionModal(null)}
-                className="p-2 text-app-muted hover:text-app-text bg-app-surface/60 rounded-xl border border-app-border"
+                onClick={() => setPreviewUid(null)}
+                className="p-2 text-app-muted hover:text-app-text bg-black/40 rounded-full border border-app-border/40 hover:scale-105 transition-all"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditJob} className="p-6 space-y-4">
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-app-muted uppercase tracking-wider">Change Assigned Job</label>
-                <select 
-                  value={editJobId}
-                  onChange={(e) => setEditJobId(e.target.value)}
-                  className="w-full bg-app-surface border border-app-border rounded-xl p-3 text-xs font-bold text-app-text focus:outline-none focus:border-brand-blue outline-none cursor-pointer"
-                  required
-                >
-                  {accessibleJobs.map((job) => (
-                    <option key={job.id} value={job.id}>
-                      {job.title} - {job.company}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-app-muted">Selecting an alternative accessible requirement will update the queue row.</p>
+            {loadingPreview ? (
+              <div className="py-24 flex justify-center items-center">
+                <div className="w-8 h-8 border-4 border-brand-blue border-t-transparent rounded-full animate-spin" />
               </div>
+            ) : previewProfile ? (
+              <div className="p-6 md:p-8 -mt-12 space-y-6">
+                
+                {/* Meta details header info */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-6 border-b border-app-border/40">
+                  <div className="flex items-end gap-4">
+                    <div className="w-20 h-20 rounded-full bg-brand-blue/10 border-4 border-[#090D1A] flex items-center justify-center text-brand-blue text-3xl font-extrabold font-mono shadow-xl shrink-0">
+                      {(previewProfile.profile?.fullName || previewProfile.name || 'Anonymous').split(' ').map((n: string) => n[0]).join('')}
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-display font-extrabold text-app-text leading-tight">
+                        {previewProfile.profile?.fullName || previewProfile.name || 'Anonymous'}
+                      </h2>
+                      <p className="text-brand-blue font-bold text-xs mt-1">
+                        {previewProfile.profile?.role || previewProfile.details?.role || 'Software Engineer'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-[11px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-full">
+                      {previewProfile.profile?.availability || previewProfile.availability || 'Available'}
+                    </span>
+                    <span className="text-[11px] font-extrabold bg-slate-800 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-full">
+                      Status: {previewProfile.profile?.status || previewProfile.status || 'Active'}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="pt-4 border-t border-app-border/40 flex items-center justify-end gap-3">
-                <button 
-                  type="button"
-                  onClick={() => setEditSelectionModal(null)}
-                  className="px-4 py-2 bg-app-surface border border-app-border hover:bg-app-bg text-app-text text-xs font-bold rounded-xl"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  className="px-5 py-2 bg-brand-blue text-white rounded-xl text-xs font-bold"
-                >
-                  Save Changes
-                </button>
+                {/* Profile attributes grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                  
+                  {/* Contact Block */}
+                  <div className="space-y-3.5 bg-app-surface/40 border border-app-border/60 p-5 rounded-2xl">
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-app-muted flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-brand-blue" />
+                      Contact Information
+                    </h4>
+                    <div className="space-y-2.5 text-xs">
+                      <div className="flex items-center gap-2.5 text-app-text">
+                        <Mail className="w-4 h-4 text-app-muted shrink-0" />
+                        <span>{previewProfile.profile?.email || previewProfile.email || 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-app-text">
+                        <Phone className="w-4 h-4 text-app-muted shrink-0" />
+                        <span>{previewProfile.profile?.phoneNumber || previewProfile.profile?.phone || previewProfile.phone || 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-app-text">
+                        <MapPin className="w-4 h-4 text-app-muted shrink-0" />
+                        <span>{previewProfile.profile?.location || previewProfile.location || 'Remote'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Career Metrics */}
+                  <div className="space-y-3.5 bg-app-surface/40 border border-app-border/60 p-5 rounded-2xl">
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-app-muted flex items-center gap-1.5">
+                      <Briefcase className="w-3.5 h-3.5 text-brand-blue" />
+                      Work & Experience
+                    </h4>
+                    <div className="space-y-2.5 text-xs">
+                      <div className="flex justify-between items-center">
+                        <span className="text-app-muted">Experience Level:</span>
+                        <span className="font-extrabold text-app-text">{previewProfile.profile?.experience || previewProfile.experience || 'Entry Level'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-app-muted">Education Degree:</span>
+                        <span className="font-extrabold text-app-text truncate max-w-[150px]">{previewProfile.profile?.education || previewProfile.education || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-app-muted">Current Assignment:</span>
+                        <span className="font-extrabold text-brand-violet">
+                          {previewProfile.profile?.assignedRecruiterId ? 'Assigned' : 'Unassigned'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Candidate Skills block */}
+                <div className="space-y-3.5">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-app-muted">
+                    Technical Skills & Expertise
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {(previewProfile.profile?.skills || previewProfile.skills || []).map((skill: string, sIdx: number) => (
+                      <span key={sIdx} className="text-xs font-mono font-bold bg-[#1E293B] text-slate-200 border border-slate-700/60 px-3.5 py-1.5 rounded-xl">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Extra Details segment */}
+                {previewProfile.profile?.details && (
+                  <div className="space-y-3 bg-app-surface/20 border border-app-border/40 p-5 rounded-2xl text-xs">
+                    <h4 className="font-bold text-app-text text-sm">Professional Summary</h4>
+                    <p className="text-app-muted leading-relaxed">
+                      This candidate is a skilled {previewProfile.profile?.details?.role || 'professional'} based in {previewProfile.profile?.location || 'Remote'} with {previewProfile.profile?.experience || 'applicable'} experience. Equipped with core technical competencies including {(previewProfile.profile?.skills || []).slice(0, 4).join(', ')}.
+                    </p>
+                  </div>
+                )}
+
+                {/* Bottom Modal Close actions */}
+                <div className="pt-6 border-t border-app-border/45 flex items-center justify-end gap-3">
+                  <button 
+                    onClick={() => setPreviewUid(null)}
+                    className="px-5 py-2.5 bg-app-surface hover:bg-app-bg text-app-muted hover:text-app-text rounded-xl text-xs font-bold border border-app-border"
+                  >
+                    Close
+                  </button>
+                  {onSubmitProfile && (
+                    <button 
+                      onClick={() => {
+                        const targetCandidate = {
+                          id: previewUid,
+                          name: previewProfile.profile?.fullName || previewProfile.name || 'Anonymous',
+                          experience: previewProfile.profile?.experience || previewProfile.experience || 'Entry Level',
+                          skills: previewProfile.profile?.skills || previewProfile.skills || [],
+                          availability: previewProfile.profile?.availability || previewProfile.availability || 'Available',
+                          details: {
+                            role: previewProfile.profile?.role || previewProfile.details?.role || 'Software Engineer',
+                            skillsFull: previewProfile.profile?.skills || previewProfile.skills || [],
+                            years: parseInt(previewProfile.profile?.experience) || 2,
+                            currentCompany: 'N/A',
+                            currentRole: previewProfile.profile?.role || previewProfile.details?.role || 'Software Engineer',
+                            availabilityDetails: previewProfile.profile?.availability || previewProfile.availability || 'Available'
+                          }
+                        };
+                        setPreviewUid(null); // close preview first
+                        onSubmitProfile(targetCandidate);
+                      }}
+                      className="px-5 py-2.5 bg-brand-blue hover:bg-brand-blue/85 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-md shadow-brand-blue/25"
+                    >
+                      <Sparkles className="w-4 h-4" /> Submit Profile
+                    </button>
+                  )}
+                </div>
+
               </div>
-            </form>
+            ) : (
+              <div className="py-24 text-center">
+                <AlertCircle className="w-12 h-12 text-app-muted mx-auto mb-3" />
+                <p className="text-sm font-semibold">Candidate profile could not be loaded</p>
+                <p className="text-xs text-app-muted mt-1">Please ensure the candidate profile exists in Firestore.</p>
+              </div>
+            )}
           </div>
         </div>
       )}

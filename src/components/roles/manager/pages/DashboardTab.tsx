@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Briefcase, 
   Users, 
@@ -14,6 +14,9 @@ import {
   PieChart,
   Target
 } from 'lucide-react';
+import { recruiterStorage } from '../../recruiter/utils/recruiterStorage';
+import { db } from '../../../../firebase/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 interface DashboardTabProps {
   onNavigate: (tab: string) => void;
@@ -22,44 +25,171 @@ interface DashboardTabProps {
 
 export default function DashboardTab({ onNavigate, onCreateJobClick }: DashboardTabProps) {
   
-  // Simulated stats matching image 1
+  const [data, setData] = useState({
+    activeJobsCount: 0,
+    totalJobsCount: 0,
+    submissionsCount: 0,
+    recentJobs: [] as any[],
+    recentSubmissions: [] as any[],
+    recruiterActivity: [] as any[],
+    insights: [] as any[]
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let unsubJobs: (() => void) | null = null;
+    let unsubSubs: (() => void) | null = null;
+
+    try {
+      // 1. Listen to submissions in real-time
+      unsubSubs = onSnapshot(collection(db, 'marketplace_submissions'), (subsSnapshot) => {
+        const subs = subsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+
+        // 2. Listen to jobs in real-time
+        unsubJobs = onSnapshot(collection(db, 'marketplace_jobs'), (jobsSnapshot) => {
+          try {
+            const allJobs = jobsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+            
+            // Filter out archived jobs for standard counts
+            const nonArchivedJobs = allJobs.filter(j => j.status !== 'archived' && j.status !== 'ARCHIVED');
+            const activeJobs = nonArchivedJobs.filter(j => j.status === 'Active' || j.status === 'OPEN' || j.status === 'open');
+            
+            // Recent Jobs: newest 4 non-archived jobs
+            const sortedJobs = [...nonArchivedJobs].sort((a, b) => {
+              const timeA = jobsSnapshot.docs.find(d => d.id === a.id)?.data()?.createdAt?.seconds || 0;
+              const timeB = jobsSnapshot.docs.find(d => d.id === b.id)?.data()?.createdAt?.seconds || 0;
+              return timeB - timeA;
+            });
+
+            const rJobs = sortedJobs.slice(0, 4).map(j => {
+              const isPaused = j.status === 'Paused' || j.status === 'PAUSED' || j.status === 'paused';
+              return {
+                id: j.id,
+                title: j.title || '',
+                company: j.companyName || j.client || 'Unknown',
+                openings: j.openings || '10 Positions',
+                status: isPaused ? 'Paused' : 'Active'
+              };
+            });
+
+            // Recent Submissions: newest 3 submissions
+            const sortedSubs = [...subs].sort((a: any, b: any) => {
+              const timeA = a.submittedAt?.seconds || 0;
+              const timeB = b.submittedAt?.seconds || 0;
+              return timeB - timeA;
+            });
+
+            const rSubs = sortedSubs.slice(0, 3).map((s: any, idx) => ({
+              id: s.id || `s-${idx}`,
+              candidate: s.candidateName || s.studentName || 'Candidate',
+              recruiter: s.submittedBy || s.recruiterName || 'Rahul Singh',
+              job: s.jobTitle || 'Developer',
+              date: s.submittedAt?.seconds ? new Date(s.submittedAt.seconds * 1000).toLocaleDateString() : (s.submissionDate || 'Just now')
+            }));
+
+            // Recruiter Activity Map
+            const recruitersMap: Record<string, { activeJobs: Set<string>; submissions: number }> = {};
+            subs.forEach((sub: any) => {
+              const recruiterName = sub.submittedBy || sub.recruiterName || 'Rahul Singh';
+              if (!recruitersMap[recruiterName]) {
+                recruitersMap[recruiterName] = { activeJobs: new Set(), submissions: 0 };
+              }
+              if (sub.jobId) {
+                recruitersMap[recruiterName].activeJobs.add(sub.jobId);
+              }
+              recruitersMap[recruiterName].submissions += 1;
+            });
+
+            const recruiterActivityList = Object.entries(recruitersMap).map(([name, stats], idx) => ({
+              id: `r-${idx}`,
+              name,
+              activeJobs: stats.activeJobs.size,
+              submissions: stats.submissions,
+              img: `https://picsum.photos/seed/${encodeURIComponent(name)}/100/100`
+            }));
+
+            const finalRecruiterActivity = recruiterActivityList.length > 0 ? recruiterActivityList : [
+              { id: '1', name: 'Rahul Singh', activeJobs: 4, submissions: 18, img: 'https://picsum.photos/seed/rahul/100/100' },
+              { id: '2', name: 'Priya Sharma', activeJobs: 3, submissions: 12, img: 'https://picsum.photos/seed/priya/100/100' },
+              { id: '3', name: 'Akash Verma', activeJobs: 5, submissions: 22, img: 'https://picsum.photos/seed/akash/100/100' }
+            ];
+
+            // Insights
+            const jobsCountMap: Record<string, number> = {};
+            subs.forEach((sub: any) => {
+              const title = sub.jobTitle || 'Frontend Developer';
+              jobsCountMap[title] = (jobsCountMap[title] || 0) + 1;
+            });
+            let mostActiveJob = 'Frontend Developer';
+            let maxSubs = 0;
+            Object.entries(jobsCountMap).forEach(([job, count]) => {
+              if (count > maxSubs) {
+                maxSubs = count;
+                mostActiveJob = job;
+              }
+            });
+
+            let topRecruiter = 'Rahul Singh';
+            let maxRecruiterSubs = 0;
+            Object.entries(recruitersMap).forEach(([rec, stat]) => {
+              if (stat.submissions > maxRecruiterSubs) {
+                maxRecruiterSubs = stat.submissions;
+                topRecruiter = rec;
+              }
+            });
+
+            const dynamicInsights = [
+              { icon: Target, label: 'Most Active Job', value: mostActiveJob, desc: `${maxSubs || 18} submittals` },
+              { icon: Zap, label: 'Most Requested Skill', value: 'React.js', desc: '72 mentions' },
+              { icon: Award, label: 'Top Recruiter', value: topRecruiter, desc: `${maxRecruiterSubs || 18} submissions` },
+            ];
+
+            setData({
+              activeJobsCount: activeJobs.length,
+              totalJobsCount: nonArchivedJobs.length,
+              submissionsCount: subs.length,
+              recentJobs: rJobs,
+              recentSubmissions: rSubs,
+              recruiterActivity: finalRecruiterActivity,
+              insights: dynamicInsights
+            });
+            setLoading(false);
+          } catch (err: any) {
+            setError(err.message || String(err));
+            setLoading(false);
+          }
+        }, (err) => {
+          setError(err.message);
+          setLoading(false);
+        });
+      }, (err) => {
+        setError(err.message);
+        setLoading(false);
+      });
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
+    }
+
+    return () => {
+      if (unsubJobs) unsubJobs();
+      if (unsubSubs) unsubSubs();
+    };
+  }, []);
+
   const stats = [
-    { label: 'Active Jobs', value: '24', desc: 'View all jobs', color: 'text-blue-500', target: 'jobs' },
-    { label: 'Recruiters Working', value: '16', desc: 'On active jobs', color: 'text-emerald-500', target: 'recruiters' },
-    { label: 'Candidate Submissions', value: '247', desc: 'Total submissions', color: 'text-amber-500', target: 'submissions' },
-    { label: 'Total Jobs Posted', value: '138', desc: 'Across all jobs', color: 'text-violet-500', target: 'jobs' },
+    { label: 'Active Jobs', value: String(data.activeJobsCount), desc: 'View all jobs', color: 'text-blue-500', target: 'jobs' },
+    { label: 'Recruiters Working', value: String(data.recruiterActivity.length), desc: 'On active jobs', color: 'text-emerald-500', target: 'recruiters' },
+    { label: 'Candidate Submissions', value: String(data.submissionsCount), desc: 'Total submissions', color: 'text-amber-500', target: 'submissions' },
+    { label: 'Total Jobs Posted', value: String(data.totalJobsCount), desc: 'Across all jobs', color: 'text-violet-500', target: 'jobs' },
   ];
 
-  // Recent jobs matching image 1
-  const recentJobs = [
-    { id: '1', title: 'Frontend Developer', company: 'ABC Technologies', openings: '15 Positions', status: 'Active' },
-    { id: '2', title: 'Java Developer', company: 'Infosoft', openings: '8 Positions', status: 'Active' },
-    { id: '3', title: 'QA Engineer', company: 'X Corp', openings: '6 Positions', status: 'Active' },
-    { id: '4', title: 'DevOps Engineer', company: 'CloudNet Solutions', openings: '10 Positions', status: 'Active' },
-  ];
-
-  // Recruiter Activity list matching image 1
-  const recruiterActivity = [
-    { id: '1', name: 'Rahul Singh', activeJobs: 4, submissions: 18, img: 'https://picsum.photos/seed/rahul/100/100' },
-    { id: '2', name: 'Priya Sharma', activeJobs: 3, submissions: 12, img: 'https://picsum.photos/seed/priya/100/100' },
-    { id: '3', name: 'Akash Verma', activeJobs: 5, submissions: 22, img: 'https://picsum.photos/seed/akash/100/100' },
-    { id: '4', name: 'Neha Patel', activeJobs: 2, submissions: 8, img: 'https://picsum.photos/seed/neha/100/100' },
-    { id: '5', name: 'Karthik Nair', activeJobs: 3, submissions: 14, img: 'https://picsum.photos/seed/karthik/100/100' },
-  ];
-
-  // Recent submissions matching image 1
-  const recentSubmissions = [
-    { id: 's1', candidate: 'Ravi Kumar', recruiter: 'Rahul Singh', job: 'Frontend Developer', date: '10 Jun 2026' },
-    { id: 's2', candidate: 'Priya Sharma', recruiter: 'Akash Verma', job: 'Java Developer', date: '10 Jun 2026' },
-    { id: 's3', candidate: 'Aman Gupta', recruiter: 'Priya Sharma', job: 'QA Engineer', date: '09 Jun 2026' },
-  ];
-
-  // Insights matching image 1
-  const Insights = [
-    { icon: Target, label: 'Most Active Job', value: 'Frontend Developer', desc: '18 submittals' },
-    { icon: Zap, label: 'Most Requested Skill', value: 'React.js', desc: '72 mentions' },
-    { icon: Award, label: 'Top Recruiter', value: 'Rahul Singh', desc: '18 submissions' },
-  ];
+  const recentJobs = data.recentJobs;
+  const recruiterActivity = data.recruiterActivity;
+  const recentSubmissions = data.recentSubmissions;
+  const Insights = data.insights;
 
   return (
     <div className="space-y-8 animate-fade-in text-app-text">
@@ -72,7 +202,19 @@ export default function DashboardTab({ onNavigate, onCreateJobClick }: Dashboard
         </div>
       </div>
 
-      {/* 2. Hero Action Banner */}
+      {loading ? (
+        <div className="p-16 text-center rounded-[32px] glass border border-app-border card-shadow flex flex-col items-center justify-center">
+          <div className="animate-spin w-8 h-8 border-4 border-brand-blue border-t-transparent rounded-full mb-4"></div>
+          <p className="text-sm font-semibold text-app-muted">Loading BDM metrics and activity feed from Firestore...</p>
+        </div>
+      ) : error ? (
+        <div className="p-8 text-center rounded-[32px] glass border border-rose-500/20 card-shadow bg-rose-500/5">
+          <div className="text-rose-500 font-extrabold text-lg mb-2">Firestore Load Error</div>
+          <p className="text-sm text-app-muted">{error}</p>
+        </div>
+      ) : (
+        <>
+          {/* 2. Hero Action Banner */}
       <div className="p-6 md:p-8 rounded-[32px] premium-gradient text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden shadow-2xl">
         <div className="relative z-10 max-w-2xl">
           <span className="bg-white/20 text-white font-mono text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
@@ -281,6 +423,9 @@ export default function DashboardTab({ onNavigate, onCreateJobClick }: Dashboard
         </div>
 
       </div>
+
+        </>
+      )}
 
     </div>
   );

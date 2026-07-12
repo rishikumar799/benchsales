@@ -42,6 +42,10 @@ const AVAILABLE_RECRUITERS = [
 interface JobTypeExtended extends JobType {
   assignmentMode?: 'open' | 'restricted';
   assignedRecruiters?: string[];
+  employmentType?: string;
+  salaryRange?: string;
+  description?: string;
+  responsibilities?: string;
 }
 
 interface CreateJobTabProps {
@@ -142,7 +146,11 @@ export default function CreateJobTab({ editJob, onBackToJobs, onSubmitJob }: Cre
       openings: `${openings} Positions`,
       status: saveAsDraft ? 'Paused' : 'Active',
       assignmentMode,
-      assignedRecruiters: assignmentMode === 'restricted' ? assignedRecruiters : []
+      assignedRecruiters: assignmentMode === 'restricted' ? assignedRecruiters : [],
+      employmentType,
+      salaryRange,
+      description,
+      responsibilities
     });
   };
 

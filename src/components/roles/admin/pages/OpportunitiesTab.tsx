@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Briefcase, 
@@ -13,6 +13,14 @@ import {
   Eye,
   Settings
 } from 'lucide-react';
+import { db } from '../../../../firebase/firebase';
+import { useAuth } from '../../../../context/AuthContext';
+import { 
+  collection, 
+  doc, 
+  onSnapshot, 
+  updateDoc 
+} from 'firebase/firestore';
 
 interface Opportunity {
   id: string;
@@ -26,23 +34,44 @@ interface Opportunity {
 }
 
 export default function OpportunitiesTab() {
-  const [opps, setOpps] = useState<Opportunity[]>([
-    { id: '1', title: 'Software Engineer', company: 'TCS', officer: 'Priya Sharma', applicants: 124, status: 'Active', visibility: 'My University', pkg: '4.5 LPA' },
-    { id: '2', title: 'System Engineer', company: 'Infosys', officer: 'Rahul Verma', applicants: 96, status: 'Active', visibility: 'My University', pkg: '4.0 LPA' },
-    { id: '3', title: 'Associate Engineer', company: 'Wipro', officer: 'Priya Sharma', applicants: 82, status: 'Active', visibility: 'Selected Universities', pkg: '3.5 LPA' },
-    { id: '4', title: 'Graduate Trainee', company: 'Accenture', officer: 'Neha Patel', applicants: 64, status: 'Active', visibility: 'All Universities', pkg: '4.2 LPA' },
-    { id: '5', title: 'Data Analyst', company: 'Capgemini', officer: 'Amit Singh', applicants: 58, status: 'Inactive', visibility: 'My University', pkg: '4.3 LPA' },
-    { id: '6', title: 'Business Analyst', company: 'Deloitte', officer: 'Kavita Joshi', applicants: 36, status: 'Closed', visibility: 'My University', pkg: '6.5 LPA' },
-    { id: '7', title: 'SDE Intern', company: 'Microsoft', officer: 'Rahul Verma', applicants: 42, status: 'Active', visibility: 'All Universities', pkg: '12.0 LPA' },
-    { id: '8', title: 'Cloud Engineer', company: 'Amazon', officer: 'Amit Singh', applicants: 30, status: 'Active', visibility: 'Selected Universities', pkg: '15.0 LPA' },
-  ]);
+  const { userProfile } = useAuth();
+  const organizationId = userProfile?.organizationId;
 
+  const [opps, setOpps] = useState<Opportunity[]>([]);
   const [search, setSearch] = useState('');
   const [officerFilter, setOfficerFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [visibilityFilter, setVisibilityFilter] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
+
+  // Real-time Firestore Sync
+  useEffect(() => {
+    if (!organizationId) return;
+
+    const oppsCol = collection(db, 'organizations_universities', organizationId, 'opportunities');
+    const unsub = onSnapshot(oppsCol, (snap) => {
+      const list = snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || '',
+          company: data.company || '',
+          officer: data.officer || '',
+          applicants: typeof data.applicants === 'number' ? data.applicants : parseInt(data.applicants || '0'),
+          status: data.status || 'Active',
+          visibility: data.visibility || 'My University',
+          pkg: data.pkg || data.package || '4.5 LPA'
+        } as Opportunity;
+      });
+      setOpps(list);
+    });
+
+    return () => unsub();
+  }, [organizationId]);
+
+  // Unique list of officers for the dropdown filter
+  const uniqueOfficers = Array.from(new Set(opps.map(o => o.officer).filter(Boolean)));
 
   // Filters logic
   const filteredOpps = opps.filter((item) => {
@@ -77,14 +106,14 @@ export default function OpportunitiesTab() {
     }
   };
 
-  const toggleStatus = (id: string) => {
-    setOpps(opps.map(o => {
-      if (o.id === id) {
-        const nextStatus = o.status === 'Active' ? 'Inactive' : o.status === 'Inactive' ? 'Closed' : 'Active';
-        return { ...o, status: nextStatus };
-      }
-      return o;
-    }));
+  const toggleStatus = async (id: string) => {
+    if (!organizationId) return;
+    const currentOpp = opps.find(o => o.id === id);
+    if (!currentOpp) return;
+
+    const nextStatus = currentOpp.status === 'Active' ? 'Inactive' : currentOpp.status === 'Inactive' ? 'Closed' : 'Active';
+    const docRef = doc(db, 'organizations_universities', organizationId, 'opportunities', id);
+    await updateDoc(docRef, { status: nextStatus });
   };
 
   return (
@@ -124,14 +153,12 @@ export default function OpportunitiesTab() {
                 setOfficerFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-muted focus:outline-none"
+              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-muted focus:outline-none cursor-pointer"
             >
               <option value="All">All Officers</option>
-              <option value="Priya Sharma">Priya Sharma</option>
-              <option value="Rahul Verma">Rahul Verma</option>
-              <option value="Neha Patel">Neha Patel</option>
-              <option value="Amit Singh">Amit Singh</option>
-              <option value="Kavita Joshi">Kavita Joshi</option>
+              {uniqueOfficers.map(off => (
+                <option key={off} value={off}>{off}</option>
+              ))}
             </select>
           </div>
 
@@ -143,7 +170,7 @@ export default function OpportunitiesTab() {
                 setStatusFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-muted focus:outline-none"
+              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-muted focus:outline-none cursor-pointer"
             >
               <option value="All">All Statuses</option>
               <option value="Active">Active</option>
@@ -160,7 +187,7 @@ export default function OpportunitiesTab() {
                 setVisibilityFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-muted focus:outline-none"
+              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-muted focus:outline-none cursor-pointer"
             >
               <option value="All">All Visibility</option>
               <option value="My University">My University</option>
@@ -222,7 +249,7 @@ export default function OpportunitiesTab() {
                     <td className="py-4 whitespace-nowrap text-center">
                       <button
                         onClick={() => toggleStatus(opp.id)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold border uppercase tracking-wider transition-colors ${getStatusStyle(opp.status)}`}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold border uppercase tracking-wider transition-colors cursor-pointer ${getStatusStyle(opp.status)}`}
                         title="Click to toggle status cycle"
                       >
                         <span>{opp.status}</span>
@@ -248,7 +275,7 @@ export default function OpportunitiesTab() {
               ) : (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-app-muted font-bold text-sm">
-                    No matching opportunities recorded within Xavier's ecosystem.
+                    No matching opportunities recorded within the university ecosystem.
                   </td>
                 </tr>
               )}
@@ -275,7 +302,7 @@ export default function OpportunitiesTab() {
                 <button
                   key={idx}
                   onClick={() => setCurrentPage(idx + 1)}
-                  className={`w-8 h-8 rounded-xl text-xs font-extrabold cursor-pointer ${
+                  className={`w-8 h-8 rounded-xl text-xs font-extrabold cursor-pointer transition-all ${
                     currentPage === idx + 1 
                       ? 'bg-brand-blue text-white shadow-md' 
                       : 'border border-app-border text-app-muted hover:bg-app-surface hover:text-app-text'
