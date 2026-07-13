@@ -105,9 +105,11 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
       { id: 'managers', label: 'Managers', icon: Users },
       { id: 'recruiters', label: 'Recruiters', icon: Users },
       { id: 'employees', label: 'Employees', icon: Users },
+      { id: 'departments', label: 'Departments', icon: Building2 },
       { id: 'jobs', label: 'Jobs', icon: Briefcase },
       { id: 'reports', label: 'Reports', icon: BarChart3 },
       { id: 'profile', label: 'Profile', icon: User },
+      { id: 'settings', label: 'Settings', icon: Settings },
     ],
     c_manager: [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -134,6 +136,7 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
       { id: 'applications', label: 'Applications', icon: FileText },
       { id: 'documents', label: 'Documents', icon: FileText },
       { id: 'profile', label: 'Profile', icon: User },
+      { id: 'settings', label: 'Settings', icon: Settings },
     ],
 
     // PLATFORM ADMIN

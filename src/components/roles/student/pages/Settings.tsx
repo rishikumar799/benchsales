@@ -37,7 +37,7 @@ export default function StudentSettings() {
         const data = snapshot.data();
         setStudentData(data);
         setFullName(data.fullName || data.name || userProfile?.name || '');
-        setPhone(data.phone || '');
+        setPhone(data.phoneNumber || data.phone || '');
       }
       setLoading(false);
     }, (error) => {
@@ -57,6 +57,7 @@ export default function StudentSettings() {
         fullName,
         name: fullName, // Sync both fields
         phone,
+        phoneNumber: phone, // Sync both fields
         updatedAt: new Date().toISOString()
       });
       alert('Settings saved successfully!');

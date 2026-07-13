@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Phone, MapPin, Building2, UserCircle2, Code, FileText, CheckCircle2 } from 'lucide-react';
+import { db } from '../../../../firebase/firebase';
+import { doc, onSnapshot, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { useAuth } from '../../../../context/AuthContext';
 
 export default function EmployeeProfileTab() {
+  const { userProfile } = useAuth();
   const [successMsg, setSuccessMsg] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   
@@ -25,11 +29,91 @@ export default function EmployeeProfileTab() {
     about: 'Passionate software engineer with experience in building modern web applications and scalable backend APIs. Always eager to learn new technologies and contribute to meaningful architectural projects.'
   });
 
-  const handleSave = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!userProfile?.organizationId || !userProfile?.uid) {
+      return;
+    }
+
+    const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'employees', userProfile.uid);
+    const unsubscribe = onSnapshot(docRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setProfile({
+          name: data.name || data.fullName || userProfile.fullName || 'Rohit Kumar',
+          employeeId: data.employeeId || 'EMP24567',
+          department: data.department || data.dept || 'Engineering',
+          designation: data.designation || 'Software Engineer',
+          location: data.location || 'Hyderabad, India',
+          manager: data.manager || 'Ankit Verma',
+          email: data.email || userProfile.email || 'rohit.kumar@company.com',
+          phone: data.phone || data.phoneNumber || userProfile.phoneNumber || '+91 98765 43210',
+          experience: data.experience || '4.2 Years',
+          totalExperience: data.totalExperience || '4.2 Years',
+          skills: data.skills || ['React', 'Node.js', 'TypeScript', 'AWS', 'Docker', 'Kubernetes', 'MongoDB', 'Git'],
+          languages: data.languages || ['English', 'Hindi'],
+          linkedin: data.linkedin || 'linkedin.com/in/rohitkumar',
+          github: data.github || 'github.com/rohitkumar',
+          about: data.about || 'Passionate software engineer with experience in building modern web applications and scalable backend APIs. Always eager to learn new technologies and contribute to meaningful architectural projects.'
+        });
+      } else {
+        // Fallback to defaults merged with auth info
+        setProfile(prev => ({
+          ...prev,
+          name: userProfile.fullName || prev.name,
+          email: userProfile.email || prev.email,
+          phone: userProfile.phoneNumber || prev.phone,
+        }));
+      }
+    }, (error) => {
+      console.error("Error fetching employee profile in realtime:", error);
+    });
+
+    return () => unsubscribe();
+  }, [userProfile?.organizationId, userProfile?.uid]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsEditing(false);
-    setSuccessMsg('✓ Profile information updated and saved successfully.');
-    setTimeout(() => setSuccessMsg(''), 4000);
+    if (!userProfile?.organizationId || !userProfile?.uid) return;
+
+    try {
+      const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'employees', userProfile.uid);
+      const updateData = {
+        uid: userProfile.uid,
+        organizationId: userProfile.organizationId,
+        name: profile.name,
+        fullName: profile.name,
+        phone: profile.phone,
+        phoneNumber: profile.phone,
+        email: profile.email,
+        department: profile.department,
+        dept: profile.department,
+        employeeId: profile.employeeId,
+        designation: profile.designation,
+        location: profile.location,
+        manager: profile.manager,
+        experience: profile.experience,
+        totalExperience: profile.totalExperience,
+        skills: profile.skills,
+        languages: profile.languages,
+        linkedin: profile.linkedin,
+        github: profile.github,
+        about: profile.about,
+        updatedAt: new Date().toISOString()
+      };
+
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        await updateDoc(docRef, updateData);
+      } else {
+        await setDoc(docRef, updateData, { merge: true });
+      }
+
+      setIsEditing(false);
+      setSuccessMsg('✓ Profile information updated and saved successfully.');
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err) {
+      console.error("Error saving employee profile:", err);
+    }
   };
 
   return (

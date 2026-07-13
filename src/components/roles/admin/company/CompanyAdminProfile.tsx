@@ -6,11 +6,8 @@ import {
   Mail, 
   Phone, 
   Calendar, 
-  Briefcase, 
-  ShieldCheck, 
   Globe, 
   Users,
-  Grid,
   Plus,
   Upload
 } from 'lucide-react';
@@ -19,12 +16,39 @@ interface CompanyAdminProfileProps {
   onNavigate: (tab: string) => void;
   onAddManagerClick: () => void;
   onAddRecruiterClick: () => void;
+  companyData: any;
+  adminProfileData: any;
 }
 
-export default function CompanyAdminProfile({ onNavigate, onAddManagerClick, onAddRecruiterClick }: CompanyAdminProfileProps) {
+export default function CompanyAdminProfile({ 
+  onNavigate, 
+  onAddManagerClick, 
+  onAddRecruiterClick,
+  companyData,
+  adminProfileData
+}: CompanyAdminProfileProps) {
   
+  // Safe extraction of real-time company fields with defaults
+  const orgName = companyData?.organizationName || companyData?.name || 'Tech Solutions Pvt. Ltd.';
+  const category = companyData?.category || 'Technology, Information and Internet';
+  const segment = companyData?.primarySegment || 'Software Development';
+  const website = companyData?.website || 'www.techsolutions.com';
+  const hqLocation = companyData?.hqLocation || companyData?.location || 'Bangalore, India';
+  const foundedYear = companyData?.foundedYear || 'Year 2015';
+  const workforceVolume = companyData?.workforceVolume || '1001 - 5000 Employees';
+  const supportEmail = companyData?.supportEmail || companyData?.email || 'contact@techsolutions.com';
+
+  // Safe extraction of real-time admin fields with defaults
+  const adminName = adminProfileData?.fullName || adminProfileData?.name || 'Vikram Singh';
+  const empId = adminProfileData?.empId || 'ADM10001';
+  const designation = adminProfileData?.designation || 'Company Administrator';
+  const department = adminProfileData?.department || adminProfileData?.dept || 'Administration';
+  const adminEmail = adminProfileData?.email || 'admin@techsolutions.com';
+  const adminPhone = adminProfileData?.phoneNumber || adminProfileData?.phone || '+91 98765 43210';
+  const adminAvatar = adminProfileData?.avatar || `https://picsum.photos/seed/${adminName.replace(/\s+/g, '')}/120/120`;
+
   return (
-    <div className="space-y-6 animate-fade-in text-app-text">
+    <div className="space-y-6 animate-fade-in text-app-text" id="company-admin-profile-root">
       
       {/* Title block */}
       <div>
@@ -51,46 +75,46 @@ export default function CompanyAdminProfile({ onNavigate, onAddManagerClick, onA
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs font-semibold">
             <div className="space-y-1">
               <span className="text-[10px] font-black uppercase text-app-muted block">Legal Entity Name</span>
-              <span className="text-app-text text-sm font-extrabold block">Tech Solutions Pvt. Ltd.</span>
+              <span className="text-app-text text-sm font-extrabold block">{orgName}</span>
             </div>
             <div className="space-y-1">
               <span className="text-[10px] font-black uppercase text-app-muted block">Category</span>
-              <span className="text-app-text text-sm font-extrabold block">Technology, Information and Internet</span>
+              <span className="text-app-text text-sm font-extrabold block">{category}</span>
             </div>
             <div className="space-y-1">
               <span className="text-[10px] font-black uppercase text-app-muted block">Primary Segment</span>
               <span className="text-app-text text-sm font-bold block flex items-center gap-1.5">
-                <Globe className="w-4 h-4 text-brand-blue" /> Software Development
+                <Globe className="w-4 h-4 text-brand-blue" /> {segment}
               </span>
             </div>
             <div className="space-y-1">
               <span className="text-[10px] font-black uppercase text-app-muted block">Official Url</span>
-              <a href="https://www.techsolutions.com" target="_blank" rel="noopener noreferrer" className="text-brand-blue text-sm font-bold block hover:underline">
-                www.techsolutions.com
+              <a href={`https://${website.replace(/^https?:\/\//, '')}`} target="_blank" rel="noopener noreferrer" className="text-brand-blue text-sm font-bold block hover:underline">
+                {website}
               </a>
             </div>
             <div className="space-y-1">
               <span className="text-[10px] font-black uppercase text-app-muted block">Headquarters location</span>
               <span className="text-app-text text-sm font-bold block flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-brand-blue" /> Bangalore, India
+                <MapPin className="w-4 h-4 text-brand-blue" /> {hqLocation}
               </span>
             </div>
             <div className="space-y-1">
               <span className="text-[10px] font-black uppercase text-app-muted block">Founded Epoch</span>
               <span className="text-app-text text-sm font-bold block flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-brand-blue" /> Year 2015
+                <Calendar className="w-4 h-4 text-brand-blue" /> {foundedYear.includes('Year') ? foundedYear : `Year ${foundedYear}`}
               </span>
             </div>
             <div className="space-y-1">
               <span className="text-[10px] font-black uppercase text-app-muted block">Workforce Volume</span>
               <span className="text-app-text text-sm font-bold block flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-brand-blue" /> 1001 - 5000 Employees
+                <Users className="w-4 h-4 text-brand-blue" /> {workforceVolume}
               </span>
             </div>
             <div className="space-y-1">
               <span className="text-[10px] font-black uppercase text-app-muted block">Official support line</span>
               <span className="text-app-text text-sm font-bold block flex items-center gap-1.5">
-                <Mail className="w-4 h-4 text-brand-blue" /> contact@techsolutions.com
+                <Mail className="w-4 h-4 text-brand-blue" /> {supportEmail}
               </span>
             </div>
           </div>
@@ -101,8 +125,8 @@ export default function CompanyAdminProfile({ onNavigate, onAddManagerClick, onA
           <div className="flex items-center gap-4 border-b border-app-border/40 pb-5">
             <div className="w-12 h-12 rounded-full overflow-hidden p-0.5 blue-gradient shrink-0">
               <img 
-                src="https://picsum.photos/seed/vikramsingh/120/120" 
-                alt="Vikram Singh" 
+                src={adminAvatar} 
+                alt={adminName} 
                 className="w-full h-full rounded-full object-cover border-2 border-app-bg"
                 referrerPolicy="no-referrer"
               />
@@ -116,34 +140,34 @@ export default function CompanyAdminProfile({ onNavigate, onAddManagerClick, onA
           <div className="space-y-4 font-semibold text-xs">
             <div className="flex justify-between items-center py-2 border-b border-app-border/40">
               <span className="text-app-muted">Personal Administrator</span>
-              <span className="text-sm font-black text-app-text">Vikram Singh</span>
+              <span className="text-sm font-black text-app-text">{adminName}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-app-border/40">
               <span className="text-app-muted">Employee ID Index</span>
-              <span className="text-sm font-black text-brand-blue font-mono">ADM10001</span>
+              <span className="text-sm font-black text-brand-blue font-mono">{empId}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-app-border/40">
               <span className="text-app-muted">System Designation</span>
-              <span className="text-sm font-bold text-app-text">Company Administrator</span>
+              <span className="text-sm font-bold text-app-text">{designation}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-app-border/40">
               <span className="text-app-muted">Assigned Department</span>
-              <span className="text-sm font-bold text-app-text">Administration</span>
+              <span className="text-sm font-bold text-app-text">{department}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-app-border/40">
               <span className="text-app-muted">Key Registry Email</span>
-              <span className="text-sm font-bold text-brand-blue font-mono">admin@techsolutions.com</span>
+              <span className="text-sm font-bold text-brand-blue font-mono">{adminEmail}</span>
             </div>
             <div className="flex justify-between items-center py-2">
               <span className="text-app-muted">Verified Support Mobile</span>
-              <span className="text-sm font-bold text-app-text font-mono">+91 98765 43210</span>
+              <span className="text-sm font-bold text-app-text font-mono">{adminPhone}</span>
             </div>
           </div>
         </div>
 
       </div>
 
-      {/* Bottom Area from screenshot: "Quick Actions" */}
+      {/* Bottom Area: Quick Actions */}
       <div className="p-6 md:p-8 rounded-[32px] glass border border-app-border/80 card-shadow space-y-4">
         <h3 className="text-base font-bold text-app-text font-display">Quick Actions</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -80,6 +80,7 @@ import EmployeeResumeBuilderTab from './employee/pages/EmployeeResumeBuilderTab'
 import EmployeeApplicationsTab from './employee/pages/EmployeeApplicationsTab';
 import EmployeeDocumentsTab from './employee/pages/EmployeeDocumentsTab';
 import EmployeeProfileTab from './employee/pages/EmployeeProfileTab';
+import EmployeeSettingsTab from './employee/pages/EmployeeSettingsTab';
 
 // Placement Officer custom page imports
 import OfficerDashboardTab from './officer/pages/DashboardTab';
@@ -128,6 +129,8 @@ import CompanyAdminEmployees from './admin/company/CompanyAdminEmployees';
 import CompanyAdminJobs from './admin/company/CompanyAdminJobs';
 import CompanyAdminReports from './admin/company/CompanyAdminReports';
 import CompanyAdminProfile from './admin/company/CompanyAdminProfile';
+import CompanyAdminDepartments from './admin/company/CompanyAdminDepartments';
+import CompanyAdminSettings from './admin/company/CompanyAdminSettings';
 
 // Platform Admin custom page imports
 import PlatformDashboard from './platform/PlatformDashboard';
@@ -246,7 +249,7 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
   const [errorMsg, setErrorMsg] = useState('');
 
   // 1.1 Corporate Recruiter States & Data
-  const [recruiterActiveCandidateId, setRecruiterActiveCandidateId] = useState('c-1');
+  const [recruiterActiveCandidateId, setRecruiterActiveCandidateId] = useState('');
   const [recruiterJobsList, setRecruiterJobsList] = useState<Array<{
     id: string;
     title: string;
@@ -257,13 +260,7 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
     status: 'Active' | 'Draft' | 'Closed';
     experience: string;
     type: string;
-  }>>([
-    { id: 'job-1', title: 'Senior Software Engineer', dept: 'Engineering', location: 'Bangalore, India', applicationsCount: 82, openings: 4, status: 'Active', experience: '4-6 Years', type: 'Full-time' },
-    { id: 'job-2', title: 'Cloud Engineer', dept: 'Infrastructure', location: 'Hyderabad, India', applicationsCount: 41, openings: 2, status: 'Active', experience: '3-5 Years', type: 'Full-time' },
-    { id: 'job-3', title: 'Tech Lead', dept: 'Engineering', location: 'Pune, India', applicationsCount: 26, openings: 1, status: 'Active', experience: '6-8 Years', type: 'Full-time' },
-    { id: 'job-4', title: 'Frontend Developer', dept: 'Product', location: 'Remote', applicationsCount: 19, openings: 3, status: 'Draft', experience: '2-4 Years', type: 'Full-time' },
-    { id: 'job-5', title: 'Data Analyst', dept: 'Data', location: 'Bangalore, India', applicationsCount: 15, openings: 2, status: 'Active', experience: '2-4 Years', type: 'Full-time' },
-  ]);
+  }>>([]);
 
   const [recruiterCandidatesList, setRecruiterCandidatesList] = useState<Array<{
     id: string;
@@ -284,130 +281,86 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
     assignedByAdmin?: string;
     assignedDate?: string;
     assignedJobs?: string[];
-  }>>([
-    {
-      id: 'c-1',
-      name: 'Rahul Kumar',
-      role: 'Senior Software Engineer',
-      email: 'rahul.kumar@gmail.com',
-      phone: '+91 9876543210',
-      location: 'Bangalore, India',
-      experience: '4.5 Years',
-      currentCompany: 'Tech Solutions Pvt. Ltd.',
-      currentRole: 'Software Engineer',
-      skills: ['React.js', 'Node.js', 'JavaScript', 'TypeScript', 'AWS', 'Docker', 'Kubernetes', 'Git'],
-      about: 'Experienced software engineer with a strong background in building scalable web applications using modern technologies. Passionate about problem solving and clean code.',
-      status: 'Applied',
-      appliedDate: '25 May 25',
-      dept: 'Engineering',
-      assignedRecruiterId: 'rec-1',
-      assignedByAdmin: 'Amit Sen (Company Admin)',
-      assignedDate: '24 May 25',
-      assignedJobs: ['Senior Software Engineer']
-    },
-    {
-      id: 'c-2',
-      name: 'Anjali Sharma',
-      role: 'Cloud Engineer',
-      email: 'anjali.sharma@gmail.com',
-      phone: '+91 9876543222',
-      location: 'Hyderabad, India',
-      experience: '3.5 Years',
-      currentCompany: 'CloudSpace Systems',
-      currentRole: 'Associate Cloud Analyst',
-      skills: ['AWS', 'Python', 'Docker', 'Terraform', 'CI/CD'],
-      about: 'Cloud professional focused on deploying high-availability architectures and automating software delivery pipelines.',
-      status: 'Under Review',
-      appliedDate: '25 May 25',
-      dept: 'Infrastructure',
-      assignedRecruiterId: 'rec-1',
-      assignedByAdmin: 'Amit Sen (Company Admin)',
-      assignedDate: '24 May 25',
-      assignedJobs: ['Cloud Engineer']
-    },
-    {
-      id: 'c-3',
-      name: 'Vikram Patel',
-      role: 'Tech Lead',
-      email: 'vikram.patel@gmail.com',
-      phone: '+91 9876543233',
-      location: 'Pune, India',
-      experience: '7 Years',
-      currentCompany: 'Platform Core',
-      currentRole: 'Senior Developer',
-      skills: ['Java', 'Spring Boot', 'MySQL', 'System Design'],
-      about: 'Passionate team lead with experience architecting backend systems and spearheading multi-engineer platform squads.',
-      status: 'Shortlisted',
-      appliedDate: '24 May 25',
-      dept: 'Engineering',
-      assignedRecruiterId: 'rec-1',
-      assignedByAdmin: 'Amit Sen (Company Admin)',
-      assignedDate: '24 May 25',
-      assignedJobs: ['Tech Lead']
-    },
-    {
-      id: 'c-4',
-      name: 'Neha Singh',
-      role: 'Data Analyst',
-      email: 'neha.singh@gmail.com',
-      phone: '+91 9876543244',
-      location: 'Bangalore, India',
-      experience: '3 Years',
-      currentCompany: 'DataMiners Inc',
-      currentRole: 'Data Analyst',
-      skills: ['Python', 'SQL', 'Tableau', 'Pandas'],
-      about: 'Detail-oriented data analyst specialized in transforming complex query results into intuitive visual intelligence boards.',
-      status: 'Interview',
-      appliedDate: '24 May 25',
-      dept: 'Data',
-      assignedRecruiterId: 'rec-1',
-      assignedByAdmin: 'Amit Sen (Company Admin)',
-      assignedDate: '24 May 25',
-      assignedJobs: ['Data Analyst']
-    },
-    {
-      id: 'c-5',
-      name: 'Amit Verma',
-      role: 'DevOps Engineer',
-      email: 'amit.verma@gmail.com',
-      phone: '+91 9876543255',
-      location: 'Remote',
-      experience: '4 Years',
-      currentCompany: 'NetworkGrid',
-      currentRole: 'Systems Engineer',
-      skills: ['AWS', 'Jenkins', 'Bash', 'Kubernetes'],
-      about: 'DevOps professional passionate about robust infrastructure automation, safety alerts, and continuous deployment.',
-      status: 'Applied',
-      appliedDate: '23 May 25',
-      dept: 'Infrastructure',
-      assignedRecruiterId: 'rec-1',
-      assignedByAdmin: 'Amit Sen (Company Admin)',
-      assignedDate: '24 May 25',
-      assignedJobs: ['DevOps Engineer']
-    },
-    {
-      id: 'c-6',
-      name: 'Siddharth Jain',
-      role: 'Tech Lead',
-      email: 'siddharth.jain@gmail.com',
-      phone: '+91 9876543266',
-      location: 'Pune, India',
-      experience: '8 Years',
-      currentCompany: 'AppDynamics',
-      currentRole: 'Tech Architect',
-      skills: ['Java', 'Spring', 'Kubernetes', 'Microservices'],
-      about: 'Experienced architect specializing in scalable microservices development and containerized system orchestration.',
-      status: 'Selected',
-      appliedDate: '22 May 25',
-      dept: 'Engineering',
-      assignedRecruiterId: 'rec-1',
-      assignedByAdmin: 'Amit Sen (Company Admin)',
-      assignedDate: '24 May 25',
-      assignedJobs: ['Tech Lead']
-    }
-  ]);
+  }>>([]);
 
   const [recruiterSelectedPipelineJob, setRecruiterSelectedPipelineJob] = useState('All');
+
+  // Real-time Sync for Corporate Recruiter (c_recruiter)
+  React.useEffect(() => {
+    if (role !== 'c_recruiter' || !userProfile?.organizationId) {
+      return;
+    }
+
+    const orgId = userProfile.organizationId;
+
+    // A. Sync Jobs
+    const jobsCol = collection(db, 'organizations_companies', orgId, 'jobs');
+    const unsubscribeJobs = onSnapshot(jobsCol, (snap) => {
+      const jobs = snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || '',
+          dept: data.dept || data.department || '',
+          location: data.location || '',
+          applicationsCount: data.applicationsCount || 0,
+          openings: Number(data.openings) || 0,
+          status: data.status || 'Active',
+          experience: data.experience || '',
+          type: data.type || '',
+          createdBy: data.createdBy || ''
+        };
+      });
+      setRecruiterJobsList(jobs);
+    }, (err) => {
+      console.error("Error syncing recruiter jobs:", err);
+    });
+
+    // B. Sync Applications (Candidates list for corporate recruiter)
+    const appsCol = collection(db, 'organizations_companies', orgId, 'applications');
+    const unsubscribeApps = onSnapshot(appsCol, (snap) => {
+      const apps = snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name || data.candidateName || '',
+          role: data.role || data.jobTitle || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          location: data.location || '',
+          experience: data.experience || '',
+          currentCompany: data.currentCompany || '',
+          currentRole: data.currentRole || '',
+          skills: data.skills || [],
+          about: data.about || '',
+          status: data.status || 'Applied',
+          appliedDate: data.appliedDate || '',
+          dept: data.dept || '',
+          assignedRecruiterId: data.assignedRecruiterId || '',
+          assignedByAdmin: data.assignedByAdmin || '',
+          assignedDate: data.assignedDate || '',
+          assignedJobs: data.assignedJobs || []
+        };
+      });
+      setRecruiterCandidatesList(apps);
+    }, (err) => {
+      console.error("Error syncing recruiter candidates:", err);
+    });
+
+    return () => {
+      unsubscribeJobs();
+      unsubscribeApps();
+    };
+  }, [role, userProfile?.organizationId]);
+
+  // Set first candidate as active when candidates list loads and active ID is empty
+  React.useEffect(() => {
+    if (role !== 'c_recruiter') return;
+    const assigned = recruiterCandidatesList.filter(c => c.assignedRecruiterId === (userProfile?.uid || auth.currentUser?.uid || 'rec-1'));
+    if (assigned.length > 0 && !recruiterActiveCandidateId) {
+      setRecruiterActiveCandidateId(assigned[0].id);
+    }
+  }, [role, recruiterCandidatesList, userProfile?.uid, recruiterActiveCandidateId]);
 
   // Company Manager (c_manager) stateful data
   const [managerJobsList, setManagerJobsList] = useState<Array<{
@@ -433,37 +386,16 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
   const [isManagerCreatingJob, setIsManagerCreatingJob] = useState(false);
 
   // Company Admin (c_admin) stateful data
-  const [adminManagersList, setAdminManagersList] = useState([
-    { id: 'mgr-1', name: 'Amit Verma', dept: 'Engineering', jobs: 24, applications: 1246, hires: 28, status: 'Active' as const, avatar: 'https://picsum.photos/seed/amitverma/100/100', email: 'amit.verma@company.com' },
-    { id: 'mgr-2', name: 'Priya Sharma', dept: 'Engineering', jobs: 18, applications: 982, hires: 22, status: 'Active' as const, avatar: 'https://picsum.photos/seed/priyasharma/100/100', email: 'priya.sharma@company.com' },
-    { id: 'mgr-3', name: 'Rahul Verma', dept: 'Product', jobs: 14, applications: 746, hires: 17, status: 'Active' as const, avatar: 'https://picsum.photos/seed/rahulv/100/100', email: 'rahul.verma@company.com' },
-    { id: 'mgr-4', name: 'Neha Patel', dept: 'Sales', jobs: 10, applications: 508, hires: 12, status: 'Active' as const, avatar: 'https://picsum.photos/seed/nehap/100/100', email: 'neha.patel@company.com' },
-    { id: 'mgr-5', name: 'Sandeep Iyer', dept: 'Operations', jobs: 8, applications: 312, hires: 9, status: 'Active' as const, avatar: 'https://picsum.photos/seed/sandeep/100/100', email: 'sandeep.iyer@company.com' },
-  ]);
-
-  const [adminRecruitersList, setAdminRecruitersList] = useState([
-    { id: 'rec-1', name: 'Priya Sharma', dept: 'Engineering', jobs: 4, applications: 248, selections: 8, status: 'Active' as const, avatar: 'https://picsum.photos/seed/priyasharma/100/100', email: 'priya.sharma@company.com' },
-    { id: 'rec-2', name: 'Rahul Verma', dept: 'Engineering', jobs: 3, applications: 186, selections: 6, status: 'Active' as const, avatar: 'https://picsum.photos/seed/rahulv/100/100', email: 'rahul.verma@company.com' },
-    { id: 'rec-3', name: 'Neha Patel', dept: 'Product', jobs: 5, applications: 310, selections: 9, status: 'Active' as const, avatar: 'https://picsum.photos/seed/nehap/100/100', email: 'neha.patel@company.com' },
-    { id: 'rec-4', name: 'Amit Singh', dept: 'Sales', jobs: 2, applications: 142, selections: 3, status: 'Active' as const, avatar: 'https://picsum.photos/seed/amits/100/100', email: 'amit.singh@company.com' },
-    { id: 'rec-5', name: 'Kavya Reddy', dept: 'Operations', jobs: 3, applications: 167, selections: 4, status: 'Active' as const, avatar: 'https://picsum.photos/seed/kavya/100/100', email: 'kavya.reddy@company.com' },
-  ]);
-
-  const [adminEmployeesList, setAdminEmployeesList] = useState([
-    { id: 'emp-1', name: 'Rahul Kumar', empId: 'EMP10001', dept: 'Engineering', designation: 'Software Engineer', status: 'Active' as const, avatar: 'https://picsum.photos/seed/rahulk/100/100', email: 'rahul.kumar@techsolutions.com' },
-    { id: 'emp-2', name: 'Anjali Sharma', empId: 'EMP10002', dept: 'Engineering', designation: 'Senior Engineer', status: 'Active' as const, avatar: 'https://picsum.photos/seed/anjalis/100/100', email: 'anjali.sharma@techsolutions.com' },
-    { id: 'emp-3', name: 'Vikram Joshi', empId: 'EMP10003', dept: 'Product', designation: 'Product Manager', status: 'Active' as const, avatar: 'https://picsum.photos/seed/vikramj/100/100', email: 'vikram.joshi@techsolutions.com' },
-    { id: 'emp-4', name: 'Sneha Reddy', empId: 'EMP10004', dept: 'Sales', designation: 'Sales Executive', status: 'Active' as const, avatar: 'https://picsum.photos/seed/snehared/100/100', email: 'sneha.reddy@techsolutions.com' },
-    { id: 'emp-5', name: 'Arjun Patel', empId: 'EMP10005', dept: 'Operations', designation: 'Operations Analyst', status: 'Active' as const, avatar: 'https://picsum.photos/seed/arjunp/100/100', email: 'arjun.patel@techsolutions.com' },
-  ]);
-
-  const [adminJobsList, setAdminJobsList] = useState([
-    { id: 'aj-1', title: 'Senior Software Engineer', dept: 'Engineering', location: 'Bangalore, India', applicationsCount: 82, openings: 4, status: 'Active' as const, experience: '4-6 Years', type: 'Full-time' },
-    { id: 'aj-2', title: 'Cloud Engineer', dept: 'Engineering', location: 'Hyderabad, India', applicationsCount: 41, openings: 2, status: 'Active' as const, experience: '3-5 Years', type: 'Full-time' },
-    { id: 'aj-3', title: 'Tech Lead', dept: 'Engineering', location: 'Pune, India', applicationsCount: 26, openings: 1, status: 'Active' as const, experience: '6-8 Years', type: 'Full-time' },
-    { id: 'aj-4', title: 'Data Scientist', dept: 'Data Science', location: 'Bangalore, India', applicationsCount: 18, openings: 2, status: 'Active' as const, experience: '4-6 Years', type: 'Full-time' },
-    { id: 'aj-5', title: 'Product Manager', dept: 'Product', location: 'Remote', applicationsCount: 15, openings: 1, status: 'Draft' as const, experience: '6-8 Years', type: 'Full-time' },
-  ]);
+  const [adminManagersList, setAdminManagersList] = useState<any[]>([]);
+  const [adminRecruitersList, setAdminRecruitersList] = useState<any[]>([]);
+  const [adminEmployeesList, setAdminEmployeesList] = useState<any[]>([]);
+  const [adminJobsList, setAdminJobsList] = useState<any[]>([]);
+  const [adminDepartmentsList, setAdminDepartmentsList] = useState<any[]>([]);
+  const [companySettings, setCompanySettings] = useState<any>({});
+  const [companyData, setCompanyData] = useState<any>(null);
+  const [adminProfileData, setAdminProfileData] = useState<any>(null);
+  const [activityList, setActivityList] = useState<any[]>([]);
+  const [applicationsList, setApplicationsList] = useState<any[]>([]);
 
   // 1. Marketplace Mock Data & States
   const [myRequirements, setMyRequirements] = useState([
@@ -816,6 +748,195 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
   ]);
 
   // ==========================================
+  // COMPANY ADMIN FIRESTORE LISTENERS & AUTO-SEEDERS
+  // ==========================================
+  
+  // 1. Root Company Document standardization & real-time Sync
+  React.useEffect(() => {
+    if (role !== 'c_admin' || !userProfile?.organizationId) {
+      return;
+    }
+
+    const docRef = doc(db, 'organizations_companies', userProfile.organizationId);
+    const unsubscribe = onSnapshot(docRef, (snap) => {
+      if (snap.exists()) {
+        setCompanyData({ id: snap.id, ...snap.data() });
+      } else {
+        // Fallback locally only - ZERO automatic seeding writes
+        const defaultCompany = {
+          organizationId: userProfile.organizationId,
+          organizationName: 'Tech Solutions Pvt. Ltd.',
+          organizationType: 'company',
+          adminUid: userProfile.uid || '',
+          status: 'Active',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          category: 'Technology, Information and Internet',
+          primarySegment: 'Software Development',
+          website: 'www.techsolutions.com',
+          hqLocation: 'Bangalore, India',
+          foundedYear: '2015',
+          workforceVolume: '1001 - 5000 Employees',
+          supportEmail: 'contact@techsolutions.com',
+          enableAutoSuggestions: true,
+          digestFrequency: 'Daily',
+          portalStatus: 'Active'
+        };
+        setCompanyData(defaultCompany);
+      }
+    }, (error) => {
+      console.error("Error syncing company document:", error);
+    });
+    return () => unsubscribe();
+  }, [role, userProfile?.organizationId]);
+
+  // 2. Admin Personal Profile real-time Sync
+  React.useEffect(() => {
+    if (role !== 'c_admin' || !userProfile?.organizationId || !userProfile?.uid) {
+      return;
+    }
+
+    const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'admins', userProfile.uid);
+    const unsubscribe = onSnapshot(docRef, (snap) => {
+      if (snap.exists()) {
+        setAdminProfileData({ id: snap.id, ...snap.data() });
+      } else {
+        // Fallback locally only - ZERO automatic seeding writes
+        const defaultAdmin = {
+          uid: userProfile.uid,
+          fullName: userProfile.fullName || userProfile.displayName || 'Vikram Singh',
+          name: userProfile.fullName || userProfile.displayName || 'Vikram Singh',
+          empId: 'ADM10001',
+          designation: 'Company Administrator',
+          department: 'Administration',
+          dept: 'Administration',
+          email: userProfile.email || 'admin@techsolutions.com',
+          phoneNumber: userProfile.phoneNumber || '+91 98765 43210',
+          phone: userProfile.phoneNumber || '+91 98765 43210',
+          status: 'Active',
+          createdAt: new Date().toISOString()
+        };
+        setAdminProfileData(defaultAdmin);
+      }
+    }, (error) => {
+      console.error("Error syncing admin profile:", error);
+    });
+    return () => unsubscribe();
+  }, [role, userProfile?.organizationId, userProfile?.uid]);
+
+  // 3. Departments real-time Sync
+  React.useEffect(() => {
+    if (role !== 'c_admin' || !userProfile?.organizationId) {
+      return;
+    }
+
+    const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'departments');
+    const unsubscribe = onSnapshot(colRef, (snapshot) => {
+      const depts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAdminDepartmentsList(depts);
+    }, (error) => {
+      console.error("Error syncing departments:", error);
+    });
+    return () => unsubscribe();
+  }, [role, userProfile?.organizationId]);
+
+  // 4. Recruiters real-time Sync
+  React.useEffect(() => {
+    if (role !== 'c_admin' || !userProfile?.organizationId) {
+      return;
+    }
+
+    const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'recruiters');
+    const unsubscribe = onSnapshot(colRef, (snapshot) => {
+      const recruiters = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAdminRecruitersList(recruiters);
+    }, (error) => {
+      console.error("Error syncing recruiters:", error);
+    });
+    return () => unsubscribe();
+  }, [role, userProfile?.organizationId]);
+
+  // 5. Employees real-time Sync
+  React.useEffect(() => {
+    if (role !== 'c_admin' || !userProfile?.organizationId) {
+      return;
+    }
+
+    const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'employees');
+    const unsubscribe = onSnapshot(colRef, (snapshot) => {
+      const emps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAdminEmployeesList(emps);
+    }, (error) => {
+      console.error("Error syncing employees:", error);
+    });
+    return () => unsubscribe();
+  }, [role, userProfile?.organizationId]);
+
+  // 6. Managers real-time Sync
+  React.useEffect(() => {
+    if (role !== 'c_admin' || !userProfile?.organizationId) {
+      return;
+    }
+
+    const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'managers');
+    const unsubscribe = onSnapshot(colRef, (snapshot) => {
+      const mgrs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAdminManagersList(mgrs);
+    }, (error) => {
+      console.error("Error syncing managers:", error);
+    });
+    return () => unsubscribe();
+  }, [role, userProfile?.organizationId]);
+
+  // 7. Jobs real-time Sync
+  React.useEffect(() => {
+    if (role !== 'c_admin' || !userProfile?.organizationId) {
+      return;
+    }
+
+    const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'jobs');
+    const unsubscribe = onSnapshot(colRef, (snapshot) => {
+      const jobs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAdminJobsList(jobs);
+    }, (error) => {
+      console.error("Error syncing jobs:", error);
+    });
+    return () => unsubscribe();
+  }, [role, userProfile?.organizationId]);
+
+  // 8. Recent Activities Sync
+  React.useEffect(() => {
+    if (role !== 'c_admin' || !userProfile?.organizationId) {
+      return;
+    }
+
+    const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'activity');
+    const unsubscribe = onSnapshot(colRef, (snapshot) => {
+      const acts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setActivityList(acts);
+    }, (error) => {
+      console.error("Error syncing activities:", error);
+    });
+    return () => unsubscribe();
+  }, [role, userProfile?.organizationId]);
+
+  // 9. Applications real-time Sync
+  React.useEffect(() => {
+    if (role !== 'c_admin' || !userProfile?.organizationId) {
+      return;
+    }
+
+    const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'applications');
+    const unsubscribe = onSnapshot(colRef, (snapshot) => {
+      const apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setApplicationsList(apps);
+    }, (error) => {
+      console.error("Error syncing applications:", error);
+    });
+    return () => unsubscribe();
+  }, [role, userProfile?.organizationId]);
+
+  // ==========================================
   // HANDLERS
   // ==========================================
 
@@ -912,6 +1033,273 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
 
     return () => unsub();
   }, []);
+
+  const handleInitializeDemoWorkspace = async () => {
+    if (!userProfile?.organizationId) return;
+
+    try {
+      // 1. Root Company Doc
+      const docRef = doc(db, 'organizations_companies', userProfile.organizationId);
+      const defaultCompany = {
+        organizationId: userProfile.organizationId,
+        organizationName: 'Tech Solutions Pvt. Ltd.',
+        organizationType: 'company',
+        adminUid: userProfile.uid || '',
+        status: 'Active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        category: 'Technology, Information and Internet',
+        primarySegment: 'Software Development',
+        website: 'www.techsolutions.com',
+        hqLocation: 'Bangalore, India',
+        foundedYear: '2015',
+        workforceVolume: '1001 - 5000 Employees',
+        supportEmail: 'contact@techsolutions.com',
+        enableAutoSuggestions: true,
+        digestFrequency: 'Daily',
+        portalStatus: 'Active'
+      };
+      await setDoc(docRef, defaultCompany);
+
+      // 2. Admin Personal Profile
+      if (userProfile.uid) {
+        const adminDocRef = doc(db, 'organizations_companies', userProfile.organizationId, 'admins', userProfile.uid);
+        const defaultAdmin = {
+          uid: userProfile.uid,
+          fullName: userProfile.fullName || userProfile.displayName || 'Vikram Singh',
+          name: userProfile.fullName || userProfile.displayName || 'Vikram Singh',
+          empId: 'ADM10001',
+          designation: 'Company Administrator',
+          department: 'Administration',
+          dept: 'Administration',
+          email: userProfile.email || 'admin@techsolutions.com',
+          phoneNumber: userProfile.phoneNumber || '+91 98765 43210',
+          phone: userProfile.phoneNumber || '+91 98765 43210',
+          status: 'Active',
+          createdAt: new Date().toISOString()
+        };
+        await setDoc(adminDocRef, defaultAdmin);
+      }
+
+      // 3. Departments
+      const deptCol = collection(db, 'organizations_companies', userProfile.organizationId, 'departments');
+      const deptDefaults = [
+        { name: 'Engineering', description: 'Software design, backend services, cloud infrastructure development and engineering QA division.', createdAt: new Date().toISOString() },
+        { name: 'Product', description: 'Product roadmap definitions, requirement specifications, UI/UX design and wireframing.', createdAt: new Date().toISOString() },
+        { name: 'Data Science', description: 'Big data processing, analytics, predictive models, machine learning algorithms and dashboard visualization.', createdAt: new Date().toISOString() },
+        { name: 'Sales', description: 'Enterprise accounts development, product presentation, contract negotiation and sales pipeline acceleration.', createdAt: new Date().toISOString() },
+        { name: 'Operations', description: 'Business alignment, resource scheduling, corporate workflow automation and customer deployment support.', createdAt: new Date().toISOString() }
+      ];
+      for (const dept of deptDefaults) {
+        await addDoc(deptCol, dept);
+      }
+
+      // 4. Recruiters
+      const recCol = collection(db, 'organizations_companies', userProfile.organizationId, 'recruiters');
+      const recDefaults = [
+        { name: 'Priya Sharma', dept: 'Engineering', jobs: 4, applications: 248, selections: 8, status: 'Active', avatar: 'https://picsum.photos/seed/priyasharma/100/100', email: 'priya.sharma@company.com' },
+        { name: 'Rahul Verma', dept: 'Engineering', jobs: 3, applications: 186, selections: 6, status: 'Active', avatar: 'https://picsum.photos/seed/rahulv/100/100', email: 'rahul.verma@company.com' },
+        { name: 'Neha Patel', dept: 'Product', jobs: 5, applications: 310, selections: 9, status: 'Active', avatar: 'https://picsum.photos/seed/nehap/100/100', email: 'neha.patel@company.com' },
+        { name: 'Amit Singh', dept: 'Sales', jobs: 2, applications: 142, selections: 3, status: 'Active', avatar: 'https://picsum.photos/seed/amits/100/100', email: 'amit.singh@company.com' },
+        { name: 'Kavya Reddy', dept: 'Operations', jobs: 3, applications: 167, selections: 4, status: 'Active', avatar: 'https://picsum.photos/seed/kavya/100/100', email: 'kavya.reddy@company.com' }
+      ];
+      for (const rec of recDefaults) {
+        await addDoc(recCol, rec);
+      }
+
+      // 5. Employees
+      const empCol = collection(db, 'organizations_companies', userProfile.organizationId, 'employees');
+      const empDefaults = [
+        { name: 'Rahul Kumar', empId: 'EMP10001', dept: 'Engineering', designation: 'Software Engineer', status: 'Active', avatar: 'https://picsum.photos/seed/rahulk/100/100', email: 'rahul.kumar@techsolutions.com', createdAt: new Date().toISOString() },
+        { name: 'Anjali Sharma', empId: 'EMP10002', dept: 'Engineering', designation: 'Senior Engineer', status: 'Active', avatar: 'https://picsum.photos/seed/anjalis/100/100', email: 'anjali.sharma@techsolutions.com', createdAt: new Date().toISOString() },
+        { name: 'Vikram Joshi', empId: 'EMP10003', dept: 'Product', designation: 'Product Manager', status: 'Active', avatar: 'https://picsum.photos/seed/vikramj/100/100', email: 'vikram.joshi@techsolutions.com', createdAt: new Date().toISOString() },
+        { name: 'Sneha Reddy', empId: 'EMP10004', dept: 'Sales', designation: 'Sales Executive', status: 'Active', avatar: 'https://picsum.photos/seed/snehared/100/100', email: 'sneha.reddy@techsolutions.com', createdAt: new Date().toISOString() },
+        { name: 'Arjun Patel', empId: 'EMP10005', dept: 'Operations', designation: 'Operations Analyst', status: 'Active', avatar: 'https://picsum.photos/seed/arjunp/100/100', email: 'arjun.patel@techsolutions.com', createdAt: new Date().toISOString() }
+      ];
+      for (const emp of empDefaults) {
+        await addDoc(empCol, emp);
+      }
+
+      // 6. Managers
+      const mgrCol = collection(db, 'organizations_companies', userProfile.organizationId, 'managers');
+      const mgrDefaults = [
+        { name: 'Amit Verma', dept: 'Engineering', jobs: 24, applications: 1246, hires: 28, status: 'Active', avatar: 'https://picsum.photos/seed/amitverma/100/100', email: 'amit.verma@company.com', createdAt: new Date().toISOString() },
+        { name: 'Priya Sharma', dept: 'Engineering', jobs: 18, applications: 982, hires: 22, status: 'Active', avatar: 'https://picsum.photos/seed/priyasharma/100/100', email: 'priya.sharma@company.com', createdAt: new Date().toISOString() },
+        { name: 'Rahul Verma', dept: 'Product', jobs: 14, applications: 746, hires: 17, status: 'Active', avatar: 'https://picsum.photos/seed/rahulv/100/100', email: 'rahul.verma@company.com', createdAt: new Date().toISOString() },
+        { name: 'Neha Patel', dept: 'Sales', jobs: 10, applications: 508, hires: 12, status: 'Active', avatar: 'https://picsum.photos/seed/nehap/100/100', email: 'neha.patel@company.com', createdAt: new Date().toISOString() },
+        { name: 'Sandeep Iyer', dept: 'Operations', jobs: 8, applications: 312, hires: 9, status: 'Active', avatar: 'https://picsum.photos/seed/sandeep/100/100', email: 'sandeep.iyer@company.com', createdAt: new Date().toISOString() }
+      ];
+      for (const mgr of mgrDefaults) {
+        await addDoc(mgrCol, mgr);
+      }
+
+      // 7. Jobs
+      const jobCol = collection(db, 'organizations_companies', userProfile.organizationId, 'jobs');
+      const jobDefaults = [
+        { title: 'Senior Software Engineer', dept: 'Engineering', location: 'Bangalore, India', applicationsCount: 82, openings: 4, status: 'Active', experience: '4-6 Years', type: 'Full-time', createdAt: new Date().toISOString() },
+        { title: 'Cloud Engineer', dept: 'Engineering', location: 'Hyderabad, India', applicationsCount: 41, openings: 2, status: 'Active', experience: '3-5 Years', type: 'Full-time', createdAt: new Date().toISOString() },
+        { title: 'Tech Lead', dept: 'Engineering', location: 'Pune, India', applicationsCount: 26, openings: 1, status: 'Active', experience: '6-8 Years', type: 'Full-time', createdAt: new Date().toISOString() },
+        { title: 'Data Scientist', dept: 'Data Science', location: 'Bangalore, India', applicationsCount: 18, openings: 2, status: 'Active', experience: '4-6 Years', type: 'Full-time', createdAt: new Date().toISOString() },
+        { title: 'Product Manager', dept: 'Product', location: 'Remote', applicationsCount: 15, openings: 1, status: 'Draft', experience: '6-8 Years', type: 'Full-time', createdAt: new Date().toISOString() }
+      ];
+      for (const job of jobDefaults) {
+        await addDoc(jobCol, job);
+      }
+
+      // 8. Recent Activities
+      const actCol = collection(db, 'organizations_companies', userProfile.organizationId, 'activity');
+      const actDefaults = [
+        { userName: 'Amit Verma', action: 'created a new job', subject: 'Senior Software Engineer', time: '10:30 AM', avatar: 'https://picsum.photos/seed/amitverma/100/100', createdAt: new Date().toISOString() },
+        { userName: 'Priya Sharma', action: 'submitted a candidate', subject: 'Rahul Kumar for Tech Lead', time: '09:45 AM', avatar: 'https://picsum.photos/seed/priyasharma/100/100', createdAt: new Date().toISOString() },
+        { userName: 'Anjali Sharma', action: 'applied for', subject: 'Cloud Engineer', time: '09:15 AM', avatar: 'https://picsum.photos/seed/anjali/100/100', createdAt: new Date().toISOString() },
+        { userName: 'Rahul Verma', action: 'closed a job', subject: 'Data Analyst', time: 'Yesterday', avatar: 'https://picsum.photos/seed/rahulv/100/100', createdAt: new Date().toISOString() },
+        { userName: 'Neha Patel', action: 'hired a candidate', subject: 'Vikram Joshi for DevOps Engineer', time: 'Yesterday', avatar: 'https://picsum.photos/seed/nehap/100/100', createdAt: new Date().toISOString() }
+      ];
+      for (const act of actDefaults) {
+        await addDoc(actCol, act);
+      }
+
+      // 9. Applications (recruiter candidates)
+      const appsCol = collection(db, 'organizations_companies', userProfile.organizationId, 'applications');
+      const currentRecUid = userProfile?.uid || auth.currentUser?.uid || 'rec-1';
+      const appDefaults = [
+        {
+          name: 'Rahul Kumar',
+          candidateName: 'Rahul Kumar',
+          role: 'Senior Software Engineer',
+          jobTitle: 'Senior Software Engineer',
+          email: 'rahul.kumar@gmail.com',
+          phone: '+91 9876543210',
+          location: 'Bangalore, India',
+          experience: '4.5 Years',
+          currentCompany: 'Tech Solutions Pvt. Ltd.',
+          currentRole: 'Software Engineer',
+          skills: ['React.js', 'Node.js', 'JavaScript', 'TypeScript', 'AWS', 'Docker', 'Kubernetes', 'Git'],
+          about: 'Experienced software engineer with a strong background in building scalable web applications using modern technologies. Passionate about problem solving and clean code.',
+          status: 'Applied',
+          appliedDate: '25 May 25',
+          dept: 'Engineering',
+          assignedRecruiterId: currentRecUid,
+          assignedByAdmin: 'Amit Sen (Company Admin)',
+          assignedDate: '24 May 25',
+          assignedJobs: ['Senior Software Engineer']
+        },
+        {
+          name: 'Anjali Sharma',
+          candidateName: 'Anjali Sharma',
+          role: 'Cloud Engineer',
+          jobTitle: 'Cloud Engineer',
+          email: 'anjali.sharma@gmail.com',
+          phone: '+91 9876543222',
+          location: 'Hyderabad, India',
+          experience: '3.5 Years',
+          currentCompany: 'CloudSpace Systems',
+          currentRole: 'Associate Cloud Analyst',
+          skills: ['AWS', 'Python', 'Docker', 'Terraform', 'CI/CD'],
+          about: 'Cloud professional focused on deploying high-availability architectures and automating software delivery pipelines.',
+          status: 'Under Review',
+          appliedDate: '25 May 25',
+          dept: 'Infrastructure',
+          assignedRecruiterId: currentRecUid,
+          assignedByAdmin: 'Amit Sen (Company Admin)',
+          assignedDate: '24 May 25',
+          assignedJobs: ['Cloud Engineer']
+        },
+        {
+          name: 'Vikram Patel',
+          candidateName: 'Vikram Patel',
+          role: 'Tech Lead',
+          jobTitle: 'Tech Lead',
+          email: 'vikram.patel@gmail.com',
+          phone: '+91 9876543233',
+          location: 'Pune, India',
+          experience: '7 Years',
+          currentCompany: 'Platform Core',
+          currentRole: 'Senior Developer',
+          skills: ['Java', 'Spring Boot', 'MySQL', 'System Design'],
+          about: 'Passionate team lead with experience architecting backend systems and spearheading multi-engineer platform squads.',
+          status: 'Shortlisted',
+          appliedDate: '24 May 25',
+          dept: 'Engineering',
+          assignedRecruiterId: currentRecUid,
+          assignedByAdmin: 'Amit Sen (Company Admin)',
+          assignedDate: '24 May 25',
+          assignedJobs: ['Tech Lead']
+        },
+        {
+          name: 'Neha Singh',
+          candidateName: 'Neha Singh',
+          role: 'Data Analyst',
+          jobTitle: 'Data Analyst',
+          email: 'neha.singh@gmail.com',
+          phone: '+91 9876543244',
+          location: 'Bangalore, India',
+          experience: '3 Years',
+          currentCompany: 'DataMiners Inc',
+          currentRole: 'Data Analyst',
+          skills: ['Python', 'SQL', 'Tableau', 'Pandas'],
+          about: 'Detail-oriented data analyst specialized in transforming complex query results into intuitive visual intelligence boards.',
+          status: 'Interview',
+          appliedDate: '24 May 25',
+          dept: 'Data',
+          assignedRecruiterId: currentRecUid,
+          assignedByAdmin: 'Amit Sen (Company Admin)',
+          assignedDate: '24 May 25',
+          assignedJobs: ['Data Analyst']
+        },
+        {
+          name: 'Amit Verma',
+          candidateName: 'Amit Verma',
+          role: 'DevOps Engineer',
+          jobTitle: 'DevOps Engineer',
+          email: 'amit.verma@gmail.com',
+          phone: '+91 9876543255',
+          location: 'Remote',
+          experience: '4 Years',
+          currentCompany: 'NetworkGrid',
+          currentRole: 'Systems Engineer',
+          skills: ['AWS', 'Jenkins', 'Bash', 'Kubernetes'],
+          about: 'DevOps professional passionate about robust infrastructure automation, safety alerts, and continuous deployment.',
+          status: 'Applied',
+          appliedDate: '23 May 25',
+          dept: 'Infrastructure',
+          assignedRecruiterId: currentRecUid,
+          assignedByAdmin: 'Amit Sen (Company Admin)',
+          assignedDate: '24 May 25',
+          assignedJobs: ['DevOps Engineer']
+        },
+        {
+          name: 'Siddharth Jain',
+          candidateName: 'Siddharth Jain',
+          role: 'Tech Lead',
+          jobTitle: 'Tech Lead',
+          email: 'siddharth.jain@gmail.com',
+          phone: '+91 9876543266',
+          location: 'Pune, India',
+          experience: '8 Years',
+          currentCompany: 'AppDynamics',
+          currentRole: 'Tech Architect',
+          skills: ['Java', 'Spring', 'Kubernetes', 'Microservices'],
+          about: 'Experienced architect specializing in scalable microservices development and containerized system orchestration.',
+          status: 'Selected',
+          appliedDate: '22 May 25',
+          dept: 'Engineering',
+          assignedRecruiterId: currentRecUid,
+          assignedByAdmin: 'Amit Sen (Company Admin)',
+          assignedDate: '24 May 25',
+          assignedJobs: ['Tech Lead']
+        }
+      ];
+      for (const app of appDefaults) {
+        await addDoc(appsCol, app);
+      }
+
+      setSuccessMsg?.('Corporate workspace initialized with high-fidelity demo data.');
+    } catch (e) {
+      console.error("Error initializing demo workspace:", e);
+      setErrorMsg?.('Failed to initialize demo workspace.');
+    }
+  };
 
   const handleCreateRequirement = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1867,23 +2255,60 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
             <CompanyAdminDashboard 
               onNavigate={(tab) => setActiveTab?.(tab)}
               onAddManagerClick={() => setActiveTab?.('managers')}
+              managersList={adminManagersList}
+              recruitersList={adminRecruitersList}
+              employeesList={adminEmployeesList}
+              jobsList={adminJobsList}
+              departmentsList={adminDepartmentsList}
+              activityList={activityList}
+              applicationsList={applicationsList}
+              onInitializeDemoWorkspace={handleInitializeDemoWorkspace}
             />
           )}
 
           {activeTab === 'managers' && (
             <CompanyAdminManagers 
               managersList={adminManagersList}
-              onAddManager={(newMgr) => {
-                const id = `mgr-${adminManagersList.length + 1}`;
-                setAdminManagersList([...adminManagersList, { id, ...newMgr }]);
+              onAddManager={async (newMgr) => {
+                if (!userProfile?.organizationId) return false;
+                try {
+                  const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'managers');
+                  await addDoc(colRef, {
+                    ...newMgr,
+                    createdAt: new Date().toISOString()
+                  });
+                  setSuccessMsg?.('Manager profile added.');
+                  return true;
+                } catch (e) {
+                  console.error("Error adding manager:", e);
+                  return false;
+                }
               }}
-              onEditManager={(updatedMgr) => {
-                setAdminManagersList(adminManagersList.map(m => m.id === updatedMgr.id ? updatedMgr : m));
-                setSuccessMsg?.('Manager updated successfully!');
+              onEditManager={async (updatedMgr) => {
+                if (!userProfile?.organizationId) return false;
+                try {
+                  const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'managers', updatedMgr.id);
+                  const { id, ...data } = updatedMgr;
+                  await updateDoc(docRef, {
+                    ...data,
+                    updatedAt: new Date().toISOString()
+                  });
+                  setSuccessMsg?.('Manager updated successfully!');
+                  return true;
+                } catch (e) {
+                  console.error("Error updating manager:", e);
+                  return false;
+                }
               }}
-              onDeleteManager={(mgrId) => {
-                setAdminManagersList(adminManagersList.filter(m => m.id !== mgrId));
-                setSuccessMsg?.('Manager profile deleted.');
+              onDeleteManager={async (mgrId) => {
+                if (!userProfile?.organizationId) return;
+                try {
+                  const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'managers', mgrId);
+                  await deleteDoc(docRef);
+                  setSuccessMsg?.('Manager profile deleted.');
+                } catch (e) {
+                  console.error("Error deleting manager:", e);
+                }
               }}
             />
           )}
@@ -1891,17 +2316,52 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
           {activeTab === 'recruiters' && (
             <CompanyAdminRecruiters 
               recruitersList={adminRecruitersList}
-              onAddRecruiter={(newRec) => {
-                const id = `rec-${adminRecruitersList.length + 1}`;
-                setAdminRecruitersList([...adminRecruitersList, { id, ...newRec }]);
+              onAddRecruiter={async (newRec) => {
+                if (!userProfile?.organizationId) return false;
+                // No duplicate recruiter documents based on unique email check
+                const duplicate = adminRecruitersList.some(r => r.email?.toLowerCase() === newRec.email?.toLowerCase());
+                if (duplicate) {
+                  alert(`A recruiter with email ${newRec.email} already exists.`);
+                  return false;
+                }
+                try {
+                  const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'recruiters');
+                  await addDoc(colRef, {
+                    ...newRec,
+                    createdAt: new Date().toISOString()
+                  });
+                  setSuccessMsg?.('Recruiter added successfully.');
+                  return true;
+                } catch (e) {
+                  console.error("Error adding recruiter:", e);
+                  return false;
+                }
               }}
-              onEditRecruiter={(updatedRec) => {
-                setAdminRecruitersList(adminRecruitersList.map(r => r.id === updatedRec.id ? updatedRec : r));
-                setSuccessMsg?.('Recruiter updated successfully!');
+              onEditRecruiter={async (updatedRec) => {
+                if (!userProfile?.organizationId) return false;
+                try {
+                  const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'recruiters', updatedRec.id);
+                  const { id, ...data } = updatedRec;
+                  await updateDoc(docRef, {
+                    ...data,
+                    updatedAt: new Date().toISOString()
+                  });
+                  setSuccessMsg?.('Recruiter updated successfully!');
+                  return true;
+                } catch (e) {
+                  console.error("Error updating recruiter:", e);
+                  return false;
+                }
               }}
-              onDeleteRecruiter={(recId) => {
-                setAdminRecruitersList(adminRecruitersList.filter(r => r.id !== recId));
-                setSuccessMsg?.('Recruiter profile deleted.');
+              onDeleteRecruiter={async (recId) => {
+                if (!userProfile?.organizationId) return;
+                try {
+                  const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'recruiters', recId);
+                  await deleteDoc(docRef);
+                  setSuccessMsg?.('Recruiter profile deleted.');
+                } catch (e) {
+                  console.error("Error deleting recruiter:", e);
+                }
               }}
             />
           )}
@@ -1909,24 +2369,75 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
           {activeTab === 'employees' && (
             <CompanyAdminEmployees 
               employeesList={adminEmployeesList}
-              onAddEmployee={(newEmp) => {
-                const id = `emp-${adminEmployeesList.length + 1}`;
-                setAdminEmployeesList([...adminEmployeesList, { id, ...newEmp }]);
+              onAddEmployee={async (newEmp) => {
+                if (!userProfile?.organizationId) return false;
+                // No duplicate employee documents
+                const emailExists = adminEmployeesList.some(e => e.email?.toLowerCase() === newEmp.email?.toLowerCase());
+                const empIdExists = adminEmployeesList.some(e => e.empId?.toLowerCase() === newEmp.empId?.toLowerCase());
+                if (emailExists || empIdExists) {
+                  alert(`An employee with that email or employee ID already exists.`);
+                  return false;
+                }
+                try {
+                  const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'employees');
+                  await addDoc(colRef, {
+                    ...newEmp,
+                    createdAt: new Date().toISOString()
+                  });
+                  setSuccessMsg?.('Employee registered successfully.');
+                  return true;
+                } catch (e) {
+                  console.error("Error registering employee:", e);
+                  return false;
+                }
               }}
-              onEditEmployee={(updatedEmp) => {
-                setAdminEmployeesList(adminEmployeesList.map(e => e.id === updatedEmp.id ? updatedEmp : e));
-                setSuccessMsg?.('Employee updated successfully!');
+              onEditEmployee={async (updatedEmp) => {
+                if (!userProfile?.organizationId) return false;
+                try {
+                  const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'employees', updatedEmp.id);
+                  const { id, ...data } = updatedEmp;
+                  await updateDoc(docRef, {
+                    ...data,
+                    updatedAt: new Date().toISOString()
+                  });
+                  setSuccessMsg?.('Employee profile updated successfully!');
+                  return true;
+                } catch (e) {
+                  console.error("Error updating employee:", e);
+                  return false;
+                }
               }}
-              onDeleteEmployee={(empId) => {
-                setAdminEmployeesList(adminEmployeesList.filter(e => e.id !== empId));
-                setSuccessMsg?.('Employee profile deleted.');
+              onDeleteEmployee={async (empId) => {
+                if (!userProfile?.organizationId) return;
+                try {
+                  const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'employees', empId);
+                  await deleteDoc(docRef);
+                  setSuccessMsg?.('Employee profile deleted.');
+                } catch (e) {
+                  console.error("Error deleting employee:", e);
+                }
               }}
-              onBulkUpload={(bulkEmployees) => {
-                const employeesWithIds = bulkEmployees.map((e, idx) => ({
-                  id: `emp-bulk-${Date.now()}-${idx}`,
-                  ...e
-                }));
-                setAdminEmployeesList([...adminEmployeesList, ...employeesWithIds]);
+              onBulkUpload={async (bulkEmployees) => {
+                if (!userProfile?.organizationId) return;
+                try {
+                  const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'employees');
+                  let count = 0;
+                  for (const emp of bulkEmployees) {
+                    const duplicate = adminEmployeesList.some(
+                      e => e.email?.toLowerCase() === emp.email?.toLowerCase() || e.empId?.toLowerCase() === emp.empId?.toLowerCase()
+                    );
+                    if (!duplicate) {
+                      await addDoc(colRef, {
+                        ...emp,
+                        createdAt: new Date().toISOString()
+                      });
+                      count++;
+                    }
+                  }
+                  setSuccessMsg?.(`Bulk upload processed successfully! Registered ${count} new profiles.`);
+                } catch (e) {
+                  console.error("Error bulk uploading employees:", e);
+                }
               }}
             />
           )}
@@ -1934,17 +2445,47 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
           {activeTab === 'jobs' && (
             <CompanyAdminJobs 
               jobsList={adminJobsList}
-              onAddJob={(newJob) => {
-                const id = `aj-${adminJobsList.length + 1}`;
-                setAdminJobsList([...adminJobsList, { id, applicationsCount: 0, ...newJob }]);
+              onAddJob={async (newJob) => {
+                if (!userProfile?.organizationId) return false;
+                try {
+                  const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'jobs');
+                  await addDoc(colRef, {
+                    ...newJob,
+                    applicationsCount: 0,
+                    createdAt: new Date().toISOString()
+                  });
+                  setSuccessMsg?.('Job requisition created successfully!');
+                  return true;
+                } catch (e) {
+                  console.error("Error creating job requisition:", e);
+                  return false;
+                }
               }}
-              onEditJob={(updatedJob) => {
-                setAdminJobsList(adminJobsList.map(j => j.id === updatedJob.id ? updatedJob : j));
-                setSuccessMsg?.('Job requisition updated.');
+              onEditJob={async (updatedJob) => {
+                if (!userProfile?.organizationId) return false;
+                try {
+                  const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'jobs', updatedJob.id);
+                  const { id, ...data } = updatedJob;
+                  await updateDoc(docRef, {
+                    ...data,
+                    updatedAt: new Date().toISOString()
+                  });
+                  setSuccessMsg?.('Job requisition updated.');
+                  return true;
+                } catch (e) {
+                  console.error("Error updating job requisition:", e);
+                  return false;
+                }
               }}
-              onDeleteJob={(jobId) => {
-                setAdminJobsList(adminJobsList.filter(j => j.id !== jobId));
-                setSuccessMsg?.('Job requisition deleted.');
+              onDeleteJob={async (jobId) => {
+                if (!userProfile?.organizationId) return;
+                try {
+                  const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'jobs', jobId);
+                  await deleteDoc(docRef);
+                  setSuccessMsg?.('Job requisition deleted.');
+                } catch (e) {
+                  console.error("Error deleting job requisition:", e);
+                }
               }}
             />
           )}
@@ -1958,6 +2499,83 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
               onNavigate={(tab) => setActiveTab?.(tab)}
               onAddManagerClick={() => setActiveTab?.('managers')}
               onAddRecruiterClick={() => setActiveTab?.('recruiters')}
+              companyData={companyData}
+              adminProfileData={adminProfileData}
+            />
+          )}
+
+          {activeTab === 'departments' && (
+            <CompanyAdminDepartments 
+              departmentsList={adminDepartmentsList}
+              employeesList={adminEmployeesList}
+              onAddDepartment={async (newDept) => {
+                if (!userProfile?.organizationId) return false;
+                // Prevent duplicate department names
+                const duplicate = adminDepartmentsList.some(d => d.name?.toLowerCase() === newDept.name?.toLowerCase());
+                if (duplicate) {
+                  alert(`A department with name ${newDept.name} already exists.`);
+                  return false;
+                }
+                try {
+                  const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'departments');
+                  await addDoc(colRef, {
+                    ...newDept,
+                    createdAt: new Date().toISOString()
+                  });
+                  setSuccessMsg?.('Department created successfully!');
+                  return true;
+                } catch (e) {
+                  console.error("Error creating department:", e);
+                  return false;
+                }
+              }}
+              onEditDepartment={async (updatedDept) => {
+                if (!userProfile?.organizationId) return false;
+                try {
+                  const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'departments', updatedDept.id);
+                  const { id, ...data } = updatedDept;
+                  await updateDoc(docRef, {
+                    ...data,
+                    updatedAt: new Date().toISOString()
+                  });
+                  setSuccessMsg?.('Department details updated.');
+                  return true;
+                } catch (e) {
+                  console.error("Error updating department:", e);
+                  return false;
+                }
+              }}
+              onDeleteDepartment={async (deptId) => {
+                if (!userProfile?.organizationId) return;
+                try {
+                  const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'departments', deptId);
+                  await deleteDoc(docRef);
+                  setSuccessMsg?.('Department deleted successfully.');
+                } catch (e) {
+                  console.error("Error deleting department:", e);
+                }
+              }}
+            />
+          )}
+
+          {activeTab === 'settings' && (
+            <CompanyAdminSettings 
+              initialSettings={companyData || {}}
+              onSaveSettings={async (settings) => {
+                if (!userProfile?.organizationId) return false;
+                try {
+                  const docRef = doc(db, 'organizations_companies', userProfile.organizationId);
+                  await setDoc(docRef, {
+                    ...settings,
+                    updatedAt: new Date().toISOString()
+                  }, { merge: true });
+                  setSuccessMsg?.('Corporate administrative settings updated.');
+                  return true;
+                } catch (e) {
+                  console.error("Error saving corporate settings:", e);
+                  return false;
+                }
+              }}
             />
           )}
 
@@ -2111,7 +2729,8 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
       {/* 9. INTERNAL RECRUITER (c_recruiter) */}
       {/* ==================================================== */}
       {role === 'c_recruiter' && (() => {
-        const assignedCandidates = recruiterCandidatesList.filter(c => c.assignedRecruiterId === 'rec-1');
+        const currentRecruiterUid = userProfile?.uid || auth.currentUser?.uid || 'rec-1';
+        const assignedCandidates = recruiterCandidatesList.filter(c => c.assignedRecruiterId === currentRecruiterUid);
         return (
           <div className="space-y-6">
             {activeTab === 'dashboard' && (
@@ -2158,20 +2777,64 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                   if (setActiveTab) setActiveTab(tab);
                 }}
                 jobs={recruiterJobsList}
-                onAddJob={(newJob) => {
-                  const jobWithId = {
-                    ...newJob,
-                    id: `job-${recruiterJobsList.length + 1}`,
-                    applicationsCount: 0
-                  };
-                  setRecruiterJobsList([jobWithId, ...recruiterJobsList]);
-                  setSuccessMsg(`Successfully created job opening "${newJob.title}"`);
-                  setTimeout(() => setSuccessMsg(''), 4000);
+                onAddJob={async (newJob) => {
+                  if (!userProfile?.organizationId) return;
+                  try {
+                    const jobsCol = collection(db, 'organizations_companies', userProfile.organizationId, 'jobs');
+                    await addDoc(jobsCol, {
+                      ...newJob,
+                      applicationsCount: 0,
+                      createdBy: currentRecruiterUid,
+                      createdAt: new Date().toISOString()
+                    });
+
+                    // Log activity
+                    const actCol = collection(db, 'organizations_companies', userProfile.organizationId, 'activity');
+                    await addDoc(actCol, {
+                      userName: userProfile.fullName || userProfile.displayName || 'Recruiter',
+                      action: 'created a new job opening',
+                      subject: newJob.title,
+                      time: 'Just Now',
+                      avatar: userProfile.avatar || 'https://picsum.photos/seed/rec/100/100',
+                      createdAt: new Date().toISOString()
+                    });
+
+                    setSuccessMsg(`Successfully created job opening "${newJob.title}"`);
+                    setTimeout(() => setSuccessMsg(''), 4000);
+                  } catch (err) {
+                    console.error("Error creating job:", err);
+                    setErrorMsg("Failed to create job opening.");
+                    setTimeout(() => setErrorMsg(''), 4000);
+                  }
                 }}
-                onUpdateJob={(updatedJob) => {
-                  setRecruiterJobsList(recruiterJobsList.map(j => j.id === updatedJob.id ? updatedJob : j));
-                  setSuccessMsg(`Successfully updated job opening "${updatedJob.title}"`);
-                  setTimeout(() => setSuccessMsg(''), 4000);
+                onUpdateJob={async (updatedJob) => {
+                  if (!userProfile?.organizationId) return;
+                  try {
+                    const jobDoc = doc(db, 'organizations_companies', userProfile.organizationId, 'jobs', updatedJob.id);
+                    const { id, ...jobData } = updatedJob;
+                    await updateDoc(jobDoc, {
+                      ...jobData,
+                      updatedAt: new Date().toISOString()
+                    });
+
+                    // Log activity
+                    const actCol = collection(db, 'organizations_companies', userProfile.organizationId, 'activity');
+                    await addDoc(actCol, {
+                      userName: userProfile.fullName || userProfile.displayName || 'Recruiter',
+                      action: 'updated job opening',
+                      subject: updatedJob.title,
+                      time: 'Just Now',
+                      avatar: userProfile.avatar || 'https://picsum.photos/seed/rec/100/100',
+                      createdAt: new Date().toISOString()
+                    });
+
+                    setSuccessMsg(`Successfully updated job opening "${updatedJob.title}"`);
+                    setTimeout(() => setSuccessMsg(''), 4000);
+                  } catch (err) {
+                    console.error("Error updating job:", err);
+                    setErrorMsg("Failed to update job opening.");
+                    setTimeout(() => setErrorMsg(''), 4000);
+                  }
                 }}
               />
             )}
@@ -2181,17 +2844,35 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                 candidates={assignedCandidates}
                 selectedCandidateId={recruiterActiveCandidateId}
                 onSelectCandidate={(id) => setRecruiterActiveCandidateId(id)}
-                onUpdateStatus={(id, status) => {
-                  const updatedList = recruiterCandidatesList.map(cand => {
-                    if (cand.id === id) {
-                      return { ...cand, status };
-                    }
-                    return cand;
-                  });
-                  setRecruiterCandidatesList(updatedList);
-                  const candName = recruiterCandidatesList.find(c => c.id === id)?.name || 'Candidate';
-                  setSuccessMsg(`Updated status of ${candName} to "${status}"`);
-                  setTimeout(() => setSuccessMsg(''), 4000);
+                onUpdateStatus={async (id, status) => {
+                  if (!userProfile?.organizationId) return;
+                  try {
+                    const appDoc = doc(db, 'organizations_companies', userProfile.organizationId, 'applications', id);
+                    await updateDoc(appDoc, {
+                      status,
+                      updatedAt: new Date().toISOString()
+                    });
+
+                    const candName = recruiterCandidatesList.find(c => c.id === id)?.name || 'Candidate';
+
+                    // Log activity
+                    const actCol = collection(db, 'organizations_companies', userProfile.organizationId, 'activity');
+                    await addDoc(actCol, {
+                      userName: userProfile.fullName || userProfile.displayName || 'Recruiter',
+                      action: `updated candidacy status of ${candName} to "${status}"`,
+                      subject: candName,
+                      time: 'Just Now',
+                      avatar: userProfile.avatar || 'https://picsum.photos/seed/rec/100/100',
+                      createdAt: new Date().toISOString()
+                    });
+
+                    setSuccessMsg(`Updated status of ${candName} to "${status}"`);
+                    setTimeout(() => setSuccessMsg(''), 4000);
+                  } catch (err) {
+                    console.error("Error updating status:", err);
+                    setErrorMsg("Failed to update status.");
+                    setTimeout(() => setErrorMsg(''), 4000);
+                  }
                 }}
               />
             )}
@@ -2231,17 +2912,35 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                   if (setActiveTab) setActiveTab(tab);
                 }}
                 candidates={assignedCandidates}
-                onUpdateStatus={(id, status) => {
-                  const updatedList = recruiterCandidatesList.map(cand => {
-                    if (cand.id === id) {
-                      return { ...cand, status };
-                    }
-                    return cand;
-                  });
-                  setRecruiterCandidatesList(updatedList);
-                  const candName = recruiterCandidatesList.find(c => c.id === id)?.name || 'Candidate';
-                  setSuccessMsg(`Successfully moved ${candName} to "${status}"`);
-                  setTimeout(() => setSuccessMsg(''), 4000);
+                onUpdateStatus={async (id, status) => {
+                  if (!userProfile?.organizationId) return;
+                  try {
+                    const appDoc = doc(db, 'organizations_companies', userProfile.organizationId, 'applications', id);
+                    await updateDoc(appDoc, {
+                      status,
+                      updatedAt: new Date().toISOString()
+                    });
+
+                    const candName = recruiterCandidatesList.find(c => c.id === id)?.name || 'Candidate';
+
+                    // Log activity
+                    const actCol = collection(db, 'organizations_companies', userProfile.organizationId, 'activity');
+                    await addDoc(actCol, {
+                      userName: userProfile.fullName || userProfile.displayName || 'Recruiter',
+                      action: `moved ${candName} to "${status}"`,
+                      subject: candName,
+                      time: 'Just Now',
+                      avatar: userProfile.avatar || 'https://picsum.photos/seed/rec/100/100',
+                      createdAt: new Date().toISOString()
+                    });
+
+                    setSuccessMsg(`Successfully moved ${candName} to "${status}"`);
+                    setTimeout(() => setSuccessMsg(''), 4000);
+                  } catch (err) {
+                    console.error("Error updating status:", err);
+                    setErrorMsg("Failed to update status.");
+                    setTimeout(() => setErrorMsg(''), 4000);
+                  }
                 }}
                 onSelectCandidate={(id) => setRecruiterActiveCandidateId(id)}
                 selectedJob={recruiterSelectedPipelineJob}
@@ -2302,6 +3001,10 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
 
           {activeTab === 'profile' && (
             <EmployeeProfileTab />
+          )}
+
+          {activeTab === 'settings' && (
+            <EmployeeSettingsTab />
           )}
         </div>
       )}

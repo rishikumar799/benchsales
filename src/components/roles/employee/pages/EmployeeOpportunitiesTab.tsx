@@ -1,54 +1,201 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Search, SlidersHorizontal, CheckCircle2, CircleDot } from 'lucide-react';
+import { Search, SlidersHorizontal, CheckCircle2, CircleDot, AlertCircle } from 'lucide-react';
+import { db } from '../../../../firebase/firebase';
+import { collection, onSnapshot, query, where, doc, setDoc, addDoc } from 'firebase/firestore';
+import { useAuth } from '../../../../context/AuthContext';
 
 interface EmployeeOpportunitiesTabProps {
   onApplyJob?: (jobTitle: string, company: string) => void;
 }
 
 export default function EmployeeOpportunitiesTab({ onApplyJob }: EmployeeOpportunitiesTabProps) {
+  const { userProfile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
   const [locFilter, setLocFilter] = useState('All');
   const [expFilter, setExpFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
+  const [sortOrder, setSortOrder] = useState('Newest');
+  
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [appliedJobs, setAppliedJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const originalJobs = [
-    { id: '1', role: 'Senior Software Engineer', team: 'Engineering Team', matchType: 'Internal Mobility', location: 'Hyderabad', exp: '4+ Years', type: 'Full Time', department: 'Engineering', date: '25 May 2024' },
-    { id: '2', role: 'Cloud Engineer', team: 'Infrastructure Team', matchType: 'Internal Transfer', location: 'Bangalore', exp: '3+ Years', type: 'Full Time', department: 'Infrastructure', date: '24 May 2024' },
-    { id: '3', role: 'Tech Lead', team: 'Platform Team', matchType: 'Internal Mobility', location: 'Hyderabad', exp: '5+ Years', type: 'Full Time', department: 'Platform', date: '23 May 2024' },
-    { id: '4', role: 'Data Scientist', team: 'Data Team', matchType: 'Internal Sourcing', location: 'Pune', exp: '3+ Years', type: 'Full Time', department: 'Data Science', date: '22 May 2024' },
-    { id: '5', role: 'DevOps Architect', team: 'Infrastructure Team', matchType: 'Internal Sourcing', location: 'Remote', exp: '5+ Years', type: 'Full Time', department: 'Infrastructure', date: '20 May 2024' },
-    { id: '6', role: 'Technical Program Manager', team: 'Engineering Team', matchType: 'Internal Mobility', location: 'Hyderabad', exp: '4+ Years', type: 'Full Time', department: 'Engineering', date: '19 May 2024' },
-    { id: '7', role: 'ML Engineer', team: 'Data Team', matchType: 'Internal Transfer', location: 'Remote', exp: '3+ Years', type: 'Full Time', department: 'Data Science', date: '18 May 2024' },
-    { id: '8', role: 'Security Analyst', team: 'Security Team', matchType: 'Internal Hiring', location: 'Pune', exp: '2+ Years', type: 'Full Time', department: 'Security', date: '15 May 2024' }
-  ];
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 3;
+
+  useEffect(() => {
+    if (!userProfile?.organizationId) return;
+
+    // Listen to open/Active jobs
+    const jobsCol = collection(db, 'organizations_companies', userProfile.organizationId, 'jobs');
+    const unsubscribeJobs = onSnapshot(jobsCol, (snapshot) => {
+      const fetchedJobs = snapshot.docs.map(snapDoc => {
+        const data = snapDoc.data();
+        return {
+          id: snapDoc.id,
+          role: data.title || data.role || '',
+          team: data.dept || data.team || data.department || 'Engineering Team',
+          matchType: data.matchType || 'Internal Mobility',
+          location: data.location || 'Hyderabad, India',
+          exp: data.experience || data.exp || '3+ Years',
+          type: data.type || 'Full Time',
+          department: data.dept || data.department || 'Engineering',
+          status: data.status || 'Active',
+          createdAt: data.createdAt || new Date().toISOString(),
+          assignedRecruiterId: data.assignedRecruiterId || data.recruiterUid || ''
+        };
+      });
+      setJobs(fetchedJobs);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error listening to jobs:", error);
+      setLoading(false);
+    });
+
+    // Listen to current employee's applications
+    const appsCol = collection(db, 'organizations_companies', userProfile.organizationId, 'applications');
+    const qApps = query(appsCol, where('employeeUid', '==', userProfile.uid));
+    const unsubscribeApps = onSnapshot(qApps, (snapshot) => {
+      const fetchedApps = snapshot.docs.map(snapDoc => snapDoc.data());
+      setAppliedJobs(fetchedApps);
+    }, (error) => {
+      console.error("Error listening to applications:", error);
+    });
+
+    return () => {
+      unsubscribeJobs();
+      unsubscribeApps();
+    };
+  }, [userProfile?.organizationId, userProfile?.uid]);
 
   const filteredJobs = useMemo(() => {
-    return originalJobs.filter(job => {
+    // Only display jobs where status is 'open' or 'active' (to support seeded jobs)
+    const openJobs = jobs.filter(job => job.status?.toLowerCase() === 'open' || job.status?.toLowerCase() === 'active');
+
+    const results = openJobs.filter(job => {
       const matchSearch = job.role.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           job.team.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchDept = deptFilter === 'All' || job.department === deptFilter;
-      const matchLoc = locFilter === 'All' || job.location === locFilter;
-      const matchExp = expFilter === 'All' || job.exp === expFilter;
-      const matchType = typeFilter === 'All' || job.type === typeFilter;
+      const matchDept = deptFilter === 'All' || job.department.toLowerCase() === deptFilter.toLowerCase();
+      const matchLoc = locFilter === 'All' || job.location.toLowerCase().includes(locFilter.toLowerCase());
+      const matchExp = expFilter === 'All' || job.exp.toLowerCase().includes(expFilter.toLowerCase());
+      const matchType = typeFilter === 'All' || job.type.toLowerCase().includes(typeFilter.toLowerCase());
       return matchSearch && matchDept && matchLoc && matchExp && matchType;
     });
-  }, [searchTerm, deptFilter, locFilter, expFilter, typeFilter]);
 
-  const departments = ['All', 'Engineering', 'Infrastructure', 'Platform', 'Data Science', 'Security'];
-  const locations = ['All', 'Hyderabad', 'Bangalore', 'Pune', 'Remote'];
-  const experiences = ['All', '2+ Years', '3+ Years', '4+ Years', '5+ Years'];
-  const jobTypes = ['All', 'Full Time', 'Contract'];
+    return results.sort((a, b) => {
+      if (sortOrder === 'Newest') {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      } else if (sortOrder === 'Oldest') {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      } else if (sortOrder === 'Title') {
+        return a.role.localeCompare(b.role);
+      }
+      return 0;
+    });
+  }, [jobs, searchTerm, deptFilter, locFilter, expFilter, typeFilter, sortOrder]);
 
-  const handleApply = (jobTitle: string) => {
-    if (onApplyJob) {
-      onApplyJob(jobTitle, 'Internal Sourcing Portal');
+  const paginatedJobs = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredJobs.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredJobs, currentPage]);
+
+  const totalPages = Math.ceil(filteredJobs.length / itemsPerPage) || 1;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, deptFilter, locFilter, expFilter, typeFilter, sortOrder]);
+
+  const departments = useMemo(() => {
+    const list = new Set(jobs.map(j => j.department).filter(Boolean));
+    return ['All', ...Array.from(list)];
+  }, [jobs]);
+
+  const locations = useMemo(() => {
+    const list = new Set(jobs.map(j => j.location.split(',')[0].trim()).filter(Boolean));
+    return ['All', ...Array.from(list)];
+  }, [jobs]);
+
+  const experiences = ['All', '2+ Years', '3+ Years', '4+ Years', '5+ Years', '3-5 Years', '4-6 Years', '6-8 Years'];
+  const jobTypes = ['All', 'Full-time', 'Full Time', 'Contract'];
+
+  const handleApply = async (job: any) => {
+    if (!userProfile?.organizationId || !userProfile?.uid) {
+      setErrorMsg('Unauthorized action. Please sign in again.');
+      return;
     }
-    setSuccessMsg(`✓ Transfer request for "${jobTitle}" submitted successfully!`);
-    setTimeout(() => setSuccessMsg(''), 4000);
+
+    const isDuplicate = appliedJobs.some(
+      app => app.jobId === job.id || (app.jobTitle === job.role && app.employeeUid === userProfile.uid)
+    );
+
+    if (isDuplicate) {
+      setErrorMsg(`You have already applied for the "${job.role}" position.`);
+      setTimeout(() => setErrorMsg(''), 4000);
+      return;
+    }
+
+    try {
+      const appsCol = collection(db, 'organizations_companies', userProfile.organizationId, 'applications');
+      const newAppDocRef = doc(appsCol);
+      const applicationId = newAppDocRef.id;
+
+      const applicationData = {
+        applicationId,
+        jobId: job.id,
+        jobTitle: job.role,
+        employeeUid: userProfile.uid,
+        employeeName: userProfile.fullName || userProfile.displayName || 'Employee',
+        organizationId: userProfile.organizationId,
+        recruiterUid: job.assignedRecruiterId || '',
+        status: 'Applied',
+        timeline: [
+          { status: 'Applied', date: new Date().toISOString(), label: 'Applied' }
+        ],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      await setDoc(newAppDocRef, applicationData);
+
+      // Log Corporate Activity
+      try {
+        const actCol = collection(db, 'organizations_companies', userProfile.organizationId, 'activity');
+        await addDoc(actCol, {
+          userName: userProfile.fullName || userProfile.displayName || 'Employee',
+          action: `applied for`,
+          subject: job.role,
+          time: 'Just Now',
+          avatar: userProfile.avatar || 'https://picsum.photos/seed/emp/100/100',
+          createdAt: new Date().toISOString()
+        });
+      } catch (err) {
+        console.error("Error logging activity:", err);
+      }
+
+      if (onApplyJob) {
+        onApplyJob(job.role, 'Internal Sourcing Portal');
+      }
+
+      setSuccessMsg(`✓ Application for "${job.role}" submitted successfully!`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err) {
+      console.error("Error applying to job:", err);
+      setErrorMsg("Failed to submit application. Please try again.");
+      setTimeout(() => setErrorMsg(''), 4000);
+    }
   };
+
+  if (!userProfile?.organizationId) {
+    return (
+      <div className="p-8 text-center text-app-muted font-bold text-xs">
+        Loading Corporate Workspace...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in">
@@ -61,6 +208,12 @@ export default function EmployeeOpportunitiesTab({ onApplyJob }: EmployeeOpportu
       {successMsg && (
         <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-bold text-xs">
           {successMsg}
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 font-bold text-xs">
+          {errorMsg}
         </div>
       )}
 
@@ -77,9 +230,20 @@ export default function EmployeeOpportunitiesTab({ onApplyJob }: EmployeeOpportu
               className="w-full bg-app-bg border border-app-border rounded-2xl py-3 pl-12 pr-4 text-xs font-semibold focus:outline-none focus:border-brand-blue transition-colors"
             />
           </div>
-          <button className="px-5 py-3 border border-app-border rounded-2xl text-xs font-bold text-app-text hover:bg-app-bg flex items-center gap-2 shrink-0 transition-colors cursor-pointer">
-            <SlidersHorizontal className="w-4 h-4" /> Filters
-          </button>
+          <div className="flex gap-2">
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              className="px-4 py-3 bg-app-bg border border-app-border rounded-2xl text-xs font-bold text-app-text hover:bg-app-surface focus:outline-none cursor-pointer"
+            >
+              <option value="Newest">Newest First</option>
+              <option value="Oldest">Oldest First</option>
+              <option value="Title">Title A-Z</option>
+            </select>
+            <button className="px-5 py-3 border border-app-border rounded-2xl text-xs font-bold text-app-text bg-app-bg hover:bg-app-surface flex items-center gap-2 shrink-0 transition-colors cursor-pointer">
+              <SlidersHorizontal className="w-4 h-4" /> Filters
+            </button>
+          </div>
         </div>
 
         {/* Dropdowns Row */}
@@ -132,11 +296,15 @@ export default function EmployeeOpportunitiesTab({ onApplyJob }: EmployeeOpportu
 
       {/* Opportunities List */}
       <div className="space-y-4">
-        {filteredJobs.length > 0 ? (
-          filteredJobs.map((job) => (
+        {loading ? (
+          <div className="p-12 text-center rounded-[32px] bg-app-surface border border-app-border text-app-muted text-xs py-16 font-bold">
+            Loading internal positions in real-time...
+          </div>
+        ) : paginatedJobs.length > 0 ? (
+          paginatedJobs.map((job) => (
             <div 
               key={job.id} 
-              className="p-6 md:p-8 rounded-[32px] bg-app-surface border border-app-border card-shadow flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
+              className="p-6 md:p-8 rounded-[32px] bg-app-surface border border-app-border card-shadow flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-fade-in"
             >
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
@@ -167,12 +335,21 @@ export default function EmployeeOpportunitiesTab({ onApplyJob }: EmployeeOpportu
                 >
                   View Details
                 </button>
-                <button 
-                  onClick={() => handleApply(job.role)}
-                  className="flex-1 md:flex-initial px-6 py-3 bg-brand-blue hover:bg-brand-blue/90 text-white font-bold text-xs rounded-xl transition-all shadow-sm cursor-pointer"
-                >
-                  Apply
-                </button>
+                {appliedJobs.some(app => app.jobId === job.id || app.jobTitle === job.role) ? (
+                  <button 
+                    disabled
+                    className="flex-1 md:flex-initial px-6 py-3 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold text-xs rounded-xl cursor-not-allowed flex items-center justify-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Applied
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => handleApply(job)}
+                    className="flex-1 md:flex-initial px-6 py-3 bg-brand-blue hover:bg-brand-blue/90 text-white font-bold text-xs rounded-xl transition-all shadow-sm cursor-pointer"
+                  >
+                    Apply
+                  </button>
+                )}
               </div>
             </div>
           ))
@@ -187,15 +364,32 @@ export default function EmployeeOpportunitiesTab({ onApplyJob }: EmployeeOpportu
       {filteredJobs.length > 0 && (
         <div className="flex justify-between items-center pt-4">
           <span className="text-[11px] font-bold text-app-muted">
-            Showing 1 to {filteredJobs.length} of {filteredJobs.length} opportunities
+            Showing {Math.min(filteredJobs.length, (currentPage - 1) * itemsPerPage + 1)} to {Math.min(filteredJobs.length, currentPage * itemsPerPage)} of {filteredJobs.length} opportunities
           </span>
           <div className="flex items-center gap-1.5">
-            <button className="p-2 border border-app-border rounded-xl text-xs font-bold bg-app-surface text-app-muted disabled:opacity-50" disabled>
+            <button 
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 border border-app-border rounded-xl text-xs font-bold bg-app-surface text-app-muted disabled:opacity-50 cursor-pointer"
+            >
               &lt;
             </button>
-            <button className="px-3.5 py-2 bg-brand-blue text-white rounded-xl text-xs font-bold">1</button>
-            <button className="px-3.5 py-2 border border-app-border bg-app-surface text-app-muted rounded-xl text-xs font-bold">2</button>
-            <button className="p-2 border border-app-border rounded-xl text-xs font-bold bg-app-surface text-app-muted">
+            {Array.from({ length: totalPages }).map((_, i) => (
+              <button 
+                key={i}
+                onClick={() => setCurrentPage(i + 1)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer ${
+                  currentPage === i + 1 ? 'bg-brand-blue text-white' : 'border border-app-border bg-app-surface text-app-muted'
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button 
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 border border-app-border rounded-xl text-xs font-bold bg-app-surface text-app-muted disabled:opacity-50 cursor-pointer"
+            >
               &gt;
             </button>
           </div>

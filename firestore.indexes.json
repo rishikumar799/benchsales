@@ -127,6 +127,14 @@
         { "fieldPath": "uid", "order": "ASCENDING" },
         { "fieldPath": "time", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "applications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "studentId", "order": "ASCENDING" },
+        { "fieldPath": "opportunityId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

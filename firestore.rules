@@ -37,25 +37,173 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
 
+    // Helper functions for University Authorization
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isMemberOfUniversity(universityId) {
+      return isAuthenticated() && getUserData().organizationId == universityId && getUserData().organizationType == 'university';
+    }
+
+    function isUnivAdmin(universityId) {
+      return isMemberOfUniversity(universityId) && getUserData().role == 'organization_admin';
+    }
+
+    function isPlacementOfficer(universityId) {
+      return isMemberOfUniversity(universityId) && getUserData().role == 'placement_officer';
+    }
+
+    function isStudent(universityId) {
+      return isMemberOfUniversity(universityId) && getUserData().role == 'student';
+    }
+
+    // Helper functions for Company Authorization
+    function isMemberOfCompany(companyId) {
+      return isAuthenticated() && getUserData().organizationId == companyId && getUserData().organizationType == 'company';
+    }
+
+    function isCompanyAdmin(companyId) {
+      return isMemberOfCompany(companyId) && getUserData().role == 'organization_admin';
+    }
+
+    function isCompanyRecruiter(companyId) {
+      return isMemberOfCompany(companyId) && getUserData().role == 'recruiter';
+    }
+
+    function isCompanyEmployee(companyId) {
+      return isMemberOfCompany(companyId) && getUserData().role == 'employee';
+    }
+
     // University collection rules
     match /organizations_universities/{universityId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
+      allow write: if isAuthenticated() && isUnivAdmin(universityId);
 
-      match /{subcollection}/{uid} {
-        allow read: if isAuthenticated();
-        allow write: if isOwner(uid) || isAuthenticated();
+      match /admins/{uid} {
+        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
+        allow write: if isAuthenticated() && isUnivAdmin(universityId);
+
+        match /activity/{activityId} {
+          allow read, write: if isAuthenticated() && isUnivAdmin(universityId) && isOwner(uid);
+        }
+      }
+
+      match /placement_officers/{uid} {
+        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
+        allow write: if isAuthenticated() && (isUnivAdmin(universityId) || (isOwner(uid) && isPlacementOfficer(universityId)));
+
+        match /activity/{activityId} {
+          allow read, write: if isAuthenticated() && isPlacementOfficer(universityId) && isOwner(uid);
+        }
+      }
+
+      match /students/{uid} {
+        allow read: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId) || isOwner(uid));
+        allow write: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId) || (isOwner(uid) && isStudent(universityId)));
+
+        match /activity/{activityId} {
+          allow read, write: if isAuthenticated() && isStudent(universityId) && isOwner(uid);
+        }
+      }
+
+      match /departments/{deptId} {
+        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
+        allow write: if isAuthenticated() && isUnivAdmin(universityId);
+      }
+
+      match /opportunities/{oppId} {
+        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
+        allow write: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId));
+      }
+
+      match /placements/{placId} {
+        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
+        allow write: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId));
+      }
+
+      match /applications/{appId} {
+        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
+        allow write: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId) || isStudent(universityId));
+      }
+
+      match /activity/{activityId} {
+        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
+        allow write: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId));
+      }
+
+      match /notifications/{notificationId} {
+        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
+        allow write: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId));
+      }
+
+      match /reports/{reportId} {
+        allow read, write: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId));
       }
     }
 
     // Company collection rules
     match /organizations_companies/{companyId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated() && isMemberOfCompany(companyId);
+      allow write: if isAuthenticated() && isCompanyAdmin(companyId);
 
-      match /{subcollection}/{uid} {
-        allow read: if isAuthenticated();
-        allow write: if isOwner(uid) || isAuthenticated();
+      match /admins/{uid} {
+        allow read: if isAuthenticated() && isMemberOfCompany(companyId);
+        allow write: if isAuthenticated() && isCompanyAdmin(companyId);
+
+        match /activity/{activityId} {
+          allow read, write: if isAuthenticated() && isCompanyAdmin(companyId) && isOwner(uid);
+        }
+      }
+
+      match /recruiters/{uid} {
+        allow read: if isAuthenticated() && isMemberOfCompany(companyId);
+        allow write: if isAuthenticated() && (isCompanyAdmin(companyId) || (isOwner(uid) && isCompanyRecruiter(companyId)));
+
+        match /activity/{activityId} {
+          allow read, write: if isAuthenticated() && isCompanyRecruiter(companyId) && isOwner(uid);
+        }
+      }
+
+      match /employees/{uid} {
+        allow read: if isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId) || isOwner(uid));
+        allow write: if isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || (isOwner(uid) && isCompanyEmployee(companyId)));
+
+        match /activity/{activityId} {
+          allow read, write: if isAuthenticated() && isCompanyEmployee(companyId) && isOwner(uid);
+        }
+      }
+
+      match /departments/{deptId} {
+        allow read: if isAuthenticated() && isMemberOfCompany(companyId);
+        allow write: if isAuthenticated() && isCompanyAdmin(companyId);
+      }
+
+      match /jobs/{jobId} {
+        allow read, write: if isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId));
+      }
+
+      match /applications/{appId} {
+        allow read, write: if isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId));
+      }
+
+      match /documents/{docId} {
+        allow read: if isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId) || (isCompanyEmployee(companyId) && request.auth.uid == resource.data.employeeUid));
+        allow write: if isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId) || (isCompanyEmployee(companyId) && request.auth.uid == request.resource.data.employeeUid));
+      }
+
+      match /activity/{activityId} {
+        allow read: if isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId));
+        allow write: if isAuthenticated() && isCompanyAdmin(companyId);
+      }
+
+      match /notifications/{notificationId} {
+        allow read: if isAuthenticated() && isMemberOfCompany(companyId);
+        allow write: if isAuthenticated() && isCompanyAdmin(companyId);
+      }
+
+      match /reports/{reportId} {
+        allow read, write: if isAuthenticated() && isCompanyAdmin(companyId);
       }
     }
 

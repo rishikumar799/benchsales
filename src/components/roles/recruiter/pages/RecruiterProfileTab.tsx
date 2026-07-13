@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, 
   Mail, 
@@ -11,19 +11,74 @@ import {
   Lock,
   Sparkles
 } from 'lucide-react';
+import { db } from '../../../../firebase/firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { useAuth } from '../../../../context/AuthContext';
 
 export default function RecruiterProfileTab() {
+  const { userProfile } = useAuth();
   const [name, setName] = useState('Priya Sharma');
   const [email, setEmail] = useState('priya.sharma@aryx.ai');
   const [phone, setPhone] = useState('+91 9876543210');
   const [location, setLocation] = useState('Bangalore, India');
   const [dept, setDept] = useState('Engineering Recruitment Division');
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!userProfile?.organizationId || !userProfile?.uid) {
+      setLoading(false);
+      return;
+    }
+
+    const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'recruiters', userProfile.uid);
+    const unsubscribe = onSnapshot(docRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setName(data.name || data.fullName || userProfile.fullName || 'Priya Sharma');
+        setEmail(data.email || userProfile.email || 'priya.sharma@aryx.ai');
+        setPhone(data.phone || data.phoneNumber || '+91 9876543210');
+        setLocation(data.location || 'Bangalore, India');
+        setDept(data.dept || data.department || 'Engineering Recruitment Division');
+      } else {
+        setName(userProfile.fullName || userProfile.displayName || 'Priya Sharma');
+        setEmail(userProfile.email || 'priya.sharma@aryx.ai');
+        setPhone(userProfile.phoneNumber || '+91 9876543210');
+        setLocation('Bangalore, India');
+        setDept('Engineering Recruitment Division');
+      }
+      setLoading(false);
+    }, (error) => {
+      console.error("Error loading recruiter profile:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [userProfile?.organizationId, userProfile?.uid]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSuccess(true);
-    setTimeout(() => setSuccess(false), 3000);
+    if (!userProfile?.organizationId || !userProfile?.uid) return;
+
+    try {
+      const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'recruiters', userProfile.uid);
+      await setDoc(docRef, {
+        uid: userProfile.uid,
+        name,
+        fullName: name,
+        email,
+        phone,
+        location,
+        dept,
+        department: dept,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (e) {
+      console.error("Error saving recruiter profile:", e);
+    }
   };
 
   return (

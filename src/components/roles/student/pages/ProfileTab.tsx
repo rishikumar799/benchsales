@@ -63,10 +63,10 @@ export default function ProfileTab() {
         // Populate edit form states
         setFullName(data.fullName || data.name || '');
         setRollNumber(data.rollNumber || '');
-        setPhone(data.phone || '');
+        setPhone(data.phoneNumber || data.phone || '');
         setDob(data.dob || '');
         setGender(data.gender || 'Male');
-        setDepartment(data.department || '');
+        setDepartment(data.department || data.dept || '');
         setBranch(data.branch || '');
         setCgpa(data.cgpa || '');
         setSemester(data.semester || '');
@@ -99,9 +99,11 @@ export default function ProfileTab() {
         name: fullName, // Keep name synchronized
         rollNumber,
         phone,
+        phoneNumber: phone, // Keep phoneNumber synchronized
         dob,
         gender,
         department,
+        dept: department, // Keep dept synchronized
         branch,
         cgpa,
         semester,
@@ -135,11 +137,11 @@ export default function ProfileTab() {
     name: studentData?.fullName || studentData?.name || 'Rohit Kumar',
     rollNumber: studentData?.rollNumber || 'CS2022001',
     email: studentData?.email || userProfile?.email || 'rohit.kumar@email.com',
-    phone: studentData?.phone || '+91 98765 43210',
+    phone: studentData?.phoneNumber || studentData?.phone || '+91 98765 43210',
     dob: studentData?.dob || '15 Aug 2004',
     gender: studentData?.gender || 'Male',
     university: studentData?.university || "St. Xavier's University",
-    department: studentData?.department || 'Computer Science Engineering',
+    department: studentData?.department || studentData?.dept || 'Computer Science Engineering',
     degree: studentData?.degree || 'B.Tech',
     batch: studentData?.year || studentData?.batch || '2026',
     cgpa: studentData?.cgpa ? `${studentData.cgpa} / 10` : '8.45 / 10',

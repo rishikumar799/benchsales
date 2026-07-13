@@ -172,6 +172,298 @@
         "items": { "type": "array" }
       },
       "required": ["items"]
+    },
+    "UniversityAdmin": {
+      "title": "University Admin Profile",
+      "description": "Administrator specific metadata document",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string" },
+        "fullName": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "phone": { "type": "string" }
+      },
+      "required": ["uid", "organizationId", "createdAt", "updatedAt", "status", "fullName"]
+    },
+    "UniversityPlacementOfficer": {
+      "title": "University Placement Officer Profile",
+      "description": "Placement officer specific metadata document",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string" },
+        "fullName": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "phone": { "type": "string" },
+        "designation": { "type": "string" },
+        "department": { "type": "string" },
+        "dept": { "type": "string" }
+      },
+      "required": ["uid", "organizationId", "createdAt", "updatedAt", "status", "fullName", "department"]
+    },
+    "UniversityStudent": {
+      "title": "University Student Profile",
+      "description": "Student specific metadata document inside the university",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string" },
+        "fullName": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "phone": { "type": "string" },
+        "rollNumber": { "type": "string" },
+        "department": { "type": "string" },
+        "dept": { "type": "string" }
+      },
+      "required": ["uid", "organizationId", "createdAt", "updatedAt", "status", "fullName", "department"]
+    },
+    "UniversityActivity": {
+      "title": "University Activity Log",
+      "description": "Activity document for tracking systemic events",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "uid": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "title", "createdAt", "organizationId"]
+    },
+    "UniversityNotification": {
+      "title": "University Notification Record",
+      "description": "General broadcast or direct notification within the university",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "uid": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "title", "createdAt", "organizationId"]
+    },
+    "UniversityReport": {
+      "title": "University Report Metadata",
+      "description": "Historical files or active audit spreadsheet references",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "uid": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "title", "createdAt", "organizationId"]
+    },
+    "Company": {
+      "title": "Company",
+      "description": "Company root organization document",
+      "type": "object",
+      "properties": {
+        "organizationId": { "type": "string" },
+        "organizationName": { "type": "string" },
+        "organizationType": { "type": "string" },
+        "adminUid": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["organizationId", "organizationName", "organizationType", "adminUid", "status", "createdAt", "updatedAt"]
+    },
+    "CompanyAdmin": {
+      "title": "Company Admin Profile",
+      "description": "Company Admin specific metadata document",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "email": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "organizationId", "email", "fullName", "phoneNumber", "status", "createdAt", "updatedAt"]
+    },
+    "CompanyRecruiter": {
+      "title": "Company Recruiter Profile",
+      "description": "Company Recruiter specific metadata document",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "email": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "designation": { "type": "string" },
+        "department": { "type": "string" }
+      },
+      "required": ["uid", "organizationId", "email", "fullName", "phoneNumber", "status", "createdAt", "updatedAt"]
+    },
+    "CompanyEmployee": {
+      "title": "Company Employee Profile",
+      "description": "Company Employee specific metadata document",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "email": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "department": { "type": "string" },
+        "designation": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "location": { "type": "string" },
+        "manager": { "type": "string" },
+        "experience": { "type": "string" },
+        "totalExperience": { "type": "string" },
+        "skills": { "type": "array" },
+        "languages": { "type": "array" },
+        "linkedin": { "type": "string" },
+        "github": { "type": "string" },
+        "about": { "type": "string" },
+        "settings": { "type": "object" }
+      },
+      "required": ["uid", "organizationId", "email", "fullName", "phoneNumber", "status", "createdAt", "updatedAt"]
+    },
+    "CompanyDocument": {
+      "title": "Company Document",
+      "description": "Document uploaded by employees or recruiters in the company",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "date": { "type": "string" },
+        "size": { "type": "string" },
+        "uid": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "category", "date", "size", "uid", "organizationId"]
+    },
+    "CompanyDepartment": {
+      "title": "Company Department",
+      "description": "Company department metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name"]
+    },
+    "CompanyJob": {
+      "title": "Company Job",
+      "description": "Company specific job opening document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "organizationId", "title", "status"]
+    },
+    "CompanyApplication": {
+      "title": "Company Job Application",
+      "description": "Application to a company specific job",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "jobId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "organizationId", "jobId", "studentId", "status"]
+    },
+    "CompanyActivity": {
+      "title": "Company Activity Log",
+      "description": "Activity document for tracking company ecosystem events",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "uid": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "title", "createdAt", "organizationId"]
+    },
+    "CompanyNotification": {
+      "title": "Company Notification Record",
+      "description": "General broadcast or direct notification within the company",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "uid": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "title", "createdAt", "organizationId"]
+    },
+    "CompanyReport": {
+      "title": "Company Report Metadata",
+      "description": "Historical files or active audit report references",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "uid": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "title", "createdAt", "organizationId"]
     }
   },
   "firestore": {
@@ -198,6 +490,98 @@
     "organizations/{organizationId}": {
       "schema": "Organization",
       "description": "Organizations directory collection"
+    },
+    "organizations_universities/{organizationId}/admins/{uid}": {
+      "schema": "UniversityAdmin",
+      "description": "Administrator profiles inside target university"
+    },
+    "organizations_universities/{organizationId}/admins/{uid}/activity/{activityId}": {
+      "schema": "UniversityActivity",
+      "description": "Activity subcollection for tracking admin actions"
+    },
+    "organizations_universities/{organizationId}/placement_officers/{uid}": {
+      "schema": "UniversityPlacementOfficer",
+      "description": "Placement officer profiles inside target university"
+    },
+    "organizations_universities/{organizationId}/placement_officers/{uid}/activity/{activityId}": {
+      "schema": "UniversityActivity",
+      "description": "Activity subcollection for tracking officer actions"
+    },
+    "organizations_universities/{organizationId}/students/{uid}": {
+      "schema": "UniversityStudent",
+      "description": "Student profiles inside target university"
+    },
+    "organizations_universities/{organizationId}/students/{uid}/activity/{activityId}": {
+      "schema": "UniversityActivity",
+      "description": "Activity subcollection for tracking student actions"
+    },
+    "organizations_universities/{organizationId}/activity/{activityId}": {
+      "schema": "UniversityActivity",
+      "description": "University ecosystem system-wide activities log"
+    },
+    "organizations_universities/{organizationId}/notifications/{notificationId}": {
+      "schema": "UniversityNotification",
+      "description": "University ecosystem internal notification announcements"
+    },
+    "organizations_universities/{organizationId}/reports/{reportId}": {
+      "schema": "UniversityReport",
+      "description": "University ecosystem generated placement spreadsheets and reports"
+    },
+    "organizations_companies/{organizationId}": {
+      "schema": "Company",
+      "description": "Company root organization document"
+    },
+    "organizations_companies/{organizationId}/admins/{uid}": {
+      "schema": "CompanyAdmin",
+      "description": "Administrator profiles inside target company"
+    },
+    "organizations_companies/{organizationId}/admins/{uid}/activity/{activityId}": {
+      "schema": "CompanyActivity",
+      "description": "Activity subcollection for tracking admin actions"
+    },
+    "organizations_companies/{organizationId}/recruiters/{uid}": {
+      "schema": "CompanyRecruiter",
+      "description": "Recruiter profiles inside target company"
+    },
+    "organizations_companies/{organizationId}/recruiters/{uid}/activity/{activityId}": {
+      "schema": "CompanyActivity",
+      "description": "Activity subcollection for tracking recruiter actions"
+    },
+    "organizations_companies/{organizationId}/employees/{uid}": {
+      "schema": "CompanyEmployee",
+      "description": "Employee profiles inside target company"
+    },
+    "organizations_companies/{organizationId}/employees/{uid}/activity/{activityId}": {
+      "schema": "CompanyActivity",
+      "description": "Activity subcollection for tracking employee actions"
+    },
+    "organizations_companies/{organizationId}/departments/{deptId}": {
+      "schema": "CompanyDepartment",
+      "description": "Company internal department structures"
+    },
+    "organizations_companies/{organizationId}/jobs/{jobId}": {
+      "schema": "CompanyJob",
+      "description": "Company specific job postings"
+    },
+    "organizations_companies/{organizationId}/applications/{applicationId}": {
+      "schema": "CompanyApplication",
+      "description": "Applications submitted for company specific jobs"
+    },
+    "organizations_companies/{organizationId}/documents/{docId}": {
+      "schema": "CompanyDocument",
+      "description": "Documents uploaded by employees or recruiters"
+    },
+    "organizations_companies/{organizationId}/activity/{activityId}": {
+      "schema": "CompanyActivity",
+      "description": "Company ecosystem system-wide activities log"
+    },
+    "organizations_companies/{organizationId}/notifications/{notificationId}": {
+      "schema": "CompanyNotification",
+      "description": "Company ecosystem internal notification announcements"
+    },
+    "organizations_companies/{organizationId}/reports/{reportId}": {
+      "schema": "CompanyReport",
+      "description": "Company ecosystem generated internal recruitment spreadsheets and reports"
     },
     "marketplace_jobs/{jobId}": {
       "schema": "MarketplaceJob",

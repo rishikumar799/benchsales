@@ -294,12 +294,91 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
           
           setUserProfile(profile);
 
-          // Dynamically initialize the role profile document if it does not exist
+          // Dynamically initialize and standardize the role profile document if it does not exist or lacks fields
           const targetRoleString = profile.role;
           const roleDocRef = getRoleDocRef(db, profile);
           if (roleDocRef) {
             const roleSnap = await getDoc(roleDocRef);
-            if (!roleSnap.exists()) {
+            const isUniversityUser = ['organization_admin', 'placement_officer', 'student'].includes(targetRoleString);
+            
+            if (isUniversityUser && profile.organizationId) {
+              const orgId = profile.organizationId;
+              const roleData: any = roleSnap.exists() ? roleSnap.data() : null;
+              
+              // Standardize values
+              const currentUid = firebaseUser.uid;
+              const currentOrgId = orgId;
+              const currentCreatedAt = roleData?.createdAt || profile.createdAt || new Date().toISOString();
+              const currentStatus = roleData?.status || roleData?.placementStatus || 'Active';
+              
+              // Name standardization
+              const currentFullName = roleData?.fullName || roleData?.name || profile.fullName || profile.displayName || 'System User';
+              const currentName = currentFullName; // backward compatibility
+              
+              // Phone standardization
+              const currentPhoneNumber = roleData?.phoneNumber || roleData?.phone || profile.phoneNumber || '';
+              const currentPhone = currentPhoneNumber; // backward compatibility
+              
+              // Department standardization (for student or placement_officer)
+              let currentDepartment = roleData?.department || roleData?.dept || '';
+              if (!currentDepartment && targetRoleString === 'placement_officer') {
+                currentDepartment = 'Training & Placement';
+              } else if (!currentDepartment && targetRoleString === 'student') {
+                currentDepartment = 'CSE';
+              }
+              const currentDept = currentDepartment; // backward compatibility
+
+              // Check if the document already contains all standardized fields perfectly
+              const isAlreadyNormalized = roleSnap.exists() && roleData && (
+                roleData.uid === currentUid &&
+                roleData.organizationId === currentOrgId &&
+                roleData.createdAt === currentCreatedAt &&
+                roleData.status === currentStatus &&
+                roleData.fullName === currentFullName &&
+                roleData.name === currentName &&
+                roleData.phoneNumber === currentPhoneNumber &&
+                roleData.phone === currentPhone &&
+                (targetRoleString !== 'student' && targetRoleString !== 'placement_officer' ? true : (
+                  roleData.department === currentDepartment &&
+                  roleData.dept === currentDept
+                )) &&
+                (targetRoleString !== 'placement_officer' ? true : (
+                  roleData.designation === (roleData.designation || 'Placement Officer')
+                ))
+              );
+
+              if (!isAlreadyNormalized) {
+                // Build normalized document only if missing or mismatched
+                const currentUpdatedAt = new Date().toISOString();
+                const normalizedDoc: any = {
+                  ...(roleData || {}),
+                  uid: currentUid,
+                  organizationId: currentOrgId,
+                  createdAt: currentCreatedAt,
+                  updatedAt: currentUpdatedAt,
+                  status: currentStatus,
+                  fullName: currentFullName,
+                  name: currentName,
+                  phoneNumber: currentPhoneNumber,
+                  phone: currentPhone,
+                };
+
+                if (targetRoleString === 'student') {
+                  normalizedDoc.department = currentDepartment;
+                  normalizedDoc.dept = currentDept;
+                } else if (targetRoleString === 'placement_officer') {
+                  normalizedDoc.department = currentDepartment;
+                  normalizedDoc.dept = currentDept;
+                  normalizedDoc.designation = roleData?.designation || 'Placement Officer';
+                }
+
+                // Save the normalized document
+                await setDoc(roleDocRef, normalizedDoc);
+                console.log(`Auto-standardized University Role Document: ${roleDocRef.path}`);
+              } else {
+                console.log(`University Role Document is already fully standardized. Zero writes performed for: ${roleDocRef.path}`);
+              }
+            } else if (!roleSnap.exists()) {
               let defaultDoc: any = {};
               if (targetRoleString === 'marketplace_jobseeker' || targetRoleString === 'marketplace_student') {
                 defaultDoc = {
