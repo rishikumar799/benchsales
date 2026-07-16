@@ -174,7 +174,7 @@ export default function CandidatePoolTab({
         
         const isAssigned = docData.assignedRecruiters?.includes(uid) || false;
         const isCreator = docData.createdBy === uid;
-        const isApproved = docData.accessStatus === 'approved' || docData.visibility === 'open';
+        const isApproved = isAssigned;
 
         list.push({
           id: docSnap.id,
@@ -187,7 +187,7 @@ export default function CandidatePoolTab({
           priority: docData.priority || 'Medium',
           posted: docData.posted || 'N/A',
           bdm: docData.bdm || 'John Mathew',
-          jobType: docData.visibility === 'open' ? 'open' : 'assigned',
+          jobType: docData.assignmentMode === 'open' || docData.visibility === 'open' ? 'open' : 'assigned',
           accessStatus: isApproved ? 'approved' : 'none'
         });
       });
@@ -260,7 +260,7 @@ export default function CandidatePoolTab({
     c.assignedRecruiterId === currentUser?.uid
   );
 
-  const accessibleJobs = jobs.filter(j => j.jobType === 'open' || j.accessStatus === 'approved');
+  const accessibleJobs = jobs.filter(j => j.accessStatus === 'approved');
 
   // Handle Save candidate action (Writes ONLY to marketplace_recruiters/{recruiterUid}/saved_candidates/{candidateUid})
   const handleToggleSaveCandidate = async (candidate: any) => {

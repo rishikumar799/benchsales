@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { db, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { useAuth } from '../../../../context/AuthContext';
 import { 
   Search, 
   Download, 
@@ -30,122 +33,209 @@ interface RecruiterType {
   status: 'Active' | 'Inactive';
   img: string;
   assignedJobs: string[];
+  email: string;
+  phoneNumber: string;
+  company: string;
+  experience: string;
+  skills: string;
+  department: string;
 }
 
 export default function RecruitersTab() {
   
-  // High fidelity dataset matching requirements exactly
-  const [recruiters, setRecruiters] = useState<RecruiterType[]>([
-    {
-      id: "rec-1",
-      name: "Rahul Singh",
-      activeJobs: 4,
-      submissions: 18,
-      shortlisted: 14,
-      selected: 8,
-      successRate: "82%",
-      placementRate: "68%",
-      lastActive: "Today, 11:30 AM",
-      joinDate: "12 Mar 2026",
-      status: "Active",
-      img: "https://picsum.photos/seed/rahul/100/100",
-      assignedJobs: ["Frontend Developer", "DevOps Engineer"]
-    },
-    {
-      id: "rec-2",
-      name: "Priya Sharma",
-      activeJobs: 3,
-      submissions: 12,
-      shortlisted: 8,
-      selected: 5,
-      successRate: "75%",
-      placementRate: "50%",
-      lastActive: "Today, 10:15 AM",
-      joinDate: "18 Mar 2026",
-      status: "Active",
-      img: "https://picsum.photos/seed/priya/100/100",
-      assignedJobs: ["Java Developer", "QA Engineer"]
-    },
-    {
-      id: "rec-3",
-      name: "Akash Verma",
-      activeJobs: 5,
-      submissions: 22,
-      shortlisted: 18,
-      selected: 12,
-      successRate: "88%",
-      placementRate: "80%",
-      lastActive: "Yesterday, 6:20 PM",
-      joinDate: "10 Mar 2026",
-      status: "Active",
-      img: "https://picsum.photos/seed/akash/100/100",
-      assignedJobs: ["DevOps Engineer", "Frontend Developer", "Java Developer"]
-    },
-    {
-      id: "rec-4",
-      name: "Neha Patel",
-      activeJobs: 2,
-      submissions: 8,
-      shortlisted: 4,
-      selected: 2,
-      successRate: "70%",
-      placementRate: "25%",
-      lastActive: "Yesterday, 4:45 PM",
-      joinDate: "22 Mar 2026",
-      status: "Active",
-      img: "https://picsum.photos/seed/neha/100/100",
-      assignedJobs: ["Frontend Developer", "QA Engineer"]
-    },
-    {
-      id: "rec-5",
-      name: "Karthik Nair",
-      activeJobs: 3,
-      submissions: 14,
-      shortlisted: 10,
-      selected: 6,
-      successRate: "80%",
-      placementRate: "66%",
-      lastActive: "09 Jun 2026",
-      joinDate: "15 Mar 2026",
-      status: "Active",
-      img: "https://picsum.photos/seed/karthik/100/100",
-      assignedJobs: ["Frontend Developer"]
-    },
-    {
-      id: "rec-6",
-      name: "Vikas Mehta",
-      activeJobs: 2,
-      submissions: 6,
-      shortlisted: 4,
-      selected: 2,
-      successRate: "60%",
-      placementRate: "33%",
-      lastActive: "08 Jun 2026",
-      joinDate: "25 Mar 2026",
-      status: "Inactive",
-      img: "https://picsum.photos/seed/vikas/100/100",
-      assignedJobs: []
-    },
-    {
-      id: "rec-7",
-      name: "Simran Kaur",
-      activeJobs: 1,
-      submissions: 3,
-      shortlisted: 2,
-      selected: 1,
-      successRate: "90%",
-      placementRate: "90%",
-      lastActive: "07 Jun 2026",
-      joinDate: "28 Mar 2026",
-      status: "Active",
-      img: "https://picsum.photos/seed/simran/100/100",
-      assignedJobs: ["Frontend Developer"]
+  const { user } = useAuth();
+  const [recruiters, setRecruiters] = useState<RecruiterType[]>([]);
+  const [allSubmissions, setAllSubmissions] = useState<any[]>([]);
+  const [allJobs, setAllJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let recsData: any[] = [];
+    let subsData: any[] = [];
+    let jobsData: any[] = [];
+
+    const unsubRecs = onSnapshot(collection(db, 'marketplace_recruiters'), (snapshot) => {
+      recsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      updateDerivedStates();
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'marketplace_recruiters');
+    });
+
+    const unsubSubs = onSnapshot(collection(db, 'marketplace_submissions'), (snapshot) => {
+      subsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAllSubmissions(subsData);
+      updateDerivedStates();
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'marketplace_submissions');
+    });
+
+    const unsubJobs = onSnapshot(collection(db, 'marketplace_jobs'), (snapshot) => {
+      jobsData = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+      setAllJobs(jobsData);
+      updateDerivedStates();
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'marketplace_jobs');
+    });
+
+    function updateDerivedStates() {
+      const activeBdmJobs = jobsData.filter(j => j.status !== 'archived');
+      const mappedRecs = recsData.map(rec => {
+        const id = rec.id;
+        const profile = rec.profile || {};
+        
+        // Step 2: Fallback chain for real recruiter name:
+        // profile.fullName -> fullName -> name -> displayName -> email prefix -> "Unknown Recruiter"
+        const email = profile.email || rec.email || '';
+        const emailPrefix = email ? email.split('@')[0] : '';
+        const displayName = rec.displayName || profile.displayName || '';
+        const name = profile.fullName || rec.fullName || profile.name || rec.name || displayName || emailPrefix || 'Unknown Recruiter';
+        
+        const status = profile.status === 'approved' || rec.status === 'Active' || rec.status === 'approved' || profile.status === 'Active' ? 'Active' : 'Inactive';
+        
+        // Step 5: Profile photo fallback order:
+        // photoURL -> avatar -> profile.photo -> Firebase Auth photoURL -> default avatar
+        let img = '';
+        if (rec.photoURL) {
+          img = rec.photoURL;
+        } else if (rec.avatar) {
+          img = rec.avatar;
+        } else if (profile.photo) {
+          img = profile.photo;
+        } else if (profile.photoURL) {
+          img = profile.photoURL;
+        } else if (rec.profilePic) {
+          img = rec.profilePic;
+        } else {
+          img = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
+        }
+
+        let joinDate = 'Not Available';
+        const rawJoin = profile.createdAt || rec.createdAt;
+        if (rawJoin) {
+          try {
+            const dateObj = (rawJoin.toDate) ? rawJoin.toDate() : new Date(rawJoin);
+            if (!isNaN(dateObj.getTime())) {
+              joinDate = dateObj.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+            }
+          } catch(e) {}
+        }
+        if (joinDate === 'Not Available' && (profile.joinDate || rec.joinDate)) {
+          joinDate = profile.joinDate || rec.joinDate;
+        }
+
+        const isStatus = (sVal: string, target: string) => {
+          return sVal?.trim().toLowerCase() === target.toLowerCase();
+        };
+
+        // Submissions for this recruiter
+        const recruiterSubs = subsData.filter(s => s.recruiterUid === id || s.recruiterId === id);
+
+        // Step 4: Last Activity (Retrieve the recruiter's most recent activity timestamp. If no activity, "No Activity Yet")
+        let lastActive = 'No Activity Yet';
+        let latestTimestampObj: Date | null = null;
+        const rawActive = profile.lastActive || rec.lastActive;
+        if (rawActive) {
+          try {
+            const dateObj = (rawActive.toDate) ? rawActive.toDate() : new Date(rawActive);
+            if (!isNaN(dateObj.getTime())) {
+              latestTimestampObj = dateObj;
+            }
+          } catch(e) {}
+        }
+        recruiterSubs.forEach(s => {
+          const rawSubDate = s.createdAt || s.submittedAt;
+          if (rawSubDate) {
+            try {
+              const dateObj = (rawSubDate.toDate) ? rawSubDate.toDate() : new Date(rawSubDate);
+              if (!isNaN(dateObj.getTime())) {
+                if (!latestTimestampObj || dateObj > latestTimestampObj) {
+                  latestTimestampObj = dateObj;
+                }
+              }
+            } catch (e) {}
+          }
+        });
+        if (latestTimestampObj) {
+          lastActive = latestTimestampObj.toLocaleDateString() + ' ' + latestTimestampObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+
+        const phoneNumber = profile.phoneNumber || profile.phone || rec.phoneNumber || rec.phone || 'Not Available';
+        const company = profile.company || rec.company || profile.organization || rec.organization || 'Not Available';
+        const experience = profile.experience || rec.experience || 'Not Available';
+        
+        let skills = 'Not Available';
+        const rawSkills = profile.skills || rec.skills;
+        if (rawSkills) {
+          if (Array.isArray(rawSkills)) {
+            skills = rawSkills.join(', ');
+          } else if (typeof rawSkills === 'string') {
+            skills = rawSkills;
+          }
+        }
+
+        const department = profile.department || profile.dept || rec.department || rec.dept || 'Not Available';
+
+        // Count jobs where this recruiter is assigned
+        const assignedBdmJobs = activeBdmJobs.filter(j => j.assignedRecruiters?.includes(id));
+        const activeJobsCount = assignedBdmJobs.length;
+        const assignedJobTitles = assignedBdmJobs.map(j => j.title || 'Requirement');
+
+        // Metrics from Firestore
+        const submissionsCount = recruiterSubs.length;
+        const shortlistedCount = recruiterSubs.filter(s => isStatus(s.status, 'shortlisted')).length;
+        const selectedCount = recruiterSubs.filter(s => isStatus(s.status, 'selected') || isStatus(s.status, 'joined') || isStatus(s.status, 'hired')).length;
+
+        // Success Rate = selected / total submissions (as requested by Step 4: "selected / total submissions")
+        // Placement Rate = calculated from successful placements
+        const successRateVal = submissionsCount > 0 ? Math.round((selectedCount / submissionsCount) * 100) : 0;
+        const successRate = successRateVal + '%';
+
+        const placementRateVal = submissionsCount > 0 ? Math.round((selectedCount / submissionsCount) * 100) : 0;
+        const placementRate = placementRateVal + '%';
+
+        return {
+          id,
+          name,
+          activeJobs: activeJobsCount,
+          submissions: submissionsCount,
+          shortlisted: shortlistedCount,
+          selected: selectedCount,
+          successRate,
+          placementRate,
+          lastActive,
+          joinDate,
+          status,
+          img,
+          assignedJobs: assignedJobTitles,
+          email: email || 'Not Available',
+          phoneNumber,
+          company,
+          experience,
+          skills,
+          department
+        } as RecruiterType;
+      });
+
+      setRecruiters(mappedRecs);
+      setLoading(false);
     }
-  ]);
+
+    return () => {
+      unsubRecs();
+      unsubSubs();
+      unsubJobs();
+    };
+  }, [user]);
 
   const [activeSubTab, setActiveSubTab] = useState<'all' | 'selected'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [companyFilter, setCompanyFilter] = useState('All');
+  const [departmentFilter, setDepartmentFilter] = useState('All');
+  const [experienceFilter, setExperienceFilter] = useState('All');
+  const [sortBy, setSortBy] = useState('Name A-Z');
   const [isExporting, setIsExporting] = useState(false);
   const [selectedRecruiter, setSelectedRecruiter] = useState<RecruiterType | null>(null);
 
@@ -157,15 +247,60 @@ export default function RecruitersTab() {
   };
 
   const filteredRecruiters = recruiters.filter(rec => {
-    // Search filter
-    const matchesSearch = rec.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          rec.id.toLowerCase().includes(searchQuery.toLowerCase());
+    // Search filter: Name, Company, Department, Skills, Email. NOT Firebase UID.
+    const queryStr = searchQuery.toLowerCase();
+    const matchesSearch = 
+      (rec.name && rec.name.toLowerCase().includes(queryStr)) || 
+      (rec.company && rec.company.toLowerCase().includes(queryStr)) ||
+      (rec.department && rec.department.toLowerCase().includes(queryStr)) ||
+      (rec.skills && rec.skills.toLowerCase().includes(queryStr)) ||
+      (rec.email && rec.email.toLowerCase().includes(queryStr));
+    
     // Status filter
     const matchesStatus = statusFilter === 'All' || rec.status === statusFilter;
+    
+    // Company filter
+    const matchesCompany = companyFilter === 'All' || rec.company === companyFilter;
+    
+    // Department filter
+    const matchesDepartment = departmentFilter === 'All' || rec.department === departmentFilter;
+
+    // Experience filter
+    const matchesExperience = experienceFilter === 'All' || rec.experience === experienceFilter;
+
     // Sub-tab filter (Selected vs All)
     const matchesTab = activeSubTab === 'all' || rec.assignedJobs.length > 0;
 
-    return matchesSearch && matchesStatus && matchesTab;
+    return matchesSearch && matchesStatus && matchesCompany && matchesDepartment && matchesExperience && matchesTab;
+  });
+
+  // Unique companies, departments, and experiences list for the filter options (computed from raw recruiters)
+  const uniqueCompanies = Array.from(new Set(recruiters.map(r => r.company).filter(c => c && c !== 'Not Available')));
+  const uniqueDepartments = Array.from(new Set(recruiters.map(r => r.department).filter(d => d && d !== 'Not Available')));
+  const uniqueExperiences = Array.from(new Set(recruiters.map(r => r.experience).filter(e => e && e !== 'Not Available')));
+
+  // Apply sorting: Newest, Oldest, Name A-Z, Most Active Recruiters, Highest Submission Count
+  const sortedRecruiters = [...filteredRecruiters].sort((a, b) => {
+    if (sortBy === 'Name A-Z') {
+      return a.name.localeCompare(b.name);
+    }
+    if (sortBy === 'Newest') {
+      const dateA = a.joinDate && a.joinDate !== 'Not Available' ? new Date(a.joinDate).getTime() : 0;
+      const dateB = b.joinDate && b.joinDate !== 'Not Available' ? new Date(b.joinDate).getTime() : 0;
+      return dateB - dateA;
+    }
+    if (sortBy === 'Oldest') {
+      const dateA = a.joinDate && a.joinDate !== 'Not Available' ? new Date(a.joinDate).getTime() : Infinity;
+      const dateB = b.joinDate && b.joinDate !== 'Not Available' ? new Date(b.joinDate).getTime() : Infinity;
+      return dateA - dateB;
+    }
+    if (sortBy === 'Most Active Recruiters') {
+      return b.activeJobs - a.activeJobs;
+    }
+    if (sortBy === 'Highest Submission Count') {
+      return b.submissions - a.submissions;
+    }
+    return 0;
   });
 
   return (
@@ -225,27 +360,72 @@ export default function RecruitersTab() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="p-4 rounded-2xl glass border border-app-border flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div className="p-4 rounded-2xl glass border border-app-border flex flex-col xl:flex-row gap-4 items-center justify-between">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-app-muted" />
           <input 
             type="text" 
-            placeholder="Search matching recruiters names or IDs..."
+            placeholder="Search by name, email, company, department or skills..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-app-surface border border-app-border rounded-xl py-3 pl-11 pr-4 text-xs font-semibold text-app-text focus:outline-none focus:border-brand-blue outline-none"
           />
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto shrink-0">
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto shrink-0">
           <select 
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-app-surface border border-app-border rounded-xl px-4 py-3 text-xs font-semibold text-app-text outline-none cursor-pointer flex-1 md:flex-initial"
           >
-            <option value="All">All statuses (All)</option>
+            <option value="All">All Statuses</option>
             <option value="Active">Active Partners</option>
             <option value="Inactive">Inactive Partners</option>
+          </select>
+
+          <select 
+            value={companyFilter}
+            onChange={(e) => setCompanyFilter(e.target.value)}
+            className="bg-app-surface border border-app-border rounded-xl px-4 py-3 text-xs font-semibold text-app-text outline-none cursor-pointer flex-1 md:flex-initial"
+          >
+            <option value="All">All Companies</option>
+            {uniqueCompanies.map((c, i) => (
+              <option key={i} value={c}>{c}</option>
+            ))}
+          </select>
+
+          <select 
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value)}
+            className="bg-app-surface border border-app-border rounded-xl px-4 py-3 text-xs font-semibold text-app-text outline-none cursor-pointer flex-1 md:flex-initial"
+          >
+            <option value="All">All Departments</option>
+            {uniqueDepartments.map((d, i) => (
+              <option key={i} value={d}>{d}</option>
+            ))}
+          </select>
+
+          <select 
+            value={experienceFilter}
+            onChange={(e) => setExperienceFilter(e.target.value)}
+            className="bg-app-surface border border-app-border rounded-xl px-4 py-3 text-xs font-semibold text-app-text outline-none cursor-pointer flex-1 md:flex-initial"
+          >
+            <option value="All">All Experiences</option>
+            {uniqueExperiences.map((exp, i) => (
+              <option key={i} value={exp}>{exp}</option>
+            ))}
+          </select>
+
+          <select 
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="bg-app-surface border border-app-border rounded-xl px-4 py-3 text-xs font-semibold text-app-text outline-none cursor-pointer flex-1 md:flex-initial"
+          >
+            <option value="Name A-Z">Name A-Z</option>
+            <option value="Newest">Newest</option>
+            <option value="Oldest">Oldest</option>
+            <option value="Most Active Recruiters">Most Active</option>
+            <option value="Highest Submission Count">Highest Submissions</option>
           </select>
         </div>
       </div>
@@ -270,8 +450,8 @@ export default function RecruitersTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-app-border/40 text-xs">
-                {filteredRecruiters.length > 0 ? (
-                  filteredRecruiters.map((rec) => (
+                {sortedRecruiters.length > 0 ? (
+                  sortedRecruiters.map((rec) => (
                     <tr key={rec.id} className="hover:bg-app-surface/30 transition-colors">
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-3">
@@ -283,7 +463,15 @@ export default function RecruitersTab() {
                           />
                           <div>
                             <span className="font-bold text-app-text block">{rec.name}</span>
-                            <span className="text-[10px] text-app-muted block font-mono font-bold uppercase mt-0.5">{rec.id}</span>
+                            {(() => {
+                              const subtitleParts = [];
+                              if (rec.company && rec.company !== 'Not Available') subtitleParts.push(rec.company);
+                              if (rec.department && rec.department !== 'Not Available') subtitleParts.push(rec.department);
+                              if (subtitleParts.length === 0 && rec.email && rec.email !== 'Not Available') subtitleParts.push(rec.email);
+                              return subtitleParts.length > 0 ? (
+                                <span className="text-[10px] text-app-muted block font-semibold mt-0.5">{subtitleParts.join(' • ')}</span>
+                              ) : null;
+                            })()}
                           </div>
                         </div>
                       </td>
@@ -346,8 +534,8 @@ export default function RecruitersTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-app-border/40 text-xs">
-                {filteredRecruiters.length > 0 ? (
-                  filteredRecruiters.map((rec) => (
+                {sortedRecruiters.length > 0 ? (
+                  sortedRecruiters.map((rec) => (
                     <tr key={rec.id} className="hover:bg-app-surface/30 transition-colors">
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-3">
@@ -359,7 +547,15 @@ export default function RecruitersTab() {
                           />
                           <div>
                             <span className="font-bold text-app-text block">{rec.name}</span>
-                            <span className="text-[10px] text-app-muted block font-mono font-bold uppercase mt-0.5">{rec.id}</span>
+                            {(() => {
+                              const subtitleParts = [];
+                              if (rec.company && rec.company !== 'Not Available') subtitleParts.push(rec.company);
+                              if (rec.department && rec.department !== 'Not Available') subtitleParts.push(rec.department);
+                              if (subtitleParts.length === 0 && rec.email && rec.email !== 'Not Available') subtitleParts.push(rec.email);
+                              return subtitleParts.length > 0 ? (
+                                <span className="text-[10px] text-app-muted block font-semibold mt-0.5">{subtitleParts.join(' • ')}</span>
+                              ) : null;
+                            })()}
                           </div>
                         </div>
                       </td>
@@ -413,7 +609,7 @@ export default function RecruitersTab() {
 
       {/* Pagination segment */}
       <div className="flex items-center justify-between text-xs font-semibold text-app-muted mt-4">
-        <span>Showing 1 to {filteredRecruiters.length} of {activeSubTab === 'all' ? '16' : filteredRecruiters.length} recruiters</span>
+        <span>Showing 1 to {sortedRecruiters.length} of {activeSubTab === 'all' ? recruiters.length : recruiters.filter(r => r.assignedJobs.length > 0).length} recruiters</span>
         <div className="flex items-center gap-1">
           <button className="p-2 border border-app-border rounded-xl bg-app-surface text-xs hover:text-app-text select-none">
             {'<'}
@@ -441,9 +637,11 @@ export default function RecruitersTab() {
                   <div>
                     <h2 className="text-2xl font-display font-bold text-app-text flex items-center gap-2">
                       {selectedRecruiter.name}
-                      <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-app-surface border border-app-border text-app-muted">
-                        ID: {selectedRecruiter.id}
-                      </span>
+                      {selectedRecruiter.company && selectedRecruiter.company !== 'Not Available' && (
+                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-brand-blue/10 border border-brand-blue/20 text-brand-blue">
+                          {selectedRecruiter.company}
+                        </span>
+                      )}
                     </h2>
                     <p className="text-xs text-app-muted mt-1 font-semibold">
                       Sourcing Partner since <span className="text-app-text">{selectedRecruiter.joinDate}</span> • Status: <span className="text-emerald-500 font-bold">{selectedRecruiter.status}</span>
@@ -509,16 +707,57 @@ export default function RecruitersTab() {
                 <div className="p-4 rounded-2xl bg-app-surface/20 border border-app-border/60">
                   <span className="text-[10px] font-extrabold text-app-muted uppercase tracking-wider block">Top Sourcing Skillset</span>
                   <div className="flex flex-wrap gap-1 mt-1.5">
-                    <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded bg-white/5 border border-app-border text-app-muted">React</span>
-                    <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded bg-white/5 border border-app-border text-app-muted">Node.js</span>
-                    <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded bg-white/5 border border-app-border text-app-muted">AWS</span>
+                    {selectedRecruiter.skills && selectedRecruiter.skills !== 'Not Available' ? (
+                      selectedRecruiter.skills.split(',').map((s: string, idx: number) => (
+                        <span key={idx} className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded bg-white/5 border border-app-border text-app-muted">
+                          {s.trim()}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-[10px] font-bold text-app-muted">Not Available</span>
+                    )}
                   </div>
                 </div>
                 <div className="p-4 rounded-2xl bg-app-surface/20 border border-app-border/60">
                   <span className="text-[10px] font-extrabold text-app-muted uppercase tracking-wider block">Most Active Vertical</span>
                   <span className="text-sm font-semibold text-brand-blue mt-1 block">
-                    Engineering
+                    {selectedRecruiter.department && selectedRecruiter.department !== 'Not Available' ? selectedRecruiter.department : 'Not Available'}
                   </span>
+                </div>
+              </div>
+
+              {/* Detailed Profile Grid */}
+              <div className="mb-6 space-y-2">
+                <h3 className="text-xs font-bold text-app-muted uppercase tracking-wider">Detailed Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 p-4 rounded-2xl bg-app-surface/20 border border-app-border/60 text-xs">
+                  <div className="flex justify-between items-center py-1.5 border-b border-app-border/30">
+                    <span className="text-app-muted">Email Address</span>
+                    <span className="text-app-text font-medium select-all">{selectedRecruiter.email}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-app-border/30">
+                    <span className="text-app-muted">Phone Number</span>
+                    <span className="text-app-text font-medium">{selectedRecruiter.phoneNumber}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-app-border/30">
+                    <span className="text-app-muted">Company</span>
+                    <span className="text-app-text font-semibold text-brand-blue">{selectedRecruiter.company}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-app-border/30">
+                    <span className="text-app-muted">Department</span>
+                    <span className="text-app-text font-medium">{selectedRecruiter.department}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-app-border/30">
+                    <span className="text-app-muted">Experience</span>
+                    <span className="text-app-text font-medium">{selectedRecruiter.experience}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-app-border/30">
+                    <span className="text-app-muted">Last Active</span>
+                    <span className="text-app-text font-medium">{selectedRecruiter.lastActive}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-app-border/30 col-span-1 md:col-span-2">
+                    <span className="text-app-muted shrink-0">Skills</span>
+                    <span className="text-app-text font-medium text-right break-words max-w-md">{selectedRecruiter.skills}</span>
+                  </div>
                 </div>
               </div>
 
@@ -544,22 +783,58 @@ export default function RecruitersTab() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-app-border/40 font-medium text-app-muted">
-                      <tr className="hover:bg-app-surface/20 transition-colors">
-                        <td className="py-3 px-4 font-bold text-app-text">Candidate #18</td>
-                        <td className="py-3 px-4 text-brand-purple font-semibold">Frontend Developer</td>
-                        <td className="py-3 px-4">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/25">Selected</span>
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono text-[11px]">10 Jun 2026</td>
-                      </tr>
-                      <tr className="hover:bg-app-surface/20 transition-colors">
-                        <td className="py-3 px-4 font-bold text-app-text">Candidate #12</td>
-                        <td className="py-3 px-4 text-brand-purple font-semibold">DevOps Engineer</td>
-                        <td className="py-3 px-4">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-brand-blue/10 text-brand-blue border border-brand-blue/25">Shortlisted</span>
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono text-[11px]">08 Jun 2026</td>
-                      </tr>
+                      {(() => {
+                        const recSubs = allSubmissions
+                          .filter(s => s.recruiterUid === selectedRecruiter.id || s.recruiterId === selectedRecruiter.id)
+                          .sort((a, b) => {
+                            const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+                            const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+                            return dateB - dateA;
+                          })
+                          .slice(0, 5);
+
+                        if (recSubs.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={4} className="py-4 px-4 text-center text-app-muted text-xs font-semibold">
+                                No submissions found for this recruiter.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return recSubs.map((sub, sIdx) => {
+                          let formattedDate = 'Not Available';
+                          const rawDate = sub.createdAt || sub.submittedAt || sub.submissionDate;
+                          if (rawDate) {
+                            try {
+                              const dateObj = (rawDate.toDate) ? rawDate.toDate() : new Date(rawDate);
+                              if (!isNaN(dateObj.getTime())) {
+                                formattedDate = dateObj.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+                              }
+                            } catch (e) {}
+                          }
+
+                          return (
+                            <tr key={sub.id || sIdx} className="hover:bg-app-surface/20 transition-colors">
+                              <td className="py-3 px-4 font-bold text-app-text">{sub.candidateName || 'Anonymous Candidate'}</td>
+                              <td className="py-3 px-4 text-brand-purple font-semibold">{sub.jobTitle || 'General Application'}</td>
+                              <td className="py-3 px-4">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                  sub.status?.toLowerCase() === 'selected' || sub.status?.toLowerCase() === 'hired' || sub.status?.toLowerCase() === 'joined'
+                                    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/25'
+                                    : sub.status?.toLowerCase() === 'shortlisted'
+                                    ? 'bg-brand-blue/10 text-brand-blue border-brand-blue/25'
+                                    : 'bg-white/5 text-app-muted border-app-border'
+                                }`}>
+                                  {sub.status || 'Submitted'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right font-mono text-[11px]">{formattedDate}</td>
+                            </tr>
+                          );
+                        });
+                      })()}
                     </tbody>
                   </table>
                 </div>

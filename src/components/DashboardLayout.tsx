@@ -1,4 +1,4 @@
-import { useState, ReactNode } from 'react';
+import { useState, ReactNode, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, 
@@ -27,6 +27,9 @@ import {
 } from 'lucide-react';
 import { UserRole } from '../types';
 import ThemeToggle from './common/ThemeToggle';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -40,6 +43,20 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children, role, onLogout, activeTab, setActiveTab, theme, toggleTheme }: DashboardLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user } = useAuth();
+  const [bdmProfile, setBdmProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (!user || role !== 'm_manager') return;
+    const unsub = onSnapshot(doc(db, 'marketplace_bdms', user.uid), (snap) => {
+      if (snap.exists()) {
+        setBdmProfile(snap.data());
+      }
+    }, (err) => {
+      console.error('Error fetching BDM profile for top navigation:', err);
+    });
+    return () => unsub();
+  }, [user, role]);
 
   const menuItems = {
     // MARKETPLACE ECOSYSTEM
@@ -479,13 +496,17 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
             <div className="flex items-center gap-3 pl-2 sm:pl-6 border-l border-app-border">
               <div className="text-right hidden sm:block">
                 <div className="text-sm font-bold text-app-text">
-                  {role === 'u_admin' ? 'Dr. Sandeep Jain' : role === 'u_officer' ? 'Priya Sharma' : role === 'c_admin' ? 'Vikram Singh' : role === 'c_manager' ? 'Amit Verma' : role === 'm_manager' || role === 'u_student' || role === 'c_employee' ? 'Rohit Kumar' : 'Rishi Kumar'}
+                  {role === 'm_manager' && bdmProfile
+                    ? (bdmProfile.fullName || bdmProfile.name || 'Anonymous Manager')
+                    : role === 'u_admin' ? 'Dr. Sandeep Jain' : role === 'u_officer' ? 'Priya Sharma' : role === 'c_admin' ? 'Vikram Singh' : role === 'c_manager' ? 'Amit Verma' : role === 'm_manager' || role === 'u_student' || role === 'c_employee' ? 'Rohit Kumar' : 'Rishi Kumar'}
                 </div>
                 <div className="text-[10px] font-bold uppercase tracking-widest text-brand-blue">{getRoleLabel(role)}</div>
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full blue-gradient p-0.5">
                 <img 
-                  src={role === 'u_admin' ? 'https://picsum.photos/seed/sandeepjain/100/100' : role === 'u_officer' ? 'https://picsum.photos/seed/priyasharma/100/100' : role === 'c_admin' ? 'https://picsum.photos/seed/vikramsingh/100/100' : role === 'c_manager' ? 'https://picsum.photos/seed/amitverma/100/100' : 'https://picsum.photos/seed/user123/100/100'} 
+                  src={role === 'm_manager' && bdmProfile
+                    ? (bdmProfile.profilePhotoUrl || bdmProfile.img || 'https://picsum.photos/seed/manager/100/100')
+                    : role === 'u_admin' ? 'https://picsum.photos/seed/sandeepjain/100/100' : role === 'u_officer' ? 'https://picsum.photos/seed/priyasharma/100/100' : role === 'c_admin' ? 'https://picsum.photos/seed/vikramsingh/100/100' : role === 'c_manager' ? 'https://picsum.photos/seed/amitverma/100/100' : 'https://picsum.photos/seed/user123/100/100'} 
                   alt="Avatar" 
                   className="w-full h-full rounded-full object-cover border-2 border-app-bg"
                   referrerPolicy="no-referrer"

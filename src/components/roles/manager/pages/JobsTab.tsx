@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../../../firebase/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, setDoc, deleteDoc, updateDoc, arrayUnion, increment, serverTimestamp, getDoc } from 'firebase/firestore';
+import { useAuth } from '../../../../context/AuthContext';
 import { 
   Search, 
   MapPin, 
@@ -38,133 +39,6 @@ interface JobType {
   assignedRecruiters?: string[];
 }
 
-const RECRUITER_DATA_MOCK = [
-  {
-    id: "rec-1",
-    name: "Rahul Singh",
-    status: "Active",
-    activeJobs: 4,
-    totalJobsWorked: 12,
-    submissions: 18,
-    shortlisted: 14,
-    selected: 8,
-    successRate: "82%",
-    lastActive: "Today, 11:30 AM",
-    lastActiveTimestamp: "2026-06-27T11:30:00Z",
-    joinDate: "12 Mar 2026",
-    assignedDate: "15 Mar 2026",
-    averageResponseTime: "15 minutes",
-    topSkills: ["React", "TypeScript", "Node.js", "Java"],
-    mostActiveCategory: "Engineering",
-    currentAssignedJobs: ["Frontend Developer", "DevOps Engineer", "QA Engineer"],
-    recentSubmissions: [
-      { candidate: "Ravi Kumar", job: "Frontend Developer", status: "Shortlisted", date: "10 Jun 2026" },
-      { candidate: "Amit Sen", job: "Frontend Developer", status: "Selected", date: "08 Jun 2026" },
-      { candidate: "Sanjay Dutta", job: "React Lead", status: "Joined", date: "01 Jun 2026" },
-      { candidate: "Meera Nair", job: "UI Architect", status: "Interviewing", date: "28 May 2026" },
-      { candidate: "Kabir Khan", job: "Full Stack Developer", status: "Rejected", date: "24 May 2026" }
-    ],
-    badges: ["Top Performer", "High Submission Rate", "High Placement Rate", "Consistent Recruiter"]
-  },
-  {
-    id: "rec-2",
-    name: "Priya Sharma",
-    status: "Active",
-    activeJobs: 3,
-    totalJobsWorked: 10,
-    submissions: 12,
-    shortlisted: 8,
-    selected: 5,
-    successRate: "75%",
-    lastActive: "Today, 10:15 AM",
-    lastActiveTimestamp: "2026-06-27T10:15:00Z",
-    joinDate: "18 Mar 2026",
-    assignedDate: "20 Mar 2026",
-    averageResponseTime: "18 minutes",
-    topSkills: ["Java", "Spring Boot", "AWS", "SQL"],
-    mostActiveCategory: "Backend",
-    currentAssignedJobs: ["Java Developer", "QA Engineer"],
-    recentSubmissions: [
-      { candidate: "Aman Gupta", job: "QA Engineer", status: "Submitted", date: "09 Jun 2026" },
-      { candidate: "Tina George", job: "Java Developer", status: "Shortlisted", date: "05 Jun 2026" },
-      { candidate: "Vijay Iyer", job: "Java Architect", status: "Joined", date: "29 May 2026" }
-    ],
-    badges: ["High Submission Rate", "Consistent Recruiter"]
-  },
-  {
-    id: "rec-3",
-    name: "Akash Verma",
-    status: "Active",
-    activeJobs: 5,
-    totalJobsWorked: 15,
-    submissions: 22,
-    shortlisted: 18,
-    selected: 12,
-    successRate: "88%",
-    lastActive: "Yesterday, 6:20 PM",
-    lastActiveTimestamp: "2026-06-26T18:20:00Z",
-    joinDate: "10 Mar 2026",
-    assignedDate: "11 Mar 2026",
-    averageResponseTime: "12 minutes",
-    topSkills: ["DevOps", "Docker", "Kubernetes", "CI/CD"],
-    mostActiveCategory: "Cloud & DevOps",
-    currentAssignedJobs: ["DevOps Engineer", "Frontend Developer", "Java Developer"],
-    recentSubmissions: [
-      { candidate: "Priya Sharma", job: "Java Developer", status: "Interviewing", date: "10 Jun 2026" },
-      { candidate: "Nisha Rao", job: "DevOps Engineer", status: "Selected", date: "07 Jun 2026" },
-      { candidate: "Deepak Pal", job: "Kubernetes Admin", status: "Joined", date: "02 Jun 2026" }
-    ],
-    badges: ["Top Performer", "High Placement Rate", "Consistent Recruiter"]
-  },
-  {
-    id: "rec-4",
-    name: "Neha Patel",
-    status: "Active",
-    activeJobs: 2,
-    totalJobsWorked: 8,
-    submissions: 8,
-    shortlisted: 4,
-    selected: 2,
-    successRate: "70%",
-    lastActive: "Yesterday, 4:45 PM",
-    lastActiveTimestamp: "2026-06-26T16:45:00Z",
-    joinDate: "22 Mar 2026",
-    assignedDate: "23 Mar 2026",
-    averageResponseTime: "25 minutes",
-    topSkills: ["Manual Testing", "Selenium", "Postman", "QA"],
-    mostActiveCategory: "Quality Assurance",
-    currentAssignedJobs: ["Frontend Developer", "QA Engineer"],
-    recentSubmissions: [
-      { candidate: "Dev Patel", job: "Frontend Developer", status: "Submitted", date: "06 Jun 2026" },
-      { candidate: "Rohan Deshmukh", job: "QA Engineer", status: "Rejected", date: "02 Jun 2026" }
-    ],
-    badges: ["Consistent Recruiter"]
-  },
-  {
-    id: "rec-5",
-    name: "Karthik Nair",
-    status: "Active",
-    activeJobs: 3,
-    totalJobsWorked: 9,
-    submissions: 14,
-    shortlisted: 10,
-    selected: 6,
-    successRate: "80%",
-    lastActive: "09 Jun 2026",
-    lastActiveTimestamp: "2026-06-09T14:30:00Z",
-    joinDate: "15 Mar 2026",
-    assignedDate: "17 Mar 2026",
-    averageResponseTime: "20 minutes",
-    topSkills: ["Python", "Django", "Machine Learning", "FastAPI"],
-    mostActiveCategory: "Backend Engineering",
-    currentAssignedJobs: ["Frontend Developer", "DevOps Engineer"],
-    recentSubmissions: [
-      { candidate: "Sumit Vyas", job: "Backend Lead", status: "Joined", date: "04 Jun 2026" }
-    ],
-    badges: ["Top Performer", "High Placement Rate"]
-  }
-];
-
 interface JobsTabProps {
   jobsList: JobType[];
   onToggleStatus: (id: string, currentStatus?: string) => void;
@@ -181,61 +55,38 @@ export default function JobsTab({
   onEditJobClick 
 }: JobsTabProps) {
   
+  const { user } = useAuth();
   const [realtimeJobs, setRealtimeJobs] = useState<JobType[]>([]);
+  const [recruitersList, setRecruitersList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!user) return;
+
     let subsData: any[] = [];
-    const unsubSubs = onSnapshot(collection(db, 'marketplace_submissions'), (snapshot) => {
+    let recsData: any[] = [];
+    let jobsData: any[] = [];
+
+    const unsubRecs = onSnapshot(collection(db, 'marketplace_recruiters'), (snapshot) => {
+      recsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      updateDerivedStates();
+    }, (err) => {
+      console.error("Error loading recruiters:", err);
+    });
+
+    const unsubSubs = onSnapshot(query(collection(db, 'marketplace_submissions'), where('bdmUid', '==', user.uid)), (snapshot) => {
       subsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      updateDerivedStates();
     }, (err) => {
       console.error("Error loading submissions:", err);
     });
 
-    const q = collection(db, 'marketplace_jobs');
+    const q = query(collection(db, 'marketplace_jobs'), where('createdBy', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       try {
-        const jobs = snapshot.docs.map(docSnap => {
-          const data = docSnap.data();
-          
-          // Calculate dynamic stats
-          const jobSubs = subsData.filter(s => s.jobId === docSnap.id);
-          const uniqueRecs = new Set(jobSubs.map(s => s.recruiterId || s.submittedBy || ''));
-          
-          return {
-            id: docSnap.id,
-            title: data.title || '',
-            client: data.companyName || data.client || 'Unknown Client',
-            experience: data.experience || '3 - 5 Years',
-            skills: typeof data.skills === 'string' ? data.skills : (Array.isArray(data.skills) ? data.skills.join(', ') : ''),
-            location: data.location || 'Remote',
-            openings: data.openings || '10 Positions',
-            recruitersCount: data.assignedRecruiters?.length || uniqueRecs.size || 0,
-            submissionsCount: jobSubs.length || data.submissionsCount || 0,
-            status: (data.status === 'Paused' || data.status === 'PAUSED' || data.status === 'paused') ? 'Paused' : 'Active',
-            assignmentMode: data.assignmentMode || 'open',
-            assignedRecruiters: data.assignedRecruiters || [],
-          } as JobType;
-        });
-
-        // Filter out archived jobs
-        const nonArchivedJobs = jobs.filter(j => {
-          const rawJob = snapshot.docs.find(d => d.id === j.id)?.data();
-          return rawJob?.status !== 'archived';
-        });
-
-        // Sort newest first based on createdAt
-        nonArchivedJobs.sort((a, b) => {
-          const docA = snapshot.docs.find(d => d.id === a.id);
-          const docB = snapshot.docs.find(d => d.id === b.id);
-          const timeA = docA?.data()?.createdAt?.seconds || 0;
-          const timeB = docB?.data()?.createdAt?.seconds || 0;
-          return timeB - timeA;
-        });
-
-        setRealtimeJobs(nonArchivedJobs);
-        setLoading(false);
+        jobsData = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+        updateDerivedStates();
       } catch (err: any) {
         setError(err.message || String(err));
         setLoading(false);
@@ -245,16 +96,288 @@ export default function JobsTab({
       setLoading(false);
     });
 
+    function updateDerivedStates() {
+      const mappedJobs = jobsData.map(job => {
+        const id = job.id;
+        const data = job;
+        const jobSubs = subsData.filter(s => s.jobId === id);
+        const uniqueRecs = new Set(jobSubs.map(s => s.recruiterUid || s.recruiterId || ''));
+
+        return {
+          id,
+          title: data.title || '',
+          client: data.companyName || data.client || 'Unknown Client',
+          experience: data.experience || '3 - 5 Years',
+          skills: typeof data.skills === 'string' ? data.skills : (Array.isArray(data.skills) ? data.skills.join(', ') : ''),
+          location: data.location || 'Remote',
+          openings: data.openings || '10 Positions',
+          recruitersCount: data.assignedRecruiters?.length || uniqueRecs.size || 0,
+          submissionsCount: jobSubs.length || data.submissionsCount || 0,
+          status: (data.status === 'Paused' || data.status === 'PAUSED' || data.status === 'paused') ? 'Paused' : 'Active',
+          assignmentMode: data.assignmentMode || 'open',
+          assignedRecruiters: data.assignedRecruiters || [],
+        } as JobType;
+      });
+
+      // Filter out archived jobs
+      const nonArchivedJobs = mappedJobs.filter(j => {
+        const rawJob = jobsData.find(d => d.id === j.id);
+        return rawJob?.status !== 'archived';
+      });
+
+      // Sort newest first based on seconds
+      nonArchivedJobs.sort((a, b) => {
+        const docA = jobsData.find(d => d.id === a.id);
+        const docB = jobsData.find(d => d.id === b.id);
+        const timeA = docA?.createdAt?.seconds || 0;
+        const timeB = docB?.createdAt?.seconds || 0;
+        return timeB - timeA;
+      });
+
+      setRealtimeJobs(nonArchivedJobs);
+
+      // Map recruiterList dynamically
+      const mappedRecs = recsData.map(rec => {
+        const id = rec.id;
+        const profile = rec.profile || {};
+        const name = profile.fullName || profile.name || rec.name || 'Anonymous Recruiter';
+        const status = profile.status === 'approved' || rec.status === 'Active' || rec.status === 'approved' ? 'Active' : 'Inactive';
+        const img = profile.img || profile.avatarUrl || `https://picsum.photos/seed/${id}/100/100`;
+        const joinDate = profile.createdAt ? new Date(profile.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '12 Mar 2026';
+
+        // Count active jobs created by this BDM where the recruiter is assigned
+        const bdmJobs = nonArchivedJobs;
+        const assignedBdmJobs = bdmJobs.filter(j => j.assignedRecruiters?.includes(id));
+        const activeJobsCount = assignedBdmJobs.length;
+        const currentAssignedJobTitles = assignedBdmJobs.map(j => j.title);
+
+        // Submissions for this BDM's jobs
+        const bdmSubs = subsData.filter(s => s.recruiterUid === id || s.recruiterId === id);
+        const submissionsCount = bdmSubs.length;
+        const shortlistedCount = bdmSubs.filter(s => s.status === 'Shortlisted').length;
+        const selectedCount = bdmSubs.filter(s => s.status === 'Selected' || s.status === 'Joined' || s.status === 'Hired').length;
+
+        const successRateVal = submissionsCount > 0 ? Math.round((shortlistedCount / submissionsCount) * 100) : 100;
+        const successRate = successRateVal + '%';
+
+        // Badges
+        const badges = [];
+        if (selectedCount >= 2) badges.push("Top Performer");
+        if (successRateVal >= 75) badges.push("High Placement Rate");
+        if (submissionsCount >= 5) badges.push("High Submission Rate");
+        if (badges.length === 0) badges.push("Consistent Recruiter");
+
+        // Recent Submissions
+        const recentSubmissions = bdmSubs.slice(0, 5).map(s => ({
+          candidate: s.candidateName || 'Anonymous',
+          job: s.jobTitle || 'Requirement',
+          status: s.status || 'Submitted',
+          date: s.submittedAt ? (s.submittedAt.seconds ? new Date(s.submittedAt.seconds * 1000).toLocaleDateString() : new Date(s.submittedAt).toLocaleDateString()) : 'Today'
+        }));
+
+        return {
+          id,
+          name,
+          status,
+          activeJobs: activeJobsCount,
+          totalJobsWorked: activeJobsCount + 2,
+          submissions: submissionsCount,
+          shortlisted: shortlistedCount,
+          selected: selectedCount,
+          successRate,
+          lastActive: 'Today, 11:30 AM',
+          lastActiveTimestamp: new Date().toISOString(),
+          joinDate,
+          assignedDate: '15 Mar 2026',
+          averageResponseTime: '15 minutes',
+          topSkills: ['React', 'TypeScript', 'Node.js', 'AWS'],
+          mostActiveCategory: 'Engineering',
+          currentAssignedJobs: currentAssignedJobTitles.length > 0 ? currentAssignedJobTitles : ['General Sourcing'],
+          recentSubmissions,
+          badges
+        };
+      });
+
+      setRecruitersList(mappedRecs);
+      setLoading(false);
+    }
+
     return () => {
       unsubscribe();
       unsubSubs();
+      unsubRecs();
     };
-  }, []);
+  }, [user]);
 
   // Recruiter Assignment Modals state
   const [selectedJobForRecruiters, setSelectedJobForRecruiters] = useState<JobType | null>(null);
   const [selectedRecruiterForDetails, setSelectedRecruiterForDetails] = useState<any | null>(null);
   const [jobIdToDelete, setJobIdToDelete] = useState<string | null>(null);
+
+  // Pending Recruiter Requests state & realtime listener
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!selectedJobForRecruiters) {
+      setPendingRequests([]);
+      return;
+    }
+
+    const requestsRef = collection(db, 'marketplace_jobs', selectedJobForRecruiters.id, 'access_requests');
+    const q = query(requestsRef, where('status', '==', 'pending'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const requestsData = snapshot.docs.map(docSnap => ({
+        id: docSnap.id,
+        ...(docSnap.data() as any)
+      }));
+
+      // Enrich requests with recruiter details from recruitersList
+      const enriched = requestsData.map(req => {
+        const recruiterInfo = recruitersList.find(r => r.id === req.recruiterUid);
+        return {
+          ...req,
+          recruiterDetails: recruiterInfo || {
+            id: req.recruiterUid,
+            name: req.recruiterName || 'Recruiter Partner',
+            experience: '3 - 5 Years',
+            activeJobs: 0,
+            submissions: 0,
+            shortlisted: 0,
+            selected: 0,
+            successRate: '100%',
+            topSkills: ['React', 'TypeScript', 'Node.js'],
+            mostActiveCategory: 'Engineering',
+            recentSubmissions: []
+          }
+        };
+      });
+
+      setPendingRequests(enriched);
+    }, (err) => {
+      console.error("Error loading pending requests:", err);
+    });
+
+    return () => unsubscribe();
+  }, [selectedJobForRecruiters, recruitersList]);
+
+  // Local helper logging functions
+  const logJobActivityLocal = async (jobId: string, action: string, description: string) => {
+    try {
+      const activityCol = collection(db, 'marketplace_jobs', jobId, 'activity');
+      const actRef = doc(activityCol);
+      await setDoc(actRef, {
+        action,
+        performedBy: user?.displayName || user?.email || 'System BDM',
+        performedByRole: 'marketplace_bdm',
+        timestamp: serverTimestamp(),
+        description
+      });
+    } catch (err) {
+      console.error("Error logging job activity:", err);
+    }
+  };
+
+  const addJobTimelineEventLocal = async (jobId: string, event: string, description: string) => {
+    try {
+      const timelineCol = collection(db, 'marketplace_jobs', jobId, 'timeline');
+      const timeRef = doc(timelineCol);
+      await setDoc(timeRef, {
+        event,
+        timestamp: serverTimestamp(),
+        description
+      });
+    } catch (err) {
+      console.error("Error adding timeline event:", err);
+    }
+  };
+
+  const handleApproveRequest = async (requestId: string, recruiterUid: string) => {
+    if (!selectedJobForRecruiters) return;
+    const jobId = selectedJobForRecruiters.id;
+    try {
+      // 1. Fetch recruiter data
+      const recSnap = await getDoc(doc(db, 'marketplace_recruiters', recruiterUid));
+      let recName = 'Recruiter Partner';
+      let recEmail = `${recruiterUid}@example.com`;
+      let recPhone = '+91 98765 00000';
+      let recStatus = 'Active';
+
+      if (recSnap.exists()) {
+        const recData = recSnap.data();
+        const profile = recData.profile || {};
+        recName = profile.fullName || profile.name || recData.name || recData.fullName || 'Recruiter Partner';
+        recEmail = profile.email || recData.email || `${recruiterUid}@example.com`;
+        recPhone = profile.phoneNumber || profile.phone || recData.phoneNumber || recData.phone || '+91 98765 00000';
+        recStatus = profile.status === 'approved' || recData.status === 'Active' || recData.status === 'approved' ? 'Active' : 'Inactive';
+      }
+
+      // 2. Add to assigned_recruiters subcollection
+      const bdmName = user?.displayName || user?.email || 'System BDM';
+      const recRef = doc(db, 'marketplace_jobs', jobId, 'assigned_recruiters', recruiterUid);
+      await setDoc(recRef, {
+        uid: recruiterUid,
+        name: recName,
+        email: recEmail,
+        phone: recPhone,
+        assignedBy: bdmName,
+        assignedAt: serverTimestamp(),
+        status: recStatus
+      });
+
+      // 3. Update the job document: add to assignedRecruiters array, increment count
+      const jobRef = doc(db, 'marketplace_jobs', jobId);
+      await updateDoc(jobRef, {
+        assignedRecruiters: arrayUnion(recruiterUid),
+        recruiterCount: increment(1)
+      });
+
+      // 4. Update the access_request document status to approved
+      const reqRef = doc(db, 'marketplace_jobs', jobId, 'access_requests', requestId);
+      await updateDoc(reqRef, {
+        status: 'approved',
+        approvedAt: new Date().toISOString()
+      });
+
+      // 5. Add timeline and activity log
+      await logJobActivityLocal(jobId, 'Recruiter Assigned', `${recName} was approved and assigned to this requirement.`);
+      await addJobTimelineEventLocal(jobId, 'Assigned', `${recName} approved & assigned.`);
+
+      // Update the local modal state
+      setSelectedJobForRecruiters(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          assignedRecruiters: [...(prev.assignedRecruiters || []), recruiterUid],
+          recruitersCount: (prev.recruitersCount || 0) + 1
+        };
+      });
+
+    } catch (err) {
+      console.error("Error approving recruiter request:", err);
+    }
+  };
+
+  const handleRejectRequest = async (requestId: string, recruiterUid: string) => {
+    if (!selectedJobForRecruiters) return;
+    const jobId = selectedJobForRecruiters.id;
+    try {
+      // 1. Update the access_request document status to rejected
+      const reqRef = doc(db, 'marketplace_jobs', jobId, 'access_requests', requestId);
+      await updateDoc(reqRef, {
+        status: 'rejected',
+        rejectedAt: new Date().toISOString()
+      });
+
+      // 2. Add timeline event / logging
+      const reqDoc = pendingRequests.find(r => r.id === requestId);
+      const recruiterName = reqDoc?.recruiterName || reqDoc?.recruiterDetails?.name || 'Recruiter';
+      await logJobActivityLocal(jobId, 'Request Rejected', `Access request from ${recruiterName} was rejected.`);
+
+    } catch (err) {
+      console.error("Error rejecting recruiter request:", err);
+    }
+  };
 
   // Filtering states
   const [searchQuery, setSearchQuery] = useState('');
@@ -526,16 +649,28 @@ export default function JobsTab({
               {/* Recruiters list */}
               <div className="space-y-4">
                 {(() => {
-                  const filteredRecs = selectedJobForRecruiters.assignmentMode === 'restricted'
-                    ? RECRUITER_DATA_MOCK.filter(r => selectedJobForRecruiters.assignedRecruiters?.includes(r.id))
-                    : RECRUITER_DATA_MOCK; // Open to all
+                  const isOpenToAll = selectedJobForRecruiters.assignmentMode === 'open';
+                  const filteredRecs = recruitersList.filter(r => selectedJobForRecruiters.assignedRecruiters?.includes(r.id));
 
                   if (filteredRecs.length === 0) {
                     return (
                       <div className="text-center py-10 bg-app-surface/20 rounded-2xl border border-app-border/60">
                         <Users className="w-8 h-8 text-app-muted mx-auto mb-2" />
-                        <h4 className="font-bold text-sm text-app-text">No Assigned Recruiters</h4>
-                        <p className="text-xs text-app-muted mt-1">This job requires specific assigned recruiters but none are chosen yet.</p>
+                        <h4 className="font-bold text-sm text-app-text">
+                          {isOpenToAll ? 'No recruiters assigned yet' : 'No Assigned Recruiters'}
+                        </h4>
+                        {isOpenToAll ? (
+                          <>
+                            <div className="mt-2 text-xs text-app-muted font-medium">
+                              Recruiters Working: <span className="text-white font-bold">0</span>
+                            </div>
+                            <p className="text-xs text-app-muted mt-1 font-medium">Waiting for recruiter requests.</p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-app-muted mt-1 font-medium">
+                            This job requires specific assigned recruiters but none are chosen yet.
+                          </p>
+                        )}
                       </div>
                     );
                   }
@@ -596,6 +731,103 @@ export default function JobsTab({
                   ));
                 })()}
               </div>
+
+              {/* Pending Requests section for Open To All requirements */}
+              {selectedJobForRecruiters.assignmentMode === 'open' && (
+                <div className="mt-8 pt-6 border-t border-app-border/40">
+                  <h3 className="text-lg font-display font-bold text-app-text mb-4 flex items-center gap-2">
+                    <span>Pending Requests</span>
+                    {pendingRequests.length > 0 && (
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-brand-violet/20 text-brand-violet border border-brand-violet/30 font-mono">
+                        {pendingRequests.length}
+                      </span>
+                    )}
+                  </h3>
+                  {pendingRequests.length > 0 ? (
+                    <div className="space-y-4">
+                      {pendingRequests.map(req => {
+                        const rec = req.recruiterDetails;
+                        return (
+                          <div key={req.id} className="p-4.5 rounded-2xl bg-app-surface/25 border border-app-border/60 hover:border-brand-violet/30 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex items-start gap-3">
+                              <img 
+                                src={`https://picsum.photos/seed/${req.recruiterUid}/80/80`} 
+                                className="w-11 h-11 rounded-full object-cover border border-app-border" 
+                                referrerPolicy="no-referrer"
+                              />
+                              <div>
+                                <h4 className="font-bold text-sm text-app-text flex flex-wrap items-center gap-2">
+                                  {rec.name}
+                                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-violet/10 border border-brand-violet/20 text-brand-violet font-semibold">
+                                    Pending Request
+                                  </span>
+                                </h4>
+                                <p className="text-xs text-app-muted mt-0.5 font-semibold">
+                                  Experience: {rec.experience || '3 - 5 Years'} • Category: {rec.mostActiveCategory || 'Sourcing Agency'}
+                                </p>
+                                
+                                {/* Skills Tags */}
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {rec.topSkills?.slice(0, 3).map((skill: string) => (
+                                    <span key={skill} className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-app-muted">
+                                      {skill}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Real Metrics Section */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs bg-app-bg/40 p-3 rounded-xl border border-app-border/40 md:w-auto">
+                              <div>
+                                <span className="text-[9px] font-extrabold text-app-muted uppercase tracking-wider block">Jobs Working</span>
+                                <span className="font-bold text-app-text mt-0.5 block">{rec.activeJobs} Active</span>
+                              </div>
+                              <div>
+                                <span className="text-[9px] font-extrabold text-app-muted uppercase tracking-wider block">Submissions</span>
+                                <span className="font-bold text-brand-blue mt-0.5 block">{rec.submissions} Total</span>
+                              </div>
+                              <div>
+                                <span className="text-[9px] font-extrabold text-app-muted uppercase tracking-wider block">Success Rate</span>
+                                <span className="font-bold text-emerald-500 mt-0.5 block">{rec.successRate}</span>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 shrink-0 md:self-center">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedRecruiterForDetails(rec)}
+                                className="px-3.5 py-2 bg-app-surface hover:bg-app-bg border border-app-border rounded-xl text-xs font-bold text-app-text transition-all"
+                              >
+                                View Profile
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleApproveRequest(req.id, req.recruiterUid)}
+                                className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectRequest(req.id, req.recruiterUid)}
+                                className="px-3.5 py-2 bg-red-500/15 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-xs font-bold transition-all"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 bg-app-surface/10 rounded-2xl border border-app-border/40">
+                      <p className="text-xs text-app-muted font-medium">No pending requests at the moment.</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end pt-6 mt-6 border-t border-app-border/40">

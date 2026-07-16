@@ -194,25 +194,44 @@ const syncAssignedRecruitersSubcollection = async (jobId: string, recruiterIds: 
     // 1. Add new recruiters
     for (const rid of recruiterIds) {
       if (!previousRecruiters.includes(rid)) {
-        const recInfo = RECRUITER_INFOS[rid] || {
-          name: 'Recruiter Partner',
-          email: `${rid}@example.com`,
-          phone: '+91 98765 00000',
-          status: 'Active'
-        };
+        // Fetch real recruiter data from Firestore
+        const recSnap = await getDoc(doc(db, 'marketplace_recruiters', rid));
+        let recName = 'Recruiter Partner';
+        let recEmail = `${rid}@example.com`;
+        let recPhone = '+91 98765 00000';
+        let recStatus = 'Active';
+
+        if (recSnap.exists()) {
+          const recData = recSnap.data();
+          const profile = recData.profile || {};
+          recName = profile.fullName || profile.name || recData.name || recData.fullName || 'Recruiter Partner';
+          recEmail = profile.email || recData.email || `${rid}@example.com`;
+          recPhone = profile.phoneNumber || profile.phone || recData.phoneNumber || recData.phone || '+91 98765 00000';
+          recStatus = profile.status === 'approved' || recData.status === 'Active' || recData.status === 'approved' ? 'Active' : 'Inactive';
+        } else {
+          // Fallback to RECRUITER_INFOS if document doesn't exist
+          const recInfo = RECRUITER_INFOS[rid];
+          if (recInfo) {
+            recName = recInfo.name;
+            recEmail = recInfo.email;
+            recPhone = recInfo.phone;
+            recStatus = recInfo.status;
+          }
+        }
+
         const recRef = doc(db, 'marketplace_jobs', jobId, 'assigned_recruiters', rid);
         await setDoc(recRef, {
           uid: rid,
-          name: recInfo.name,
-          email: recInfo.email,
-          phone: recInfo.phone,
+          name: recName,
+          email: recEmail,
+          phone: recPhone,
           assignedBy: bdmName,
           assignedAt: serverTimestamp(),
-          status: recInfo.status
+          status: recStatus
         });
         
         // Log activity & timeline
-        await logJobActivity(jobId, 'Recruiter Assigned', `${recInfo.name} was assigned to this requirement.`);
+        await logJobActivity(jobId, 'Recruiter Assigned', `${recName} was assigned to this requirement.`);
       }
     }
 
@@ -222,8 +241,20 @@ const syncAssignedRecruitersSubcollection = async (jobId: string, recruiterIds: 
         const recRef = doc(db, 'marketplace_jobs', jobId, 'assigned_recruiters', rid);
         await deleteDoc(recRef);
         
-        const recInfo = RECRUITER_INFOS[rid] || { name: rid };
-        await logJobActivity(jobId, 'Recruiter Removed', `${recInfo.name} was unassigned from this requirement.`);
+        // Fetch name for logging activity
+        const recSnap = await getDoc(doc(db, 'marketplace_recruiters', rid));
+        let recName = rid;
+        if (recSnap.exists()) {
+          const recData = recSnap.data();
+          const profile = recData.profile || {};
+          recName = profile.fullName || profile.name || recData.name || recData.fullName || rid;
+        } else {
+          const recInfo = RECRUITER_INFOS[rid];
+          if (recInfo) {
+            recName = recInfo.name;
+          }
+        }
+        await logJobActivity(jobId, 'Recruiter Removed', `${recName} was unassigned from this requirement.`);
       }
     }
   } catch (err) {
@@ -420,64 +451,7 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
   ]);
 
   // BDM Manager States and Datasets matching Image 2 exactly
-  const [mManagerJobs, setMManagerJobs] = useState([
-    {
-      id: 'job-1',
-      title: 'Frontend Developer',
-      client: 'ABC Technologies',
-      experience: '3 - 5 Years',
-      skills: 'React, Node.js, TypeScript, HTML',
-      location: 'Hyderabad',
-      openings: '15 Positions',
-      recruitersCount: 5,
-      submissionsCount: 18,
-      status: 'Active' as const,
-      assignmentMode: 'restricted' as const,
-      assignedRecruiters: ['rec-1', 'rec-2', 'rec-3', 'rec-4', 'rec-5'],
-    },
-    {
-      id: 'job-2',
-      title: 'Java Developer',
-      client: 'Infosoft',
-      experience: '4 - 6 Years',
-      skills: 'Java, Spring Boot, MySQL',
-      location: 'Bangalore',
-      openings: '8 Positions',
-      recruitersCount: 3,
-      submissionsCount: 12,
-      status: 'Active' as const,
-      assignmentMode: 'open' as const,
-      assignedRecruiters: [] as string[],
-    },
-    {
-      id: 'job-3',
-      title: 'QA Engineer',
-      client: 'X Corp',
-      experience: '2 - 4 Years',
-      skills: 'Manual Testing, Selenium, JIRA',
-      location: 'Pune',
-      openings: '6 Positions',
-      recruitersCount: 2,
-      submissionsCount: 8,
-      status: 'Active' as const,
-      assignmentMode: 'restricted' as const,
-      assignedRecruiters: ['rec-2', 'rec-3'],
-    },
-    {
-      id: 'job-4',
-      title: 'DevOps Engineer',
-      client: 'CloudNet Solutions',
-      experience: '3 - 6 Years',
-      skills: 'AWS, Docker, Kubernetes',
-      location: 'Remote',
-      openings: '10 Positions',
-      recruitersCount: 4,
-      submissionsCount: 15,
-      status: 'Active' as const,
-      assignmentMode: 'open' as const,
-      assignedRecruiters: [] as string[],
-    }
-  ]);
+  const [mManagerJobs, setMManagerJobs] = useState<any[]>([]);
   const [editingMManagerJob, setEditingMManagerJob] = useState<any | null>(null);
 
   // Recruiter Specific States and Datasets
@@ -941,30 +915,6 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
   // ==========================================
 
   React.useEffect(() => {
-    const syncJobs = () => {
-      const dbJobs = recruiterStorage.getJobs();
-      setMManagerJobs(dbJobs.map(job => ({
-        id: job.id,
-        title: job.title,
-        client: job.company,
-        experience: job.experience,
-        skills: Array.isArray(job.skills) ? job.skills.join(', ') : String(job.skills),
-        location: job.location,
-        openings: job.positions,
-        recruitersCount: job.jobType === 'assigned' ? 3 : 5, 
-        submissionsCount: recruiterStorage.getSubmissions().filter(s => s.jobId === job.id).length, 
-        status: job.accessStatus === 'none' ? 'Paused' as const : 'Active' as const, 
-        assignmentMode: job.jobType === 'assigned' ? 'restricted' as const : 'open' as const,
-        assignedRecruiters: job.jobType === 'assigned' ? ['rec-1', 'rec-2'] : []
-      })));
-    };
-
-    syncJobs();
-    window.addEventListener('storage', syncJobs);
-    return () => window.removeEventListener('storage', syncJobs);
-  }, []);
-
-  React.useEffect(() => {
     const unsub = onSnapshot(collection(db, 'marketplace_submissions'), async (snapshot) => {
       try {
         const allSubs = snapshot.docs.map(d => ({ id: d.id, ...d.data() as any }));
@@ -1329,9 +1279,25 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
       const bdmUid = auth.currentUser?.uid || 'anonymous-bdm';
       const dbStatus = jobData.status === 'Paused' ? 'paused' : 'open';
 
-      if (jobData.id) {
+      // Triple-layer of ID detection for edit mode
+      let jobId = jobData.id || editingMManagerJob?.id || editingMManagerJob?.jobId;
+
+      // Secondary fallback query to find existing job with same title and company name, created by current user
+      if (!jobId && jobData.title && jobData.client) {
+        const q = query(
+          collection(db, 'marketplace_jobs'),
+          where('createdBy', '==', bdmUid),
+          where('title', '==', jobData.title),
+          where('companyName', '==', jobData.client)
+        );
+        const querySnap = await getDocs(q);
+        if (!querySnap.empty) {
+          jobId = querySnap.docs[0].id;
+        }
+      }
+
+      if (jobId) {
         // Edit mode using updateDoc()
-        const jobId = jobData.id;
         const jobRef = doc(db, 'marketplace_jobs', jobId);
         
         // Fetch existing job to find old assignments
@@ -1354,7 +1320,9 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
           status: dbStatus,
           assignmentMode: jobData.assignmentMode || 'open',
           assignedRecruiters: jobData.assignedRecruiters || [],
-          updatedAt: serverTimestamp()
+          recruiterCount: jobData.assignedRecruiters?.length || 0,
+          updatedAt: serverTimestamp(),
+          updatedBy: bdmUid
         });
 
         // Sync BDM lightweight reference
@@ -1365,7 +1333,8 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
           company: jobData.client || 'Unknown',
           companyName: jobData.client || 'Unknown',
           status: dbStatus,
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
+          updatedBy: bdmUid
         }, { merge: true });
 
         // Sync recruiters subcollection

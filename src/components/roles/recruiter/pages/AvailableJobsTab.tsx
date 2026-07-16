@@ -148,9 +148,7 @@ export default function AvailableJobsTab({ onNavigate }: AvailableJobsTabProps) 
       const isAssigned = assignedJobIds.has(job.id);
       
       let accessStatus: 'approved' | 'pending' | 'none' = 'none';
-      if (jobType === 'open') {
-        accessStatus = 'approved';
-      } else if (isAssigned) {
+      if (isAssigned) {
         accessStatus = 'approved';
       } else {
         const reqStatus = accessRequestsMap.get(job.id);
@@ -374,9 +372,9 @@ export default function AvailableJobsTab({ onNavigate }: AvailableJobsTabProps) 
       <div className="space-y-4" id="jobs-listings-container">
         {filteredJobs.length > 0 ? (
           filteredJobs.map((job) => {
-            const isApproved = job.jobType === 'open' || job.accessStatus === 'approved';
-            const isPending = job.jobType === 'assigned' && job.accessStatus === 'pending';
-            const isLocked = job.jobType === 'assigned' && job.accessStatus === 'none';
+            const isApproved = job.accessStatus === 'approved';
+            const isPending = job.accessStatus === 'pending';
+            const isLocked = job.accessStatus === 'none';
 
             return (
               <div 
@@ -449,9 +447,7 @@ export default function AvailableJobsTab({ onNavigate }: AvailableJobsTabProps) 
                     {/* Access Status Display */}
                     <div className="text-[11px] font-bold">
                       Access Status:{' '}
-                      {job.jobType === 'open' ? (
-                        <span className="text-emerald-500">Unrestricted</span>
-                      ) : job.accessStatus === 'approved' ? (
+                      {job.accessStatus === 'approved' ? (
                         <span className="text-emerald-500">Access Approved</span>
                       ) : job.accessStatus === 'pending' ? (
                         <span className="text-yellow-500">Pending Approval</span>
@@ -466,7 +462,7 @@ export default function AvailableJobsTab({ onNavigate }: AvailableJobsTabProps) 
                         onClick={() => handleRequestAccess(job.id)} 
                         className="w-full md:w-auto px-6 py-3 bg-brand-blue text-white font-extrabold rounded-2xl shadow-lg shadow-brand-blue/15 text-xs hover:scale-[1.02] active:scale-95 transition-all"
                       >
-                        Request Access
+                        {job.jobType === 'open' ? 'Request To Work' : 'Request Access'}
                       </button>
                     )}
 

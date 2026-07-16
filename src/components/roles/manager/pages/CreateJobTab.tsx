@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { db } from '../../../../firebase/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { 
   ArrowLeft, 
   Plus, 
@@ -29,16 +31,6 @@ interface JobType {
   status: 'Active' | 'Paused';
 }
 
-const AVAILABLE_RECRUITERS = [
-  { id: "rec-1", name: "Rahul Singh", activeJobs: 4, submissions: 18, successRate: "82%", status: "Active", img: "https://picsum.photos/seed/rahul/100/100" },
-  { id: "rec-2", name: "Priya Sharma", activeJobs: 3, submissions: 12, successRate: "75%", status: "Active", img: "https://picsum.photos/seed/priya/100/100" },
-  { id: "rec-3", name: "Akash Verma", activeJobs: 5, submissions: 22, successRate: "88%", status: "Active", img: "https://picsum.photos/seed/akash/100/100" },
-  { id: "rec-4", name: "Neha Patel", activeJobs: 2, submissions: 8, successRate: "70%", status: "Active", img: "https://picsum.photos/seed/neha/100/100" },
-  { id: "rec-5", name: "Karthik Nair", activeJobs: 3, submissions: 14, successRate: "80%", status: "Active", img: "https://picsum.photos/seed/karthik/100/100" },
-  { id: "rec-6", name: "Vikas Mehta", activeJobs: 2, submissions: 6, successRate: "60%", status: "Inactive", img: "https://picsum.photos/seed/vikas/100/100" },
-  { id: "rec-7", name: "Simran Kaur", activeJobs: 1, submissions: 3, successRate: "90%", status: "Active", img: "https://picsum.photos/seed/simran/100/100" }
-];
-
 interface JobTypeExtended extends JobType {
   assignmentMode?: 'open' | 'restricted';
   assignedRecruiters?: string[];
@@ -55,6 +47,28 @@ interface CreateJobTabProps {
 }
 
 export default function CreateJobTab({ editJob, onBackToJobs, onSubmitJob }: CreateJobTabProps) {
+  
+  const [availableRecruiters, setAvailableRecruiters] = useState<any[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'marketplace_recruiters'), (snapshot) => {
+      const recs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const profile = data.profile || {};
+        return {
+          id: doc.id,
+          name: profile.fullName || profile.name || data.name || 'Anonymous Recruiter',
+          activeJobs: data.assignedJobs?.length || 0,
+          submissions: data.submissions || 0,
+          successRate: data.successRate || '100%',
+          status: profile.status === 'approved' || data.status === 'Active' || data.status === 'approved' ? 'Active' : 'Inactive',
+          img: profile.img || profile.avatarUrl || `https://picsum.photos/seed/${doc.id}/100/100`
+        };
+      });
+      setAvailableRecruiters(recs);
+    });
+    return () => unsubscribe();
+  }, []);
   
   // Local Form Fields
   const [title, setTitle] = useState('');
@@ -365,7 +379,7 @@ export default function CreateJobTab({ editJob, onBackToJobs, onSubmitJob }: Cre
 
                 {/* Grid list of matched available recruiters */}
                 <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                  {AVAILABLE_RECRUITERS.filter(r => 
+                  {availableRecruiters.filter(r => 
                     r.name.toLowerCase().includes(recruiterSearch.toLowerCase())
                   ).map(rec => {
                     const isSelected = assignedRecruiters.includes(rec.id);
@@ -375,7 +389,7 @@ export default function CreateJobTab({ editJob, onBackToJobs, onSubmitJob }: Cre
                         className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${
                           isSelected 
                             ? 'bg-brand-blue/5 border-brand-blue/30' 
-                            : 'bg-app-surface/40 border-app-border/60 hover:bg-app-surface'
+                             : 'bg-app-surface/40 border-app-border/60 hover:bg-app-surface'
                         }`}
                       >
                         <div className="flex items-center gap-3">
@@ -422,7 +436,7 @@ export default function CreateJobTab({ editJob, onBackToJobs, onSubmitJob }: Cre
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       {assignedRecruiters.map(id => {
-                        const rec = AVAILABLE_RECRUITERS.find(r => r.id === id);
+                        const rec = availableRecruiters.find(r => r.id === id);
                         if (!rec) return null;
                         return (
                           <span 

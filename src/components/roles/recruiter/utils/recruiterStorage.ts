@@ -571,7 +571,7 @@ function mapFirestoreJobToRecruiterJob(docData: any, docId: string): RecruiterJo
 
   // Determine access status dynamically based on BDM assignments array
   const isAssigned = docData.assignedRecruiters?.includes(auth.currentUser?.uid || '');
-  const accessStatus = jobType === 'open' || isAssigned ? 'approved' : 'none';
+  const accessStatus = isAssigned ? 'approved' : 'none';
 
   return {
     id: docId,
