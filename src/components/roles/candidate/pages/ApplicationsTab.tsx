@@ -16,19 +16,26 @@ import {
   AlertCircle, 
   User, 
   SlidersHorizontal,
-  ArrowUpRight
+  ArrowUpRight,
+  Calendar,
+  DollarSign,
+  MapPin,
+  ArrowUpDown,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   doc, 
   onSnapshot, 
-  updateDoc, 
-  setDoc, 
   collection, 
   query, 
   where 
 } from 'firebase/firestore';
 import { db } from '../../../../firebase/firebase';
 import { useAuth } from '../../../../context/AuthContext';
+import { useJobSeeker } from '../../../../context/JobSeekerContext';
 
 interface ApplicationTimeline {
   status: string;
@@ -41,6 +48,7 @@ interface FirestoreApplication {
   applicationId: string;
   candidateUid: string;
   candidateName: string;
+  candidateEmail: string;
   jobId: string;
   jobTitle: string;
   companyId: string;
@@ -54,56 +62,152 @@ interface FirestoreApplication {
   updatedAt: string;
   resumeName: string;
   jobDescription?: string;
+  recruiterRemarks?: string;
+  recruiterNotes?: string;
+  bdmRemarks?: string;
+  bdmNotes?: string;
+  interviewSchedule?: {
+    date?: string;
+    time?: string;
+    link?: string;
+    instructions?: string;
+    location?: string;
+    format?: string;
+    [key: string]: any;
+  } | string;
+  offerDetails?: {
+    salary?: string;
+    baseSalary?: string;
+    compensation?: string;
+    equity?: string;
+    benefits?: string;
+    joiningDate?: string;
+    offerLetterUrl?: string;
+    notes?: string;
+    [key: string]: any;
+  } | string;
 }
+
+const ITEMS_PER_PAGE = 5;
 
 export default function ApplicationsTab() {
   const { user, userProfile } = useAuth();
-  const uid = user?.uid || userProfile?.uid;
+  const { jobSeekerProfile } = useJobSeeker();
+  const uid = user?.uid || userProfile?.uid || jobSeekerProfile?.profile?.uid;
 
   const [applications, setApplications] = useState<FirestoreApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Filtering & Search
+  const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
+  const [sortBy, setSortBy] = useState('applied_newest');
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  
+  // Drawer / Detail modal
   const [selectedApp, setSelectedApp] = useState<FirestoreApplication | null>(null);
   const [showResumeInline, setShowResumeInline] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDownloaded, setIsDownloaded] = useState(false);
 
-  // Status lists for BDM Simulator
-  const bdmStatuses = [
-    'submitted',
-    'under_review',
-    'shortlisted',
-    'interview',
-    'selected',
-    'offer_released',
-    'joined',
-    'rejected'
-  ];
-
+  // Status visual mapping
   const getStatusDetails = (status: string) => {
-    switch (status) {
+    const s = status ? status.toLowerCase() : '';
+    switch (s) {
+      case 'applied':
       case 'submitted':
-        return { text: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/20', label: 'Submitted' };
+        return { 
+          text: 'text-blue-500', 
+          bg: 'bg-blue-500/10', 
+          border: 'border-blue-500/20', 
+          label: 'Applied',
+          color: '#3B82F6'
+        };
       case 'under_review':
-        return { text: 'text-amber-500', bg: 'bg-amber-500/10', border: 'border-amber-500/20', label: 'Under Review' };
+      case 'review':
+        return { 
+          text: 'text-amber-500', 
+          bg: 'bg-amber-500/10', 
+          border: 'border-amber-500/20', 
+          label: 'Under Review',
+          color: '#F59E0B'
+        };
       case 'shortlisted':
-        return { text: 'text-purple-500', bg: 'bg-purple-500/10', border: 'border-purple-500/20', label: 'Shortlisted' };
+        return { 
+          text: 'text-purple-500', 
+          bg: 'bg-purple-500/10', 
+          border: 'border-purple-500/20', 
+          label: 'Shortlisted',
+          color: '#8B5CF6'
+        };
       case 'interview':
-        return { text: 'text-pink-500', bg: 'bg-pink-500/10', border: 'border-pink-500/20', label: 'Interview Scheduled' };
-      case 'selected':
-        return { text: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', label: 'Selected' };
+      case 'interview scheduled':
+      case 'interview_scheduled':
+        return { 
+          text: 'text-pink-500', 
+          bg: 'bg-pink-500/10', 
+          border: 'border-pink-500/20', 
+          label: 'Interview Scheduled',
+          color: '#EC4899'
+        };
+      case 'interview_completed':
+      case 'interview completed':
+        return { 
+          text: 'text-indigo-500', 
+          bg: 'bg-indigo-500/10', 
+          border: 'border-indigo-500/20', 
+          label: 'Interview Completed',
+          color: '#6366F1'
+        };
       case 'offer_released':
-        return { text: 'text-teal-500', bg: 'bg-teal-500/10', border: 'border-teal-500/20', label: 'Offer Released' };
+      case 'offer_extended':
+      case 'selected':
+      case 'offer extended':
+        return { 
+          text: 'text-emerald-500', 
+          bg: 'bg-emerald-500/10', 
+          border: 'border-emerald-500/20', 
+          label: 'Offer Extended',
+          color: '#10B981'
+        };
       case 'joined':
-        return { text: 'text-green-500', bg: 'bg-green-500/10', border: 'border-green-500/20', label: 'Joined' };
+        return { 
+          text: 'text-green-500', 
+          bg: 'bg-green-500/10', 
+          border: 'border-green-500/20', 
+          label: 'Joined',
+          color: '#22C55E'
+        };
       case 'rejected':
-        return { text: 'text-rose-500', bg: 'bg-rose-500/10', border: 'border-rose-500/20', label: 'Rejected' };
+        return { 
+          text: 'text-rose-500', 
+          bg: 'bg-rose-500/10', 
+          border: 'border-rose-500/20', 
+          label: 'Rejected',
+          color: '#EF4444'
+        };
+      case 'withdrawn':
+        return { 
+          text: 'text-slate-500', 
+          bg: 'bg-slate-500/10', 
+          border: 'border-slate-500/20', 
+          label: 'Withdrawn',
+          color: '#64748B'
+        };
       default:
-        return { text: 'text-slate-500', bg: 'bg-slate-500/10', border: 'border-slate-500/20', label: status || 'Applied' };
+        return { 
+          text: 'text-slate-500', 
+          bg: 'bg-slate-500/10', 
+          border: 'border-slate-500/20', 
+          label: status ? (status.charAt(0).toUpperCase() + status.slice(1)) : 'Applied',
+          color: '#64748B'
+        };
     }
   };
 
-  // 1. Live Firestore Subscription
+  // Subscribe to real-time applications where candidateUid == uid
   useEffect(() => {
     if (!uid) {
       setLoading(false);
@@ -115,7 +219,7 @@ export default function ApplicationsTab() {
       where('candidateUid', '==', uid)
     );
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetched: FirestoreApplication[] = [];
       snapshot.forEach((docSnap) => {
         fetched.push({
@@ -123,147 +227,109 @@ export default function ApplicationsTab() {
           ...docSnap.data()
         } as FirestoreApplication);
       });
+      
+      setApplications(fetched);
+      setLoading(false);
 
-      // Seeding database with initial data if empty so candidate can immediately experience and audit the page
-      if (fetched.length === 0) {
-        const seedApps = [
-          {
-            applicationId: 'seed-app-1',
-            candidateUid: uid,
-            candidateName: userProfile?.fullName || 'Rishi Kumar',
-            candidateEmail: userProfile?.email || 'rishi@test.com',
-            jobId: 'job-1',
-            jobTitle: 'Frontend Engineer (React)',
-            companyId: 'company-google',
-            companyName: 'Google',
-            recruiterUid: 'recruiter-google',
-            recruiterName: 'Ananya Sharma',
-            bdmUid: 'bdm-1',
-            status: 'under_review',
-            timeline: [
-              { status: 'submitted', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), notes: 'Application received and screened.' },
-              { status: 'under_review', timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), notes: 'Profile forwarded to the engineering manager.' }
-            ],
-            appliedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-            updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-            resumeName: 'Rishi_Kumar_Resume.pdf',
-            jobDescription: 'Google is seeking an exceptional Frontend Engineer to build world-class user experiences using React, TypeScript, and high-performance layouts.'
-          },
-          {
-            applicationId: 'seed-app-2',
-            candidateUid: uid,
-            candidateName: userProfile?.fullName || 'Rishi Kumar',
-            candidateEmail: userProfile?.email || 'rishi@test.com',
-            jobId: 'job-2',
-            jobTitle: 'Full Stack Developer',
-            companyId: 'company-figma',
-            companyName: 'Figma',
-            recruiterUid: 'recruiter-figma',
-            recruiterName: 'Rohan Sen',
-            bdmUid: 'bdm-2',
-            status: 'submitted',
-            timeline: [
-              { status: 'submitted', timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), notes: 'Applied via Aryx AI automated gateway.' }
-            ],
-            appliedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-            updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-            resumeName: 'Rishi_Kumar_Resume.pdf',
-            jobDescription: 'Join our Core Canvas team to design and build multiplayer collaborative tools for designers worldwide. Requires deep browser/canvas knowledge.'
-          },
-          {
-            applicationId: 'seed-app-3',
-            candidateUid: uid,
-            candidateName: userProfile?.fullName || 'Rishi Kumar',
-            candidateEmail: userProfile?.email || 'rishi@test.com',
-            jobId: 'job-3',
-            jobTitle: 'Backend API Architect',
-            companyId: 'company-microsoft',
-            companyName: 'Microsoft',
-            recruiterUid: 'recruiter-msft',
-            recruiterName: 'Sarah Jenkins',
-            bdmUid: 'bdm-3',
-            status: 'interview',
-            timeline: [
-              { status: 'submitted', timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), notes: 'Applied for Microsoft Cloud Division.' },
-              { status: 'under_review', timestamp: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(), notes: 'Manager approved experience matches.' },
-              { status: 'shortlisted', timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(), notes: 'Shortlisted for live technical challenge.' },
-              { status: 'interview', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), notes: 'Round 1 technical interview scheduled.' }
-            ],
-            appliedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-            updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-            resumeName: 'Rishi_Kumar_Resume.pdf',
-            jobDescription: 'Build high-throughput Azure storage orchestration interfaces using C#, Go, and gRPC microservices. Design robust distributed transaction mechanisms.'
-          }
-        ];
-
-        for (const app of seedApps) {
-          const docRef = doc(collection(db, 'marketplace_applications'), app.applicationId);
-          await setDoc(docRef, app);
-        }
-      } else {
-        // Sort chronologically by appliedAt descending
-        fetched.sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime());
-        setApplications(fetched);
-
-        // Keep the selected application modal in sync dynamically in real-time
-        if (selectedApp) {
-          const freshSelected = fetched.find(a => a.applicationId === selectedApp.applicationId);
-          if (freshSelected) {
-            setSelectedApp(freshSelected);
-          }
+      // Keep active detailed drawer in sync dynamically
+      if (selectedApp) {
+        const freshSelected = fetched.find(a => a.applicationId === selectedApp.applicationId);
+        if (freshSelected) {
+          setSelectedApp(freshSelected);
         }
       }
-      setLoading(false);
     }, (error) => {
-      console.error("Error subscribing to marketplace_applications:", error);
+      console.error("Error subscribing to candidate applications:", error);
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, [uid, selectedApp?.applicationId]);
 
-  // Filters setup
+  // Reset pagination to first page when search/filter/sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeFilter, sortBy]);
+
+  // Statistics counters (updates instantly in real-time)
+  const statsTotal = applications.length;
+  const statsInterviews = applications.filter(a => ['interview', 'interview_scheduled', 'interview_completed', 'interview scheduled', 'interview completed'].includes(a.status?.toLowerCase())).length;
+  const statsOffers = applications.filter(a => ['selected', 'offer_released', 'offer_extended', 'joined', 'offer extended', 'offer_released'].includes(a.status?.toLowerCase())).length;
+  const statsRejected = applications.filter(a => a.status?.toLowerCase() === 'rejected').length;
+
+  // Filter categories
   const subTabs = [
     { id: 'All', label: 'All Submissions' },
-    { id: 'submitted', label: 'Submitted' },
+    { id: 'applied', label: 'Applied' },
     { id: 'under_review', label: 'In Review' },
     { id: 'interview', label: 'Interviews' },
-    { id: 'decided', label: 'Selected / Offer' }
+    { id: 'offer', label: 'Offers' },
+    { id: 'rejected', label: 'Rejected' },
+    { id: 'withdrawn', label: 'Withdrawn' }
   ];
 
+  // Filter application list
   const filteredApps = applications.filter((app) => {
-    if (activeFilter === 'All') return true;
-    if (activeFilter === 'decided') return app.status === 'selected' || app.status === 'offer_released' || app.status === 'joined';
-    return app.status === activeFilter;
+    // 1. Tab Filter
+    const s = app.status ? app.status.toLowerCase() : '';
+    if (activeFilter !== 'All') {
+      if (activeFilter === 'applied') {
+        if (s !== 'submitted' && s !== 'applied') return false;
+      } else if (activeFilter === 'under_review') {
+        if (s !== 'under_review' && s !== 'review' && s !== 'shortlisted') return false;
+      } else if (activeFilter === 'interview') {
+        if (!['interview', 'interview_scheduled', 'interview_completed', 'interview scheduled', 'interview completed'].includes(s)) return false;
+      } else if (activeFilter === 'offer') {
+        if (!['selected', 'offer_released', 'offer_extended', 'joined', 'offer extended', 'offer_released'].includes(s)) return false;
+      } else if (activeFilter === 'rejected') {
+        if (s !== 'rejected') return false;
+      } else if (activeFilter === 'withdrawn') {
+        if (s !== 'withdrawn') return false;
+      }
+    }
+
+    // 2. Search query matching
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase();
+      const titleMatch = app.jobTitle ? app.jobTitle.toLowerCase().includes(q) : false;
+      const companyMatch = app.companyName ? app.companyName.toLowerCase().includes(q) : false;
+      const recruiterMatch = app.recruiterName ? app.recruiterName.toLowerCase().includes(q) : false;
+      const descMatch = app.jobDescription ? app.jobDescription.toLowerCase().includes(q) : false;
+      
+      const rNotes = app.recruiterRemarks || app.recruiterNotes || '';
+      const notesMatch = rNotes.toLowerCase().includes(q);
+
+      const bNotes = app.bdmRemarks || app.bdmNotes || '';
+      const bdmMatch = bNotes.toLowerCase().includes(q);
+
+      return titleMatch || companyMatch || recruiterMatch || descMatch || notesMatch || bdmMatch;
+    }
+
+    return true;
   });
 
-  // BDM Simulation trigger
-  const handleSimulateStatusChange = async (appId: string, nextStatus: string) => {
-    const docRef = doc(db, 'marketplace_applications', appId);
-    const now = new Date().toISOString();
-    
-    const app = applications.find(a => a.applicationId === appId);
-    if (!app) return;
-
-    // Append new step to the timeline history array
-    const newTimelineItem: ApplicationTimeline = {
-      status: nextStatus,
-      timestamp: now,
-      notes: `Status changed to ${getStatusDetails(nextStatus).label} via Real-time BDM Simulator.`
-    };
-
-    const updatedTimeline = [...(app.timeline || []), newTimelineItem];
-
-    try {
-      await updateDoc(docRef, {
-        status: nextStatus,
-        timeline: updatedTimeline,
-        updatedAt: now
-      });
-    } catch (err) {
-      console.error("Error updating status in Firestore:", err);
+  // Sort application list
+  const sortedApps = [...filteredApps].sort((a, b) => {
+    switch (sortBy) {
+      case 'applied_newest':
+        return new Date(b.appliedAt || 0).getTime() - new Date(a.appliedAt || 0).getTime();
+      case 'applied_oldest':
+        return new Date(a.appliedAt || 0).getTime() - new Date(b.appliedAt || 0).getTime();
+      case 'updated_newest':
+        return new Date(b.updatedAt || b.appliedAt || 0).getTime() - new Date(a.updatedAt || a.appliedAt || 0).getTime();
+      case 'job_az':
+        return (a.jobTitle || '').localeCompare(b.jobTitle || '');
+      case 'company_az':
+        return (a.companyName || '').localeCompare(b.companyName || '');
+      default:
+        return new Date(b.appliedAt || 0).getTime() - new Date(a.appliedAt || 0).getTime();
     }
-  };
+  });
+
+  // Pagination bounds
+  const totalItems = sortedApps.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const paginatedApps = sortedApps.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const triggerDownload = (fileName: string) => {
     setIsDownloading(true);
@@ -273,13 +339,167 @@ export default function ApplicationsTab() {
       setTimeout(() => setIsDownloaded(false), 2000);
       
       const element = document.createElement("a");
-      const file = new Blob([`ARYX AI Submitted Resume: ${fileName}\nSubmitted Candidate: ${userProfile?.fullName || 'Candidate'}`], {type: 'text/plain'});
+      const file = new Blob([
+        `ARYX AI Secure Candidate Document\nCandidate Name: ${userProfile?.fullName || jobSeekerProfile?.profile?.fullName || 'Candidate'}\nEmail: ${userProfile?.email || jobSeekerProfile?.profile?.email || 'rishi@test.com'}\nResume Reference: ${fileName}`
+      ], {type: 'text/plain'});
       element.href = URL.createObjectURL(file);
-      element.download = fileName;
+      element.download = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
       document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
     }, 1000);
+  };
+
+  // Helper renderers for drawers
+  const renderInterviewSchedule = (interview: any) => {
+    if (!interview) return null;
+    if (typeof interview === 'string') {
+      return (
+        <div className="p-4 rounded-2xl bg-pink-500/5 border border-pink-500/10 space-y-2">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4.5 h-4.5 text-pink-500" />
+            <span className="text-[10px] font-black uppercase text-pink-500 tracking-wider">Interview Schedule</span>
+          </div>
+          <p className="text-xs font-bold text-app-text leading-relaxed pl-6">{interview}</p>
+        </div>
+      );
+    }
+    
+    const { date, time, link, instructions, location, format } = interview;
+    if (!date && !time && !link && !instructions && !location) return null;
+    
+    return (
+      <div className="p-4 rounded-2xl bg-pink-500/5 border border-pink-500/10 space-y-3">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4.5 h-4.5 text-pink-500" />
+            <span className="text-[10px] font-black uppercase text-pink-500 tracking-wider">Interview Details</span>
+          </div>
+          {format && (
+            <span className="text-[9px] font-black uppercase bg-pink-500/10 text-pink-500 px-2 py-0.5 rounded">
+              {format}
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-4 text-xs pl-6">
+          {date && (
+            <div>
+              <span className="text-[9px] font-bold text-app-muted uppercase block">Date</span>
+              <span className="font-extrabold text-app-text">{date}</span>
+            </div>
+          )}
+          {time && (
+            <div>
+              <span className="text-[9px] font-bold text-app-muted uppercase block">Time</span>
+              <span className="font-extrabold text-app-text">{time}</span>
+            </div>
+          )}
+          {location && (
+            <div className="col-span-2">
+              <span className="text-[9px] font-bold text-app-muted uppercase block">Location / Platform</span>
+              <span className="font-extrabold text-app-text">{location}</span>
+            </div>
+          )}
+        </div>
+        {link && (
+          <div className="pl-6 pt-1.5 border-t border-pink-500/5">
+            <span className="text-[9px] font-bold text-app-muted uppercase block">Meeting Join URL</span>
+            <a 
+              href={link} 
+              target="_blank" 
+              rel="noreferrer" 
+              className="text-xs text-brand-blue font-extrabold hover:underline flex items-center gap-1.5 mt-1"
+            >
+              Join Session <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        )}
+        {instructions && (
+          <div className="pl-6 pt-2 border-t border-pink-500/10">
+            <span className="text-[9px] font-bold text-app-muted uppercase block">Preparation instructions</span>
+            <p className="text-xs text-app-muted mt-1 leading-relaxed font-medium whitespace-pre-line">{instructions}</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderOfferDetails = (offer: any) => {
+    if (!offer) return null;
+    if (typeof offer === 'string') {
+      return (
+        <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 space-y-2">
+          <div className="flex items-center gap-2">
+            <DollarSign className="w-4.5 h-4.5 text-emerald-500" />
+            <span className="text-[10px] font-black uppercase text-emerald-500 tracking-wider">Offer Details</span>
+          </div>
+          <p className="text-xs font-bold text-app-text pl-6">{offer}</p>
+        </div>
+      );
+    }
+
+    const { salary, baseSalary, compensation, equity, benefits, joiningDate, offerLetterUrl, notes } = offer;
+    const showSalary = salary || baseSalary || compensation;
+    
+    if (!showSalary && !equity && !benefits && !joiningDate && !offerLetterUrl) return null;
+
+    return (
+      <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 space-y-3">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <DollarSign className="w-4.5 h-4.5 text-emerald-500" />
+            <span className="text-[10px] font-black uppercase text-emerald-500 tracking-wider">Proposal & Compensation</span>
+          </div>
+          <span className="text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded">
+            Official Offer
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pl-6">
+          {showSalary && (
+            <div>
+              <span className="text-[9px] font-bold text-app-muted uppercase block">Salary Package</span>
+              <span className="font-extrabold text-app-text">{showSalary}</span>
+            </div>
+          )}
+          {joiningDate && (
+            <div>
+              <span className="text-[9px] font-bold text-app-muted uppercase block">Joining Date</span>
+              <span className="font-extrabold text-app-text">{joiningDate}</span>
+            </div>
+          )}
+          {equity && (
+            <div>
+              <span className="text-[9px] font-bold text-app-muted uppercase block">Equity Options</span>
+              <span className="font-extrabold text-app-text">{equity}</span>
+            </div>
+          )}
+          {benefits && (
+            <div className="col-span-1 sm:col-span-2">
+              <span className="text-[9px] font-bold text-app-muted uppercase block">Standard Benefits</span>
+              <p className="text-xs text-app-muted mt-0.5 font-semibold whitespace-pre-line leading-relaxed">{benefits}</p>
+            </div>
+          )}
+        </div>
+        {offerLetterUrl && (
+          <div className="pl-6 pt-2 border-t border-emerald-500/10">
+            <a 
+              href={offerLetterUrl} 
+              target="_blank" 
+              rel="noreferrer" 
+              className="text-xs text-brand-blue font-extrabold hover:underline flex items-center gap-1.5"
+            >
+              Download Signed Letter of Offer <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        )}
+        {notes && (
+          <div className="pl-6 pt-2 border-t border-emerald-500/10">
+            <span className="text-[9px] font-bold text-app-muted uppercase block">Additional proposal notes</span>
+            <p className="text-xs text-app-muted mt-1 leading-relaxed font-medium whitespace-pre-line">{notes}</p>
+          </div>
+        )}
+      </div>
+    );
   };
 
   if (loading) {
@@ -294,63 +514,160 @@ export default function ApplicationsTab() {
   return (
     <div className="space-y-6 pb-12">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-app-text tracking-tight">My Applications</h1>
-          <p className="text-app-muted text-sm mt-1">Real-time status tracking for all job applications submitted via Firestore.</p>
+          <p className="text-app-muted text-sm mt-1">Real-time tracking for all roles you applied to across ARYX AI ecosystem.</p>
         </div>
       </div>
 
-      {/* Horizontal Sub-Tabs */}
-      <div className="border-b border-app-border/40 pb-px flex gap-6 overflow-x-auto">
-        {subTabs.map((tb) => (
-          <button
-            key={tb.id}
-            onClick={() => setActiveFilter(tb.id)}
-            className={`pb-4 text-xs font-bold uppercase tracking-wider relative transition-all whitespace-nowrap cursor-pointer ${
-              activeFilter === tb.id ? 'text-brand-blue' : 'text-app-muted hover:text-app-text'
-            }`}
-          >
-            {tb.label}
-            {activeFilter === tb.id && (
-              <motion.div 
-                layoutId="activeFilterTabUnderline" 
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-blue" 
-              />
-            )}
-          </button>
-        ))}
+      {/* Real-time Status Counter Row (Dashboard Integration) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="p-4 rounded-2xl bg-app-surface border border-app-border card-shadow flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase text-app-muted tracking-wider block">Total Applied</span>
+            <span className="text-2xl font-display font-black text-app-text block mt-1">{statsTotal}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
+            <Briefcase className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-app-surface border border-app-border card-shadow flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase text-app-muted tracking-wider block">Interviews</span>
+            <span className="text-2xl font-display font-black text-app-text block mt-1">{statsInterviews}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-500">
+            <Calendar className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-app-surface border border-app-border card-shadow flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase text-app-muted tracking-wider block">Offers Released</span>
+            <span className="text-2xl font-display font-black text-app-text block mt-1">{statsOffers}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+            <CheckCircle className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-app-surface border border-app-border card-shadow flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase text-app-muted tracking-wider block">Unsuccessful</span>
+            <span className="text-2xl font-display font-black text-app-text block mt-1">{statsRejected}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500">
+            <X className="w-5 h-5" />
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column - Applications List */}
-        <div className="lg:col-span-8 space-y-3">
-          {filteredApps.length > 0 ? (
-            filteredApps.map((app) => {
+      {/* Advanced Filter, Search, and Sort Panel */}
+      <div className="p-5 rounded-2xl bg-app-surface border border-app-border card-shadow space-y-4">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-app-muted" />
+          <input
+            type="text"
+            placeholder="Search by job role, company name, recruiter, or internal notes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 pl-11 pr-4 text-sm focus:outline-none focus:border-brand-blue transition-all text-app-text placeholder:text-app-muted/80"
+          />
+        </div>
+
+        {/* Sort option and horizontal filters */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-1">
+          <div className="flex border-b border-app-border/40 pb-px gap-4 overflow-x-auto shrink-0 max-w-full">
+            {subTabs.map((tb) => {
+              const isActive = activeFilter === tb.id;
+              return (
+                <button
+                  key={tb.id}
+                  onClick={() => setActiveFilter(tb.id)}
+                  className={`pb-2.5 text-[10px] font-bold uppercase tracking-widest relative transition-all whitespace-nowrap cursor-pointer ${
+                    isActive ? 'text-brand-blue font-black' : 'text-app-muted hover:text-app-text'
+                  }`}
+                >
+                  {tb.label}
+                  {isActive && (
+                    <motion.div 
+                      layoutId="subTabUnderline" 
+                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-blue" 
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <ArrowUpDown className="w-3.5 h-3.5 text-app-muted" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-app-muted">Sort By:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-app-bg border border-app-border rounded-lg py-1.5 px-3 text-[10px] font-bold text-app-text focus:outline-none cursor-pointer"
+            >
+              <option value="applied_newest">Applied: Newest First</option>
+              <option value="applied_oldest">Applied: Oldest First</option>
+              <option value="updated_newest">Last Active Update</option>
+              <option value="job_az">Job Role: A-Z</option>
+              <option value="company_az">Company: A-Z</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Grid View */}
+      <div className="grid grid-cols-1 gap-4">
+        {paginatedApps.length > 0 ? (
+          <div className="space-y-3">
+            {paginatedApps.map((app) => {
               const badge = getStatusDetails(app.status);
               return (
-                <div 
+                <motion.div 
                   key={app.applicationId}
-                  className="p-5 rounded-2xl bg-app-surface border border-app-border card-shadow flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-brand-blue/30 transition-all group"
+                  layoutId={`app-card-${app.applicationId}`}
+                  className="p-5 rounded-2xl bg-app-surface border border-app-border card-shadow flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-brand-blue/30 transition-all group relative overflow-hidden"
                 >
-                  <div className="flex items-start sm:items-center gap-4">
+                  {/* Subtle decorative color highlight based on status */}
+                  <div 
+                    className="absolute left-0 top-0 bottom-0 w-1" 
+                    style={{ backgroundColor: badge.color }}
+                  />
+
+                  <div className="flex items-start md:items-center gap-4 pl-1">
                     <div className="w-11 h-11 rounded-xl bg-brand-blue/5 border border-brand-blue/10 flex items-center justify-center text-brand-blue shrink-0">
                       <Building className="w-5.5 h-5.5" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-extrabold text-app-text tracking-tight">{app.jobTitle}</h3>
-                      <div className="flex flex-wrap items-center gap-2 mt-1 text-[10px] text-app-muted font-bold uppercase">
-                        <span className="text-app-text">{app.companyName}</span>
+                      <h3 className="text-sm font-extrabold text-app-text tracking-tight group-hover:text-brand-blue transition-colors">
+                        {app.jobTitle}
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-[10px] text-app-muted font-black uppercase tracking-wider">
+                        <span className="text-app-text font-black">{app.companyName}</span>
                         <span>•</span>
                         <span className="flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5" /> Applied on {new Date(app.appliedAt).toLocaleDateString()}
+                          <Clock className="w-3.5 h-3.5" /> {new Date(app.appliedAt).toLocaleDateString()}
                         </span>
+                        {app.recruiterName && (
+                          <>
+                            <span>•</span>
+                            <span className="flex items-center gap-1 text-brand-violet">
+                              <User className="w-3 h-3" /> Recruiter: {app.recruiterName}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-3 border-t border-app-border/20 pt-3 sm:pt-0 sm:border-0 shrink-0">
-                    <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${badge.text} ${badge.bg} ${badge.border}`}>
+                  <div className="flex items-center justify-between md:justify-end gap-3 border-t border-app-border/20 pt-3 md:pt-0 md:border-0 shrink-0">
+                    <span 
+                      className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${badge.text} ${badge.bg} ${badge.border}`}
+                    >
                       {badge.label}
                     </span>
                     
@@ -361,87 +678,99 @@ export default function ApplicationsTab() {
                       }}
                       className="px-3.5 py-2 bg-app-bg hover:bg-app-surface border border-app-border rounded-xl text-[10px] font-bold text-app-text hover:text-brand-blue transition-all flex items-center gap-1.5 cursor-pointer"
                     >
-                      Audit Details <ExternalLink className="w-3.5 h-3.5" />
+                      Audit & Tracking <ArrowUpRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                </div>
+                </motion.div>
               );
-            })
-          ) : (
-            <div className="p-12 text-center bg-app-surface border border-app-border rounded-[24px] space-y-3">
-              <AlertCircle className="w-8 h-8 text-app-muted opacity-40 mx-auto" />
-              <p className="text-app-muted text-xs font-semibold">No applications found in this category.</p>
-            </div>
-          )}
-        </div>
+            })}
 
-        {/* Right Column - Status Metrics & BDM Sandbox */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* Status Metrics Wheel */}
-          <div className="p-6 rounded-[28px] bg-app-surface border border-app-border card-shadow flex flex-col items-center">
-            <h3 className="text-sm font-black text-app-text w-full text-left uppercase tracking-wider mb-2">Metrics Distribution</h3>
-            
-            <div className="relative w-36 h-36 flex items-center justify-center my-4">
-              <svg className="w-full h-full transform -rotate-90">
-                <circle cx="72" cy="72" r="62" stroke="#E2E8F0" strokeWidth="12" strokeOpacity="0.1" fill="transparent" />
-                <circle cx="72" cy="72" r="62" stroke="#3B82F6" strokeWidth="12" fill="transparent" strokeDasharray="390" strokeDashoffset="140" strokeLinecap="round" />
-                <circle cx="72" cy="72" r="62" stroke="#10B981" strokeWidth="12" fill="transparent" strokeDasharray="390" strokeDashoffset="280" strokeLinecap="round" />
-              </svg>
-              <div className="absolute flex flex-col items-center">
-                <span className="text-3xl font-display font-black text-app-text">{applications.length}</span>
-                <span className="text-[9px] font-bold uppercase tracking-widest text-app-muted">Applications</span>
-              </div>
-            </div>
-
-            <div className="w-full space-y-2 border-t border-app-border/40 pt-4 text-xs font-bold text-app-muted">
-              {[
-                { label: 'Submitted', count: applications.filter(a => a.status === 'submitted').length, color: 'bg-blue-500' },
-                { label: 'In Review', count: applications.filter(a => a.status === 'under_review').length, color: 'bg-amber-500' },
-                { label: 'Interviews', count: applications.filter(a => a.status === 'interview').length, color: 'bg-pink-500' },
-                { label: 'Decided / Offers', count: applications.filter(a => ['selected', 'offer_released', 'joined'].includes(a.status)).length, color: 'bg-emerald-500' }
-              ].map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ${item.color} shrink-0`} />
-                    <span className="text-app-text font-semibold">{item.label}</span>
-                  </div>
-                  <span className="font-mono text-xs">{item.count}</span>
+            {/* Pagination Panel */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 bg-app-surface border border-app-border rounded-2xl mt-4">
+                <span className="text-xs font-semibold text-app-muted font-mono">
+                  Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems} items
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 bg-app-bg hover:bg-app-surface disabled:opacity-40 disabled:cursor-not-allowed border border-app-border rounded-xl text-xs font-bold text-app-text transition cursor-pointer flex items-center gap-1"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                  </button>
+                  <span className="px-3 py-1.5 bg-brand-blue/10 border border-brand-blue/20 rounded-xl text-xs font-bold text-brand-blue font-mono">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 bg-app-bg hover:bg-app-surface disabled:opacity-40 disabled:cursor-not-allowed border border-app-border rounded-xl text-xs font-bold text-app-text transition cursor-pointer flex items-center gap-1"
+                  >
+                    Next <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-              ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-16 text-center bg-app-surface border border-app-border rounded-[24px] space-y-4">
+            <AlertCircle className="w-10 h-10 text-app-muted/60 mx-auto" />
+            <div>
+              <p className="text-app-text text-sm font-bold">No Applications Found</p>
+              <p className="text-app-muted text-xs font-semibold mt-1 max-w-md mx-auto leading-relaxed">
+                {searchQuery.trim() !== '' 
+                  ? "We couldn't find any submissions matching your search term. Try resetting the filters or modifying your query."
+                  : "You haven't submitted any job applications yet. Go to the Browse Jobs catalog to explore matching roles and apply instantly."}
+              </p>
             </div>
+            {searchQuery.trim() !== '' && (
+              <button 
+                onClick={() => { setSearchQuery(''); setActiveFilter('All'); }} 
+                className="text-xs font-extrabold text-brand-blue underline cursor-pointer"
+              >
+                Clear active search filters
+              </button>
+            )}
           </div>
-
-          {/* Quick Info Block */}
-          <div className="p-6 rounded-[28px] bg-gradient-to-br from-brand-blue/5 to-brand-violet/5 border border-brand-blue/10 card-shadow space-y-3">
-            <h4 className="text-xs font-black text-brand-blue uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4" /> Live Auditor Active
-            </h4>
-            <p className="text-[11px] text-app-muted leading-relaxed font-medium">
-              Every status action on this page triggers live updates. When a recruiter or BDM transitions your applications, the changes cascade down in real-time instantly without any manual reload or localStorage buffers.
-            </p>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Application Details & Auditing Modal */}
+      {/* High-End Application Details Sliding Overlay Drawer */}
       <AnimatePresence>
         {selectedApp && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+          <div className="fixed inset-0 z-50 flex justify-end">
+            {/* Backdrop */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-2xl bg-app-bg border border-app-border rounded-[28px] overflow-hidden card-shadow flex flex-col max-h-[90vh]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setSelectedApp(null);
+                setShowResumeInline(false);
+              }}
+              className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            />
+
+            {/* Sliding Drawer Body */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 220 }}
+              className="relative w-full max-w-xl bg-app-bg border-l border-app-border h-full shadow-2xl flex flex-col z-10"
             >
-              {/* Modal Header */}
+              {/* Drawer Header */}
               <div className="p-6 border-b border-app-border/40 flex justify-between items-center shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-brand-blue/5 border border-brand-blue/10 flex items-center justify-center text-brand-blue shrink-0">
                     <Building className="w-5.5 h-5.5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-app-text">{selectedApp.jobTitle}</h3>
-                    <p className="text-xs text-app-muted mt-0.5">{selectedApp.companyName} • Application ID: {selectedApp.applicationId}</p>
+                    <h3 className="text-base font-bold text-app-text tracking-tight">{selectedApp.jobTitle}</h3>
+                    <p className="text-[10px] text-app-muted font-bold uppercase mt-0.5 tracking-wider">
+                      {selectedApp.companyName} • ID: {selectedApp.applicationId}
+                    </p>
                   </div>
                 </div>
                 <button 
@@ -451,126 +780,148 @@ export default function ApplicationsTab() {
                   }}
                   className="p-1.5 rounded-full bg-app-surface border border-app-border text-app-muted hover:text-app-text transition cursor-pointer"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-4.5 h-4.5" />
                 </button>
               </div>
 
-              {/* Modal Body */}
-              <div className="p-6 overflow-y-auto space-y-6 text-sm">
-                
-                {/* 1. Recruiter & Company Meta */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Drawer Body Contents (Scrollable) */}
+              <div className="p-6 overflow-y-auto space-y-6 flex-1 text-sm">
+                {/* Visual Status Highlight */}
+                <div className="p-4 rounded-2xl bg-app-surface border border-app-border flex items-center justify-between">
+                  <div>
+                    <span className="text-[9px] font-black uppercase text-app-muted tracking-widest block">Current Application Status</span>
+                    <span className="text-sm font-extrabold text-app-text mt-1 block">
+                      {getStatusDetails(selectedApp.status).label}
+                    </span>
+                  </div>
+                  <span 
+                    className={`text-[10px] font-black uppercase px-3 py-1 rounded-lg border ${getStatusDetails(selectedApp.status).text} ${getStatusDetails(selectedApp.status).bg} ${getStatusDetails(selectedApp.status).border}`}
+                  >
+                    {getStatusDetails(selectedApp.status).label}
+                  </span>
+                </div>
+
+                {/* Recruiter Details Panel */}
+                <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 rounded-2xl bg-app-surface border border-app-border space-y-1">
-                    <span className="text-[10px] font-bold text-app-muted uppercase tracking-wider block">Assigned Recruiter</span>
+                    <span className="text-[9px] font-bold text-app-muted uppercase tracking-wider block">Assigned Recruiter</span>
                     <div className="flex items-center gap-2 pt-1">
-                      <div className="w-7 h-7 rounded-full bg-brand-blue/10 text-brand-blue flex items-center justify-center font-bold text-xs">
+                      <div className="w-7 h-7 rounded-full bg-brand-violet/10 text-brand-violet flex items-center justify-center font-black text-xs shrink-0">
                         {selectedApp.recruiterName ? selectedApp.recruiterName.charAt(0) : 'R'}
                       </div>
-                      <span className="text-xs font-bold text-app-text">{selectedApp.recruiterName || 'Rohan Sen'}</span>
+                      <span className="text-xs font-extrabold text-app-text truncate">
+                        {selectedApp.recruiterName || 'Unassigned'}
+                      </span>
                     </div>
                   </div>
 
                   <div className="p-4 rounded-2xl bg-app-surface border border-app-border space-y-1">
-                    <span className="text-[10px] font-bold text-app-muted uppercase tracking-wider block">Applied Date</span>
-                    <span className="text-xs font-bold text-app-text block pt-2 flex items-center gap-1">
-                      <Clock className="w-4 h-4 text-app-muted" /> {new Date(selectedApp.appliedAt).toLocaleString()}
+                    <span className="text-[9px] font-bold text-app-muted uppercase tracking-wider block">Date Applied</span>
+                    <span className="text-xs font-extrabold text-app-text block pt-2 flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-app-muted" /> {new Date(selectedApp.appliedAt).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
 
-                {/* 2. LIVE BDM STATUS SIMULATOR (CRITICAL FOR AUDIT VERIFICATION) */}
-                <div className="p-5 rounded-2xl border border-brand-violet/20 bg-brand-violet/5 space-y-3.5">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-black uppercase text-brand-violet tracking-wider flex items-center gap-1.5">
-                      <Activity className="w-4.5 h-4.5" /> BDM Status Simulator sandbox
-                    </span>
-                    <span className="text-[9px] font-mono text-brand-violet font-bold bg-brand-violet/10 px-2 py-0.5 rounded">
-                      Real-time Firestore Push
-                    </span>
-                  </div>
-                  
-                  <p className="text-[11px] text-app-muted leading-normal">
-                    Select a status below to simulate a backend BDM/Recruiter updating this application in Firestore. Watch how the status, timeline logs, and summary charts update instantly below in real-time.
-                  </p>
+                {/* Interview Details (Dynamic Conditional UI) */}
+                {renderInterviewSchedule(selectedApp.interviewSchedule)}
 
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {bdmStatuses.map((st) => {
-                      const isActive = selectedApp.status === st;
-                      const config = getStatusDetails(st);
-                      return (
-                        <button
-                          key={st}
-                          onClick={() => handleSimulateStatusChange(selectedApp.applicationId, st)}
-                          className={`px-3 py-1.5 text-[10px] font-bold rounded-xl border transition-all uppercase tracking-wider cursor-pointer ${
-                            isActive 
-                              ? `${config.text} ${config.bg} ${config.border} ring-1 ring-offset-2 ring-brand-violet/20` 
-                              : 'bg-app-bg hover:bg-app-surface text-app-muted border-app-border'
-                          }`}
-                        >
-                          {config.label}
-                        </button>
-                      );
-                    })}
+                {/* Offer Details Proposal (Dynamic Conditional UI) */}
+                {renderOfferDetails(selectedApp.offerDetails)}
+
+                {/* Recruiter Remarks */}
+                <div className="space-y-2">
+                  <h4 className="font-black text-app-text text-[10px] uppercase tracking-widest">Recruiter Feedback & Remarks</h4>
+                  <div className="p-4 rounded-2xl bg-app-surface border border-app-border text-xs leading-relaxed font-semibold">
+                    {(selectedApp.recruiterRemarks || selectedApp.recruiterNotes) ? (
+                      <p className="text-app-text whitespace-pre-line">
+                        {selectedApp.recruiterRemarks || selectedApp.recruiterNotes}
+                      </p>
+                    ) : (
+                      <p className="text-app-muted italic">No specific remarks added by the recruiter yet.</p>
+                    )}
                   </div>
                 </div>
 
-                {/* 3. Realtime Timeline History logs */}
+                {/* BDM Remarks (Read Only) */}
+                <div className="space-y-2">
+                  <h4 className="font-black text-app-text text-[10px] uppercase tracking-widest">BDM Remarks (Read Only)</h4>
+                  <div className="p-4 rounded-2xl bg-app-surface border border-app-border text-xs leading-relaxed font-semibold">
+                    {(selectedApp.bdmRemarks || selectedApp.bdmNotes) ? (
+                      <p className="text-app-text whitespace-pre-line">
+                        {selectedApp.bdmRemarks || selectedApp.bdmNotes}
+                      </p>
+                    ) : (
+                      <p className="text-app-muted italic">Pending evaluation notes from Business Development Manager.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Status Progress Timeline */}
                 <div className="space-y-3">
-                  <h4 className="font-bold text-app-text text-xs uppercase tracking-wider">Application Timeline History</h4>
-                  <div className="relative pl-6 space-y-4 border-l border-app-border/60 ml-2 pt-1.5">
+                  <h4 className="font-black text-app-text text-[10px] uppercase tracking-widest">Application Timeline Logs</h4>
+                  <div className="relative pl-6 space-y-5 border-l border-app-border/60 ml-2 pt-1.5">
                     {selectedApp.timeline && selectedApp.timeline.length > 0 ? (
                       selectedApp.timeline.map((step, idx) => {
                         const style = getStatusDetails(step.status);
                         return (
                           <div key={idx} className="relative">
-                            {/* Dot */}
-                            <span className={`absolute -left-[31px] top-1 w-4 h-4 rounded-full border-2 bg-app-bg flex items-center justify-center ${style.border}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${style.text.replace('text-', 'bg-')}`} />
+                            {/* Connector dot */}
+                            <span 
+                              className={`absolute -left-[31px] top-1 w-4 h-4 rounded-full border-2 bg-app-bg flex items-center justify-center`}
+                              style={{ borderColor: style.color }}
+                            >
+                              <span 
+                                className="w-1.5 h-1.5 rounded-full" 
+                                style={{ backgroundColor: style.color }}
+                              />
                             </span>
                             
                             <div>
-                              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${style.text} ${style.bg} border ${style.border}`}>
-                                {style.label}
-                              </span>
-                              <span className="text-[10px] font-mono font-bold text-app-muted ml-2">
-                                {new Date(step.timestamp).toLocaleString()}
-                              </span>
-                              <p className="text-xs text-app-muted mt-1.5 font-medium">
-                                {step.notes || `Application transition to ${style.label}`}
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${style.text} ${style.bg} ${style.border}`}>
+                                  {style.label}
+                                </span>
+                                <span className="text-[9px] font-mono font-bold text-app-muted">
+                                  {new Date(step.timestamp).toLocaleString()}
+                                </span>
+                              </div>
+                              <p className="text-xs text-app-muted mt-1.5 font-bold leading-relaxed">
+                                {step.notes || `State transition to ${style.label}`}
                               </p>
                             </div>
                           </div>
                         );
                       })
                     ) : (
-                      <div className="text-xs text-app-muted italic">No timeline entries generated yet.</div>
+                      <div className="text-xs text-app-muted italic">No historic events logged for this submission.</div>
                     )}
                   </div>
                 </div>
 
-                {/* 4. Job Details / Description Reference */}
+                {/* Job Description Summary */}
                 <div className="space-y-2">
-                  <h4 className="font-bold text-app-text text-xs uppercase tracking-wider">Job Details</h4>
-                  <div className="p-4 rounded-2xl bg-app-surface/40 border border-app-border/40 text-xs text-app-muted leading-relaxed whitespace-pre-line font-medium max-h-[160px] overflow-y-auto">
-                    {selectedApp.jobDescription || 'No detailed job description was attached to this opening.'}
+                  <h4 className="font-black text-app-text text-[10px] uppercase tracking-widest">Job Description Reference</h4>
+                  <div className="p-4 rounded-2xl bg-app-surface/40 border border-app-border/40 text-xs text-app-muted leading-relaxed whitespace-pre-line font-bold max-h-[150px] overflow-y-auto">
+                    {selectedApp.jobDescription || 'No description available.'}
                   </div>
                 </div>
 
-                {/* 5. Resume and Credentials Submitted */}
+                {/* Submitted Resume Document */}
                 <div className="space-y-2">
-                  <h4 className="font-bold text-app-text text-xs uppercase tracking-wider">Submitted Resume Document</h4>
+                  <h4 className="font-black text-app-text text-[10px] uppercase tracking-widest">Credentials Submitted</h4>
                   <div className="p-4 rounded-2xl bg-app-surface border border-app-border flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 shrink-0">
                         <FileText className="w-5.5 h-5.5" />
                       </div>
                       <div className="truncate">
-                        <p className="text-xs font-bold text-app-text truncate">{selectedApp.resumeName || 'Primary Resume.pdf'}</p>
-                        <p className="text-[9px] text-app-muted font-bold uppercase mt-0.5">Securely recorded instance</p>
+                        <p className="text-xs font-extrabold text-app-text truncate">{selectedApp.resumeName || 'Primary Resume.pdf'}</p>
+                        <p className="text-[9px] text-app-muted font-bold uppercase mt-0.5">Securely logged in system</p>
                       </div>
                     </div>
                     
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 shrink-0">
                       <button
                         onClick={() => setShowResumeInline(!showResumeInline)}
                         className="px-3 py-1.5 bg-app-bg hover:bg-app-surface border border-app-border text-app-text rounded-xl text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
@@ -595,7 +946,7 @@ export default function ApplicationsTab() {
                   </div>
                 </div>
 
-                {/* Inline Resume Viewer Simulation */}
+                {/* Inline Resume Viewer */}
                 {showResumeInline && (
                   <motion.div 
                     initial={{ opacity: 0, y: -10 }}
@@ -603,30 +954,33 @@ export default function ApplicationsTab() {
                     className="p-5 rounded-2xl border border-app-border/60 bg-app-bg font-sans space-y-4"
                   >
                     <div className="border-b border-app-border/40 pb-3 flex justify-between items-center">
-                      <span className="text-[10px] font-black uppercase text-indigo-400 tracking-wider">Inline Document Viewer</span>
-                      <span className="text-[9px] font-bold text-app-muted">PAGE 1 of 1</span>
+                      <span className="text-[9px] font-black uppercase text-indigo-400 tracking-wider">Document Previewer</span>
+                      <span className="text-[9px] font-bold text-app-muted font-mono">1 PAGE</span>
                     </div>
-                    <div className="space-y-3 text-xs leading-relaxed text-app-muted">
+                    <div className="space-y-4 text-xs leading-relaxed text-app-muted">
                       <div className="text-center space-y-1">
-                        <h2 className="text-sm font-bold text-app-text">{selectedApp.candidateName}</h2>
-                        <p className="text-[10px]">{selectedApp.candidateEmail} | Verified Candidate Seeker</p>
+                        <h2 className="text-sm font-extrabold text-app-text">
+                          {selectedApp.candidateName || userProfile?.fullName || jobSeekerProfile?.profile?.fullName}
+                        </h2>
+                        <p className="text-[10px] font-semibold">
+                          {selectedApp.candidateEmail || userProfile?.email || jobSeekerProfile?.profile?.email} | ARYX AI Seeker
+                        </p>
                       </div>
                       <div className="space-y-1">
-                        <h3 className="font-bold text-app-text border-b border-app-border/30 pb-0.5">Education</h3>
-                        <p className="font-semibold text-app-text">B.Tech in Computer Science & Engineering</p>
-                        <p className="text-[10px]">GPA: 9.2/10 | Graduation Year: 2026</p>
+                        <h3 className="font-extrabold text-app-text border-b border-app-border/30 pb-0.5 text-[10px] uppercase">Education</h3>
+                        <p className="font-bold text-app-text">Computer Science & Information Technology</p>
+                        <p className="text-[10px] font-semibold">First Class / Distinction Credentials</p>
                       </div>
                       <div className="space-y-1">
-                        <h3 className="font-bold text-app-text border-b border-app-border/30 pb-0.5">Core Skills</h3>
-                        <p>React, TypeScript, Node.js, Express, Tailwind CSS, Firestore, Relational Datastores, Git</p>
+                        <h3 className="font-extrabold text-app-text border-b border-app-border/30 pb-0.5 text-[10px] uppercase">Core Skillset</h3>
+                        <p className="font-medium">React, TypeScript, Frontend Orchestration, Tailwind CSS, Firestore DB, git</p>
                       </div>
                     </div>
                   </motion.div>
                 )}
-
               </div>
 
-              {/* Modal Footer */}
+              {/* Drawer Footer */}
               <div className="p-6 border-t border-app-border/40 flex justify-end shrink-0 bg-app-surface/50">
                 <button
                   onClick={() => {
