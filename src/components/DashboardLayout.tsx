@@ -31,7 +31,7 @@ import { useAuth } from '../context/AuthContext';
 import { useRecruiter } from '../context/RecruiterContext';
 import { useJobSeeker } from '../context/JobSeekerContext';
 import { db } from '../firebase/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -47,6 +47,8 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user } = useAuth();
   const [bdmProfile, setBdmProfile] = useState<any>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
   // Consume recruiter profile from centralized RecruiterContext if role matches
   const recruiterCtx = role === 'm_recruiter' ? useRecruiter() : null;
@@ -69,6 +71,82 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
       return () => unsub();
     }
   }, [user, role]);
+
+  useEffect(() => {
+    if (!user || role !== 'm_candidate') return;
+
+    const q = query(
+      collection(db, 'marketplace_applications'),
+      where('candidateUid', '==', user.uid)
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      const fetched: any[] = [];
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        fetched.push({
+          id: docSnap.id,
+          ...data
+        });
+      });
+      
+      // Sort by updatedAt descending
+      fetched.sort((a, b) => new Date(b.updatedAt || b.appliedAt || 0).getTime() - new Date(a.updatedAt || a.appliedAt || 0).getTime());
+      
+      // Map applications to notifications
+      const notifs = fetched.map(app => {
+        const statusLower = app.status?.toLowerCase() || 'submitted';
+        let text = `Your application for ${app.jobTitle} is under review.`;
+        if (statusLower === 'submitted') {
+          text = `Application submitted successfully for ${app.jobTitle} at ${app.companyName}.`;
+        } else if (statusLower === 'shortlisted') {
+          text = `Congratulations! You have been shortlisted for ${app.jobTitle} at ${app.companyName}.`;
+        } else if (statusLower === 'interview' || statusLower === 'interview_scheduled' || statusLower === 'interview scheduled') {
+          text = `Interview scheduled for ${app.jobTitle} at ${app.companyName}! Check details in applications list.`;
+        } else if (statusLower === 'interview_completed' || statusLower === 'interview completed') {
+          text = `Interview completed for ${app.jobTitle} at ${app.companyName}. Recruiter feedback is being evaluated.`;
+        } else if (statusLower === 'offer_released' || statusLower === 'offer_extended' || statusLower === 'offer extended' || statusLower === 'selected') {
+          text = `Amazing news! Offer extended for ${app.jobTitle} at ${app.companyName}. Review offer proposal details.`;
+        } else if (statusLower === 'joined') {
+          text = `Welcome aboard! You have officially joined ${app.companyName} as a ${app.jobTitle}.`;
+        } else if (statusLower === 'rejected') {
+          text = `Update regarding ${app.jobTitle} position at ${app.companyName}. Click for details.`;
+        }
+        
+        return {
+          id: app.applicationId || app.id,
+          title: app.jobTitle,
+          company: app.companyName,
+          status: app.status,
+          message: text,
+          time: app.updatedAt || app.appliedAt,
+          unread: true
+        };
+      });
+      
+      setNotifications(notifs.slice(0, 5));
+    }, (err) => {
+      console.error('Error fetching real-time applications for notifications:', err);
+    });
+
+    return () => unsub();
+  }, [user, role]);
+
+  const getRelativeTime = (timeStr: string) => {
+    if (!timeStr) return '1d';
+    try {
+      const diffMs = Date.now() - new Date(timeStr).getTime();
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h`;
+      const diffDays = Math.floor(diffHours / 24);
+      return `${diffDays}d`;
+    } catch (e) {
+      return '1d';
+    }
+  };
 
   const menuItems = {
     // MARKETPLACE ECOSYSTEM
@@ -539,10 +617,73 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
           </div>
 
           <div className="flex items-center gap-2 sm:gap-6">
-            <button className="relative p-2 text-app-muted hover:text-app-text transition-colors">
-              <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-brand-blue rounded-full border-2 border-app-bg" />
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+                className="relative p-2 text-app-muted hover:text-app-text transition-colors cursor-pointer focus:outline-none"
+              >
+                <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
+                {notifications.length > 0 && (
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-brand-blue rounded-full border-2 border-app-bg" />
+                )}
+              </button>
+              
+              <AnimatePresence>
+                {showNotifDropdown && (
+                  <>
+                    {/* Backdrop to close dropdown on outer clicks */}
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setShowNotifDropdown(false)}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 mt-2 w-80 sm:w-96 bg-app-surface border border-app-border rounded-2xl shadow-xl z-50 p-4 space-y-3 text-left"
+                    >
+                      <div className="flex justify-between items-center pb-2 border-b border-app-border/40">
+                        <span className="text-xs font-black uppercase text-app-text tracking-wider">Real-time Activity Alerts</span>
+                        <span className="text-[10px] font-bold text-brand-blue bg-brand-blue/10 px-2 py-0.5 rounded-full font-mono">{notifications.length} updates</span>
+                      </div>
+                      
+                      <div className="max-h-[300px] overflow-y-auto space-y-2.5 pr-1 select-none">
+                        {notifications.length === 0 ? (
+                          <div className="py-8 text-center text-app-muted text-xs font-semibold">
+                            <Bell className="w-6 h-6 mx-auto opacity-30 mb-2" />
+                            No recent alerts or status changes.
+                          </div>
+                        ) : (
+                          notifications.map((notif) => (
+                            <div 
+                              key={notif.id}
+                              onClick={() => {
+                                setActiveTab('applications');
+                                setShowNotifDropdown(false);
+                              }}
+                              className="p-3 bg-app-bg hover:bg-app-surface border border-app-border rounded-xl cursor-pointer transition-all space-y-1"
+                            >
+                              <div className="flex justify-between items-start gap-2">
+                                <span className="text-xs font-extrabold text-app-text block truncate max-w-[200px]">
+                                  {notif.title}
+                                </span>
+                                <span className="text-[8px] font-mono font-bold text-app-muted text-right shrink-0">
+                                  {getRelativeTime(notif.time)}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-app-muted leading-relaxed font-semibold">
+                                {notif.message}
+                              </p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
             
             <div className="flex items-center gap-3 pl-2 sm:pl-6 border-l border-app-border">
               <div className="text-right hidden sm:block">
