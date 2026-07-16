@@ -31,10 +31,10 @@ service cloud.firestore {
       }
     }
 
-    // Jobseeker (student) specific profile: read/write allowed only for the student owner, or read/write by recruiters/BDMs
+    // Jobseeker (student) specific profile: read allowed by authenticated users, write restricted strictly to the document owner
     match /marketplace_jobseekers/{uid} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow write: if isOwner(uid);
     }
 
     // Helper functions for University Authorization

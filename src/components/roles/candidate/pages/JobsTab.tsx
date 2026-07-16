@@ -20,7 +20,7 @@ import {
   Eye
 } from 'lucide-react';
 
-import { db } from '../../../../firebase/firebase';
+import { db, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
 import { useAuth } from '../../../../context/AuthContext';
 import { useJobSeeker } from '../../../../context/JobSeekerContext';
 import { 
@@ -134,13 +134,26 @@ const formatTimestamp = (ts: any) => {
 
 export default function JobsTab() {
   const { userProfile } = useAuth();
-  const { jobSeekerProfile, loading: profileLoading } = useJobSeeker();
+  const { jobSeekerProfile, loading: profileLoading, profileCompletion, resumeCompletion } = useJobSeeker();
   const [jobs, setJobs] = useState<any[]>([]);
   const [myApplications, setMyApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Browse Jobs / Saved Jobs selection
+  const [activeSubTab, setActiveSubTab] = useState<'browse' | 'saved'>('browse');
+
+  // Search & Filters state
   const [search, setSearch] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('All');
+  const [selectedExperience, setSelectedExperience] = useState('All');
+  const [selectedSalary, setSelectedSalary] = useState('All');
+  const [selectedEmploymentType, setSelectedEmploymentType] = useState('All');
+  const [sortBy, setSortBy] = useState<'relevance' | 'newest' | 'salary' | 'experience'>('relevance');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
+
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
   const [selectedJobForDetails, setSelectedJobForDetails] = useState<Job | null>(null);
@@ -151,6 +164,15 @@ export default function JobsTab() {
 
   // Sync Resume Builder default name if present - Cloud-first, fallback-safe
   const existingResumeName = jobSeekerProfile?.resume?.uploadedResume?.name || "Primary Resume (from Resume Builder)";
+
+  // Completeness Checks
+  const isProfileIncomplete = profileCompletion < 30 || !jobSeekerProfile?.profile?.fullName || !jobSeekerProfile?.profile?.email;
+  const isResumeIncomplete = resumeCompletion < 30 && !jobSeekerProfile?.resume?.uploadedResume?.name && !jobSeekerProfile?.resume?.personalInfo?.fullName;
+
+  // Reset pagination to first page when any filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedLocation, selectedExperience, selectedSalary, selectedEmploymentType, sortBy, activeSubTab]);
 
   // 1. Subscribe to open jobs in real-time
   useEffect(() => {
@@ -163,7 +185,7 @@ export default function JobsTab() {
       setJobs(fetchedJobs);
       setLoading(false);
     }, (error) => {
-      console.error("Error listening to jobs:", error);
+      handleFirestoreError(error, OperationType.GET, 'marketplace_jobs');
       setLoading(false);
     });
 
@@ -185,7 +207,7 @@ export default function JobsTab() {
       }));
       setMyApplications(fetchedApps);
     }, (error) => {
-      console.error("Error listening to applications:", error);
+      handleFirestoreError(error, OperationType.GET, 'marketplace_applications');
     });
 
     return () => unsubscribeApps();
@@ -212,7 +234,7 @@ export default function JobsTab() {
       const seekerRef = doc(db, 'marketplace_jobseekers', userProfile.uid);
       await setDoc(seekerRef, { saved_jobs: nextSaved }, { merge: true });
     } catch (err) {
-      console.error("Error saving job:", err);
+      handleFirestoreError(err, OperationType.WRITE, `marketplace_jobseekers/${userProfile.uid}`);
     }
   };
 
@@ -282,7 +304,7 @@ export default function JobsTab() {
       }, 1500);
 
     } catch (err) {
-      console.error("Error submitting application:", err);
+      handleFirestoreError(err, OperationType.WRITE, 'marketplace_applications');
     }
   };
 
@@ -320,25 +342,87 @@ export default function JobsTab() {
     };
   });
 
+  // Extract filters dynamically from mappedJobs
+  const uniqueLocations = ['All', ...Array.from(new Set(mappedJobs.map(j => j.location).filter(Boolean)))];
+  const uniqueExperiences = ['All', ...Array.from(new Set(mappedJobs.map(j => j.experience).filter(Boolean)))];
+  const uniqueSalaries = ['All', ...Array.from(new Set(mappedJobs.map(j => j.salary).filter(Boolean)))];
+  const uniqueEmploymentTypes = ['All', ...Array.from(new Set(mappedJobs.map(j => j.employmentType).filter(Boolean)))];
+
+  // Primary filtering
   const filteredJobs = mappedJobs.filter(job => {
+    // If active tab is "Saved Jobs", filter by saved ids first
+    if (activeSubTab === 'saved' && !savedJobIds.includes(job.id)) {
+      return false;
+    }
+
     const matchesSearch = job.role.toLowerCase().includes(search.toLowerCase()) || 
                           job.company.toLowerCase().includes(search.toLowerCase()) ||
-                          job.skills.some(s => s.toLowerCase().includes(search.toLowerCase()));
+                          job.skills.some(s => s.toLowerCase().includes(search.toLowerCase())) ||
+                          job.description.toLowerCase().includes(search.toLowerCase());
+
     const matchesLocation = selectedLocation === 'All' || job.location === selectedLocation;
-    return matchesSearch && matchesLocation;
+    const matchesExperience = selectedExperience === 'All' || job.experience === selectedExperience;
+    const matchesSalary = selectedSalary === 'All' || job.salary === selectedSalary;
+    const matchesEmploymentType = selectedEmploymentType === 'All' || job.employmentType === selectedEmploymentType;
+
+    return matchesSearch && matchesLocation && matchesExperience && matchesSalary && matchesEmploymentType;
   });
 
-  // Extract locations dynamically
-  const uniqueLocations = ['All', ...Array.from(new Set(mappedJobs.map(j => j.location).filter(Boolean)))];
+  // Sorting helper
+  const sortJobs = (jobsList: Job[]) => {
+    return [...jobsList].sort((a, b) => {
+      if (sortBy === 'relevance') {
+        return b.match - a.match;
+      }
+      if (sortBy === 'newest') {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        return dateB.getTime() - dateA.getTime();
+      }
+      if (sortBy === 'salary') {
+        const parseSalary = (salStr: string) => {
+          const matched = salStr.match(/(\d+)/g);
+          if (matched && matched.length > 0) {
+            return Math.max(...matched.map(Number));
+          }
+          return 0;
+        };
+        return parseSalary(b.salary) - parseSalary(a.salary);
+      }
+      if (sortBy === 'experience') {
+        const parseExp = (expStr: string) => {
+          const matched = expStr.match(/(\d+)/g);
+          if (matched && matched.length > 0) {
+            return Math.min(...matched.map(Number));
+          }
+          return 0;
+        };
+        return parseExp(a.experience) - parseExp(b.experience);
+      }
+      return 0;
+    });
+  };
 
-  // Keep track of active job selection safely
+  const sortedJobs = sortJobs(filteredJobs);
+
+  // Pagination calculations
+  const totalItems = sortedJobs.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
+  const paginatedJobs = sortedJobs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  // Active selected job on the list for match insights
   useEffect(() => {
-    if (filteredJobs.length > 0 && !activeJobId) {
-      setActiveJobId(filteredJobs[0].id);
+    if (paginatedJobs.length > 0) {
+      const isStillInList = paginatedJobs.some(j => j.id === activeJobId);
+      if (!isStillInList) {
+        setActiveJobId(paginatedJobs[0].id);
+      }
+    } else {
+      setActiveJobId(null);
     }
-  }, [jobs, activeJobId, filteredJobs]);
+  }, [search, selectedLocation, selectedExperience, selectedSalary, selectedEmploymentType, sortBy, activeSubTab, currentPage]);
 
-  const activeJob = filteredJobs.find(j => j.id === activeJobId) || filteredJobs[0];
+  const activeJob = paginatedJobs.find(j => j.id === activeJobId) || paginatedJobs[0];
 
   if (loading) {
     return (
@@ -352,39 +436,127 @@ export default function JobsTab() {
   return (
     <div className="space-y-6 pb-12">
       {/* Welcome Heading */}
-      <div>
-        <h1 className="text-3xl font-display font-bold text-app-text tracking-tight">Find Your Dream Job</h1>
-        <p className="text-app-muted text-sm mt-1">Discover the best opportunities matching your skills and experience.</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-display font-bold text-app-text tracking-tight">Find Your Dream Job</h1>
+          <p className="text-app-muted text-sm mt-1">Discover the best opportunities matching your skills and experience.</p>
+        </div>
       </div>
 
-      {/* Filter and search bar layout */}
-      <div className="flex flex-col md:flex-row gap-4 p-4 rounded-2xl bg-app-surface border border-app-border card-shadow">
-        <div className="relative flex-1">
+      {/* Tab Switcher */}
+      <div className="flex border-b border-app-border/40 gap-6">
+        <button
+          onClick={() => setActiveSubTab('browse')}
+          className={`pb-3 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+            activeSubTab === 'browse'
+              ? 'border-brand-blue text-brand-blue font-extrabold'
+              : 'border-transparent text-app-muted hover:text-app-text'
+          }`}
+        >
+          Browse Jobs ({mappedJobs.length})
+        </button>
+        <button
+          onClick={() => setActiveSubTab('saved')}
+          className={`pb-3 text-sm font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+            activeSubTab === 'saved'
+              ? 'border-brand-blue text-brand-blue font-extrabold'
+              : 'border-transparent text-app-muted hover:text-app-text'
+          }`}
+        >
+          Saved Jobs ({savedJobIds.length})
+        </button>
+      </div>
+
+      {/* Advanced Filter, Search, and Sort Panel */}
+      <div className="p-5 rounded-2xl bg-app-surface border border-app-border card-shadow space-y-4 animate-fadeIn">
+        {/* Search Input */}
+        <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-app-muted" />
           <input
             type="text"
-            placeholder="Search jobs, skills, companies..."
+            placeholder="Search by job title, skills, description or companies..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 pl-11 pr-4 text-sm focus:outline-none focus:border-brand-blue transition-all"
+            className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 pl-11 pr-4 text-sm focus:outline-none focus:border-brand-blue transition-all text-app-text"
           />
         </div>
-        
-        <div className="flex flex-wrap gap-2 items-center">
-          <select 
-            value={selectedLocation} 
-            onChange={(e) => setSelectedLocation(e.target.value)}
-            className="bg-app-bg border border-app-border rounded-xl py-2.5 px-4 text-xs font-semibold text-app-text focus:outline-none"
-          >
-            {uniqueLocations.map((loc, idx) => (
-              <option key={idx} value={loc}>{loc === 'All' ? 'All Locations' : loc}</option>
-            ))}
-          </select>
 
-          <button className="bg-app-bg hover:bg-app-surface border border-app-border p-2.5 rounded-xl text-app-muted hover:text-app-text flex items-center gap-1.5 transition-colors">
-            <SlidersHorizontal className="w-4 h-4" />
-            <span className="text-xs font-semibold">Active Filter</span>
-          </button>
+        {/* Dropdown Filters Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {/* Location Filter */}
+          <div className="space-y-1">
+            <span className="text-[10px] font-black uppercase text-app-muted tracking-wide block pl-1">Location</span>
+            <select
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-text focus:outline-none cursor-pointer"
+            >
+              <option value="All">All Locations</option>
+              {uniqueLocations.filter(loc => loc !== 'All').map((loc, idx) => (
+                <option key={idx} value={loc}>{loc}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Experience Filter */}
+          <div className="space-y-1">
+            <span className="text-[10px] font-black uppercase text-app-muted tracking-wide block pl-1">Experience</span>
+            <select
+              value={selectedExperience}
+              onChange={(e) => setSelectedExperience(e.target.value)}
+              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-text focus:outline-none cursor-pointer"
+            >
+              <option value="All">All Experiences</option>
+              {uniqueExperiences.filter(exp => exp !== 'All').map((exp, idx) => (
+                <option key={idx} value={exp}>{exp}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Salary Filter */}
+          <div className="space-y-1">
+            <span className="text-[10px] font-black uppercase text-app-muted tracking-wide block pl-1">Salary Range</span>
+            <select
+              value={selectedSalary}
+              onChange={(e) => setSelectedSalary(e.target.value)}
+              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-text focus:outline-none cursor-pointer"
+            >
+              <option value="All">All Salaries</option>
+              {uniqueSalaries.filter(sal => sal !== 'All').map((sal, idx) => (
+                <option key={idx} value={sal}>{sal}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Employment Type Filter */}
+          <div className="space-y-1">
+            <span className="text-[10px] font-black uppercase text-app-muted tracking-wide block pl-1">Job Type</span>
+            <select
+              value={selectedEmploymentType}
+              onChange={(e) => setSelectedEmploymentType(e.target.value)}
+              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-text focus:outline-none cursor-pointer"
+            >
+              <option value="All">All Job Types</option>
+              {uniqueEmploymentTypes.filter(et => et !== 'All').map((et, idx) => (
+                <option key={idx} value={et}>{et}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sorting */}
+          <div className="space-y-1 col-span-2 sm:col-span-1">
+            <span className="text-[10px] font-black uppercase text-app-muted tracking-wide block pl-1">Sort By</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-text focus:outline-none cursor-pointer"
+            >
+              <option value="relevance">AI Match Score</option>
+              <option value="newest">Newest First</option>
+              <option value="salary">Highest Salary</option>
+              <option value="experience">Least Experience Required</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -392,8 +564,8 @@ export default function JobsTab() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-4">
           <AnimatePresence mode="popLayout">
-            {filteredJobs.length > 0 ? (
-              filteredJobs.map((job) => (
+            {paginatedJobs.length > 0 ? (
+              paginatedJobs.map((job) => (
                 <motion.div
                   key={job.id}
                   layout
@@ -418,8 +590,8 @@ export default function JobsTab() {
                             <button 
                               type="button"
                               onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedJobForDetails(job);
+                                  e.stopPropagation();
+                                  setSelectedJobForDetails(job);
                               }}
                               className="text-[10px] font-extrabold text-brand-blue hover:underline tracking-tight cursor-pointer"
                             >
@@ -472,7 +644,7 @@ export default function JobsTab() {
                           e.stopPropagation();
                           toggleSave(job.id);
                         }}
-                        className={`p-2.5 rounded-xl border flex items-center justify-center transition-all ${
+                        className={`p-2.5 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
                           savedJobIds.includes(job.id)
                             ? 'bg-amber-500/10 border-amber-500/20 text-amber-500'
                             : 'bg-app-bg hover:bg-app-surface border-app-border text-app-muted hover:text-app-text'
@@ -501,12 +673,40 @@ export default function JobsTab() {
             ) : (
               <div className="p-12 text-center bg-app-surface border border-app-border rounded-[24px] space-y-3">
                 <p className="text-app-muted text-sm font-semibold">No jobs found matching your search values.</p>
-                <button onClick={() => { setSearch(''); setSelectedLocation('All'); }} className="text-xs font-bold text-brand-blue underline">
+                <button onClick={() => { setSearch(''); setSelectedLocation('All'); setSelectedExperience('All'); setSelectedSalary('All'); setSelectedEmploymentType('All'); }} className="text-xs font-bold text-brand-blue underline cursor-pointer">
                   Reset search filters
                 </button>
               </div>
             )}
           </AnimatePresence>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between p-4 bg-app-surface border border-app-border rounded-2xl mt-4 animate-fadeIn">
+              <span className="text-xs font-semibold text-app-muted font-mono">
+                Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems} jobs
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 bg-app-bg hover:bg-app-surface disabled:opacity-40 border border-app-border rounded-xl text-xs font-bold text-app-text transition cursor-pointer"
+                >
+                  Previous
+                </button>
+                <span className="px-3 py-1.5 bg-brand-blue/10 border border-brand-blue/20 rounded-xl text-xs font-bold text-brand-blue font-mono">
+                  {currentPage} / {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 bg-app-bg hover:bg-app-surface disabled:opacity-40 border border-app-border rounded-xl text-xs font-bold text-app-text transition cursor-pointer"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right side match analysis */}
@@ -847,7 +1047,7 @@ export default function JobsTab() {
                             <button 
                               type="button"
                               onClick={() => setUploadedFileName('')}
-                              className="text-[10px] text-app-muted hover:text-red-500 font-bold"
+                              className="text-[10px] text-app-muted hover:text-red-500 font-bold cursor-pointer"
                             >
                               Remove
                             </button>
@@ -877,6 +1077,33 @@ export default function JobsTab() {
                     )}
                   </div>
 
+                  {/* Completeness Warning Alerts */}
+                  {(isProfileIncomplete || (applyResumeOption === 'existing' && isResumeIncomplete)) && (
+                    <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 space-y-2">
+                      <div className="flex gap-2.5 items-start">
+                        <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="text-xs font-extrabold text-app-text">Application Blocked</h4>
+                          <p className="text-[10px] text-app-muted leading-relaxed mt-0.5">
+                            Please complete the following requirement(s) before submitting your application:
+                          </p>
+                          <ul className="list-disc list-inside mt-1.5 space-y-1 text-[10px] text-app-muted font-bold">
+                            {isProfileIncomplete && (
+                              <li>
+                                <strong className="text-red-500">Incomplete Profile:</strong> Go to the <span className="text-brand-blue">Profile</span> tab and fill out your Name and Email.
+                              </li>
+                            )}
+                            {applyResumeOption === 'existing' && isResumeIncomplete && (
+                              <li>
+                                <strong className="text-red-500">No Resume Found:</strong> Build your resume under <span className="text-brand-blue">Resume Builder</span> first or choose 'Upload Custom' above.
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex gap-3 pt-2">
                     <button
                       type="button"
@@ -887,7 +1114,8 @@ export default function JobsTab() {
                     </button>
                     <button
                       type="submit"
-                      className="w-full py-3 bg-brand-blue hover:bg-brand-blue/90 text-white rounded-xl text-xs font-extrabold cursor-pointer transition shadow-lg shadow-brand-blue/15 uppercase tracking-wide"
+                      disabled={isProfileIncomplete || (applyResumeOption === 'existing' && isResumeIncomplete)}
+                      className="w-full py-3 bg-brand-blue hover:bg-brand-blue/90 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-extrabold cursor-pointer transition shadow-lg shadow-brand-blue/15 uppercase tracking-wide"
                     >
                       Submit Application
                     </button>
