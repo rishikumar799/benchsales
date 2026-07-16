@@ -10,9 +10,10 @@ import {
   Percent
 } from 'lucide-react';
 import BdmProfilePopup from '../components/BdmProfilePopup';
-import { collection, query, where, doc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, doc, onSnapshot, collectionGroup } from 'firebase/firestore';
 import { db } from '../../../../firebase/firebase';
 import { useAuth } from '../../../../context/AuthContext';
+import { useRecruiter } from '../../../../context/RecruiterContext';
 
 interface DashboardTabProps {
   onNavigate: (tab: string) => void;
@@ -36,12 +37,15 @@ export default function DashboardTab({
 }: DashboardTabProps) {
   
   const { user, userProfile } = useAuth();
+  const { recruiterProfile } = useRecruiter();
   const uid = user?.uid || userProfile?.uid;
 
   const [loading, setLoading] = useState(true);
   const [selectedBdmName, setSelectedBdmName] = useState<string | null>(null);
 
   const [jobs, setJobs] = useState<any[]>([]);
+  const [assignedJobIds, setAssignedJobIds] = useState<Set<string>>(new Set());
+  const [accessRequestsMap, setAccessRequestsMap] = useState<Map<string, string>>(new Map());
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [selectionsCount, setSelectionsCount] = useState<number>(0);
   const [candidates, setCandidates] = useState<any[]>([]);
@@ -57,10 +61,16 @@ export default function DashboardTab({
     const qJobs = query(collection(db, 'marketplace_jobs'), where('status', '==', 'open'));
     const unsubJobs = onSnapshot(qJobs, (snapshot) => {
       const list: any[] = [];
+      const assignedIds = new Set<string>();
       snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
+        const data = docSnap.data();
+        list.push({ id: docSnap.id, ...data });
+        if (data.assignedRecruiters?.includes(uid)) {
+          assignedIds.add(docSnap.id);
+        }
       });
       setJobs(list);
+      setAssignedJobIds(assignedIds);
     }, (err) => {
       console.error("Dashboard jobs sync error:", err);
     });
@@ -131,7 +141,11 @@ export default function DashboardTab({
     const unsubCandidates = onSnapshot(candidatesCol, (snapshot) => {
       const list: any[] = [];
       snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
+        const data = docSnap.data();
+        const profile = data.profile || {};
+        const candidateRecruiterId = profile.assignedRecruiterId || data.assignedRecruiterId || data.recruiterId || profile.recruiterId || null;
+        if (candidateRecruiterId !== uid) return;
+        list.push({ id: docSnap.id, ...data });
       });
       setCandidates(list);
     }, (err) => {
@@ -166,9 +180,43 @@ export default function DashboardTab({
     };
   }, [uid, selectedCount]);
 
+  // Sync access requests for open jobs individually to avoid collectionGroup index requirement
+  useEffect(() => {
+    if (!uid || jobs.length === 0) return;
+
+    const unsubs = jobs.map(job => {
+      const docRef = doc(db, 'marketplace_jobs', job.id, 'access_requests', uid);
+      return onSnapshot(docRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          setAccessRequestsMap(prev => {
+            const next = new Map(prev);
+            next.set(job.id, data.status || 'pending');
+            return next;
+          });
+        } else {
+          setAccessRequestsMap(prev => {
+            if (prev.has(job.id)) {
+              const next = new Map(prev);
+              next.delete(job.id);
+              return next;
+            }
+            return prev;
+          });
+        }
+      }, (err) => {
+        console.error(`Dashboard error syncing access request for job ${job.id}:`, err);
+      });
+    });
+
+    return () => {
+      unsubs.forEach(unsub => unsub());
+    };
+  }, [uid, jobs]);
+
   // Derived stats and samples
-  const openJobsCount = jobs.filter(j => j.assignmentMode !== 'restricted').length;
-  const assignedJobsCount = jobs.filter(j => j.assignmentMode === 'restricted').length;
+  const openJobsCount = jobs.filter(j => j.assignmentMode !== 'restricted' && !assignedJobIds.has(j.id)).length;
+  const assignedJobsCount = jobs.filter(j => assignedJobIds.has(j.id)).length;
   const availableCandidatesCount = candidates.length;
   const submittedCandidatesCount = submissions.length;
 
@@ -193,7 +241,7 @@ export default function DashboardTab({
 
   // Sample lists
   const requirementsSample = jobs
-    .filter(j => j.status !== 'paused')
+    .filter(j => j.status !== 'paused' && (j.assignmentMode !== 'restricted' || assignedJobIds.has(j.id)))
     .slice(0, 3)
     .map(j => {
       const skills = Array.isArray(j.skills) 
@@ -270,7 +318,7 @@ export default function DashboardTab({
         <div>
           <h1 className="text-3xl font-display font-bold text-app-text">Dashboard</h1>
           <p className="text-app-muted mt-1">
-            Welcome back, {userProfile?.fullName || user?.displayName || 'Rohit'}! Here's your recruitment overview.
+            Welcome back, {recruiterProfile?.profile?.fullName || recruiterProfile?.fullName || userProfile?.fullName || user?.displayName || 'Rohit'}! Here's your recruitment overview.
           </p>
         </div>
       </div>

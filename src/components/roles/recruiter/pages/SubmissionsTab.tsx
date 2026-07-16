@@ -19,6 +19,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { db, auth, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { 
   collection, 
   query, 
@@ -29,17 +30,20 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { CandidateSubmission, RecruiterJob, RecruiterCandidate } from '../utils/recruiterStorage';
+import { useRecruiter } from '../../../../context/RecruiterContext';
 
 interface SubmissionsTabProps {
   onAddLogMessage?: (msg: string) => void;
 }
 
 export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps) {
+  const { recruiterProfile } = useRecruiter();
   const [submissions, setSubmissions] = useState<CandidateSubmission[]>([]);
   const [jobs, setJobs] = useState<RecruiterJob[]>([]);
   const [candidates, setCandidates] = useState<RecruiterCandidate[]>([]);
-  const [recruiterName, setRecruiterName] = useState('Rohit Kumar');
   const [loading, setLoading] = useState(true);
+
+  const recruiterName = recruiterProfile?.profile?.fullName || recruiterProfile?.fullName || auth.currentUser?.displayName || 'Rohit Kumar';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [jobFilter, setJobFilter] = useState('All');
@@ -54,133 +58,124 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
 
   // Load recruiter profile, submissions, candidates, and jobs from Firestore in real-time
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // 2. Subscribe to submissions where recruiterUid == current user's UID
+        const qSubmissions = query(
+          collection(db, 'marketplace_submissions'),
+          where('recruiterUid', '==', user.uid)
+        );
+        const unsubSubmissions = onSnapshot(qSubmissions, (snapshot) => {
+          const list: any[] = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            list.push({
+              id: docSnap.id,
+              submissionId: data.submissionId || docSnap.id,
+              jobId: data.jobId || 'N/A',
+              jobTitle: data.jobTitle || 'N/A',
+              companyName: data.companyName || 'N/A',
+              candidateUid: data.candidateUid || 'N/A',
+              candidateId: data.candidateId || data.candidateUid || 'N/A',
+              candidateName: data.candidateName || 'Anonymous',
+              candidateEmail: data.candidateEmail || 'N/A',
+              candidatePhone: data.candidatePhone || 'N/A',
+              candidateResume: data.candidateResume || `${(data.candidateName || 'Candidate').replace(' ', '_')}_Resume.pdf`,
+              submissionDate: data.submissionDate || (data.submittedAt ? new Date(data.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'),
+              submittedBy: data.submittedBy || data.recruiterName || 'Marketplace Recruiter',
+              recruiterUid: data.recruiterUid || 'N/A',
+              recruiterName: data.recruiterName || 'Marketplace Recruiter',
+              bdmUid: data.bdmUid || 'N/A',
+              companyId: data.companyId || 'N/A',
+              status: data.status || 'submitted',
+              submittedAt: data.submittedAt || '',
+              updatedAt: data.updatedAt || '',
+              assignedBdm: data.assignedBdm || 'John Mathew',
+              lastUpdated: data.lastUpdated || (data.updatedAt ? new Date(data.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'),
+              notes: data.notes || '',
+              timeline: data.timeline || []
+            });
+          });
+          
+          // Sort submissions by submittedAt descending
+          list.sort((a, b) => {
+            const timeA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+            const timeB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+            return timeB - timeA;
+          });
 
-    // 1. Subscribe to recruiter profile
-    const recruiterRef = doc(db, 'marketplace_recruiters', user.uid);
-    const unsubProfile = onSnapshot(recruiterRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setRecruiterName(data?.profile?.fullName || user.displayName || 'Rohit Kumar');
+          setSubmissions(list);
+          setLoading(false);
+        }, (err) => {
+          console.error("Submissions sync error:", err);
+          setLoading(false);
+        });
+
+        // 3. Subscribe to all candidate profiles to dynamically enrich details popups
+        const unsubCandidates = onSnapshot(collection(db, 'marketplace_jobseekers'), (snapshot) => {
+          const list: any[] = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            const profile = data.profile || {};
+            list.push({
+              id: docSnap.id,
+              name: profile.fullName || data.name || 'Anonymous',
+              experience: profile.experience || data.experience || 'Entry Level',
+              skills: profile.skills || data.skills || [],
+              availability: profile.availability || data.availability || 'Available',
+              details: profile.details || data.details || {
+                role: profile.role || data.role || 'Software Engineer',
+                skillsFull: profile.skills || data.skills || [],
+                years: 2,
+                currentCompany: 'N/A',
+                currentRole: 'N/A',
+                availabilityDetails: 'Immediate'
+              }
+            });
+          });
+          setCandidates(list);
+        }, (err) => {
+          console.error("Candidates sync error in SubmissionsTab:", err);
+        });
+
+        // 4. Subscribe to all jobs to dynamically enrich details popups
+        const unsubJobs = onSnapshot(collection(db, 'marketplace_jobs'), (snapshot) => {
+          const list: any[] = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            list.push({
+              id: docSnap.id,
+              title: data.title || 'N/A',
+              company: data.company || data.companyName || 'N/A',
+              experience: data.experience || '3-5 Years',
+              skills: data.skills || [],
+              location: data.location || 'Remote',
+              positions: data.positions || 'N/A',
+              priority: data.priority || 'Medium',
+              posted: data.posted || 'Recent',
+              bdm: data.bdm || 'John Mathew',
+              ...data
+            });
+          });
+          setJobs(list);
+        }, (err) => {
+          console.error("Jobs sync error in SubmissionsTab:", err);
+        });
+
+        return () => {
+          unsubSubmissions();
+          unsubCandidates();
+          unsubJobs();
+        };
       } else {
-        setRecruiterName(user.displayName || 'Rohit Kumar');
+        setSubmissions([]);
+        setCandidates([]);
+        setJobs([]);
+        setLoading(false);
       }
-    }, (err) => {
-      console.warn("Error subscribing to recruiter profile:", err);
     });
 
-    // 2. Subscribe to submissions where recruiterUid == current user's UID
-    const qSubmissions = query(
-      collection(db, 'marketplace_submissions'),
-      where('recruiterUid', '==', user.uid)
-    );
-    const unsubSubmissions = onSnapshot(qSubmissions, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        list.push({
-          id: docSnap.id,
-          submissionId: data.submissionId || docSnap.id,
-          jobId: data.jobId || 'N/A',
-          jobTitle: data.jobTitle || 'N/A',
-          companyName: data.companyName || 'N/A',
-          candidateUid: data.candidateUid || 'N/A',
-          candidateId: data.candidateId || data.candidateUid || 'N/A',
-          candidateName: data.candidateName || 'Anonymous',
-          candidateEmail: data.candidateEmail || 'N/A',
-          candidatePhone: data.candidatePhone || 'N/A',
-          candidateResume: data.candidateResume || `${(data.candidateName || 'Candidate').replace(' ', '_')}_Resume.pdf`,
-          submissionDate: data.submissionDate || (data.submittedAt ? new Date(data.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'),
-          submittedBy: data.submittedBy || data.recruiterName || 'Marketplace Recruiter',
-          recruiterUid: data.recruiterUid || 'N/A',
-          recruiterName: data.recruiterName || 'Marketplace Recruiter',
-          bdmUid: data.bdmUid || 'N/A',
-          companyId: data.companyId || 'N/A',
-          status: data.status || 'submitted',
-          submittedAt: data.submittedAt || '',
-          updatedAt: data.updatedAt || '',
-          assignedBdm: data.assignedBdm || 'John Mathew',
-          lastUpdated: data.lastUpdated || (data.updatedAt ? new Date(data.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'),
-          notes: data.notes || '',
-          timeline: data.timeline || []
-        });
-      });
-      
-      // Sort submissions by submittedAt descending
-      list.sort((a, b) => {
-        const timeA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
-        const timeB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
-        return timeB - timeA;
-      });
-
-      setSubmissions(list);
-      setLoading(false);
-    }, (err) => {
-      console.error("Submissions sync error:", err);
-      setLoading(false);
-    });
-
-    // 3. Subscribe to all candidate profiles to dynamically enrich details popups
-    const unsubCandidates = onSnapshot(collection(db, 'marketplace_jobseekers'), (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const profile = data.profile || {};
-        list.push({
-          id: docSnap.id,
-          name: profile.fullName || data.name || 'Anonymous',
-          experience: profile.experience || data.experience || 'Entry Level',
-          skills: profile.skills || data.skills || [],
-          availability: profile.availability || data.availability || 'Available',
-          details: profile.details || data.details || {
-            role: profile.role || data.role || 'Software Engineer',
-            skillsFull: profile.skills || data.skills || [],
-            years: 2,
-            currentCompany: 'N/A',
-            currentRole: 'N/A',
-            availabilityDetails: 'Immediate'
-          }
-        });
-      });
-      setCandidates(list);
-    }, (err) => {
-      console.error("Candidates sync error in SubmissionsTab:", err);
-    });
-
-    // 4. Subscribe to all jobs to dynamically enrich details popups
-    const unsubJobs = onSnapshot(collection(db, 'marketplace_jobs'), (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        list.push({
-          id: docSnap.id,
-          title: data.title || 'N/A',
-          company: data.company || data.companyName || 'N/A',
-          experience: data.experience || '3-5 Years',
-          skills: data.skills || [],
-          location: data.location || 'Remote',
-          positions: data.positions || 'N/A',
-          priority: data.priority || 'Medium',
-          posted: data.posted || 'Recent',
-          bdm: data.bdm || 'John Mathew',
-          ...data
-        });
-      });
-      setJobs(list);
-    }, (err) => {
-      console.error("Jobs sync error in SubmissionsTab:", err);
-    });
-
-    return () => {
-      unsubProfile();
-      unsubSubmissions();
-      unsubCandidates();
-      unsubJobs();
-    };
+    return () => unsubscribeAuth();
   }, []);
 
   // Export report simulation

@@ -26,13 +26,15 @@ import {
   arrayUnion 
 } from 'firebase/firestore';
 
+import { useRecruiter } from '../../../../context/RecruiterContext';
+
 interface AvailableJobsTabProps {
   onNavigate: (tab: string) => void;
   onRequestAccess?: (companyName: string) => void;
 }
 
 export default function AvailableJobsTab({ onNavigate }: AvailableJobsTabProps) {
-  
+  const { recruiterProfile } = useRecruiter();
   const [jobsRaw, setJobsRaw] = useState<any[]>([]);
   const [assignedJobIds, setAssignedJobIds] = useState<Set<string>>(new Set());
   const [accessRequestsMap, setAccessRequestsMap] = useState<Map<string, string>>(new Map());
@@ -42,97 +44,87 @@ export default function AvailableJobsTab({ onNavigate }: AvailableJobsTabProps) 
   const [selectedLoc, setSelectedLoc] = useState('All');
   const [selectedPrior, setSelectedPrior] = useState('All');
   const [selectedBdmName, setSelectedBdmName] = useState<string | null>(null);
-  const [currentUserInfo, setCurrentUserInfo] = useState<{ name: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const currentUserInfo = useMemo(() => {
+    return {
+      name: recruiterProfile?.profile?.fullName || recruiterProfile?.fullName || auth.currentUser?.displayName || 'Recruiter Partner',
+      email: recruiterProfile?.profile?.email || recruiterProfile?.email || auth.currentUser?.email || ''
+    };
+  }, [recruiterProfile]);
 
   // Sync real-time Firestore data based on Auth state
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
         const uid = user.uid;
-
-        // Fetch recruiter's profile to get recruiterName and recruiterEmail
-        const profileRef = doc(db, 'marketplace_recruiters', uid);
-        getDoc(profileRef).then((snap) => {
-          if (snap.exists()) {
-            const data = snap.data();
-            setCurrentUserInfo({
-              name: data.profile?.fullName || user.displayName || 'Recruiter Partner',
-              email: data.profile?.email || user.email || ''
-            });
-          } else {
-            setCurrentUserInfo({
-              name: user.displayName || 'Recruiter Partner',
-              email: user.email || ''
-            });
-          }
-        }).catch((err) => {
-          console.error("Error loading recruiter profile:", err);
-          setCurrentUserInfo({
-            name: user.displayName || 'Recruiter Partner',
-            email: user.email || ''
-          });
-        });
-
         // 1. Listen to marketplace_jobs (status == 'open')
         const qJobs = query(collection(db, 'marketplace_jobs'), where('status', '==', 'open'));
         const unsubJobs = onSnapshot(qJobs, (snapshot) => {
           const rawJobsList: any[] = [];
+          const assignedIds = new Set<string>();
           snapshot.forEach((d) => {
-            rawJobsList.push({ id: d.id, ...d.data() });
+            const data = d.data();
+            rawJobsList.push({ id: d.id, ...data });
+            if (data.assignedRecruiters?.includes(uid)) {
+              assignedIds.add(d.id);
+            }
           });
           setJobsRaw(rawJobsList);
+          setAssignedJobIds(assignedIds);
           setLoading(false);
         }, (err) => {
           console.error("Jobs sync error:", err);
         });
 
-        // 2. Listen to assigned_recruiters subcollection across all jobs for current user
-        const qAssigned = query(collectionGroup(db, 'assigned_recruiters'), where('uid', '==', uid));
-        const unsubAssigned = onSnapshot(qAssigned, (snapshot) => {
-          const assignedIds = new Set<string>();
-          snapshot.forEach((d) => {
-            const parentId = d.ref.parent.parent?.id;
-            if (parentId) {
-              assignedIds.add(parentId);
-            }
-          });
-          setAssignedJobIds(assignedIds);
-        }, (err) => {
-          console.error("Assigned recruiters sync error:", err);
-        });
-
-        // 3. Listen to access_requests subcollection across all jobs for current user
-        const qRequests = query(collectionGroup(db, 'access_requests'), where('recruiterUid', '==', uid));
-        const unsubRequests = onSnapshot(qRequests, (snapshot) => {
-          const reqMap = new Map<string, string>();
-          snapshot.forEach((d) => {
-            const parentId = d.ref.parent.parent?.id;
-            if (parentId) {
-              reqMap.set(parentId, d.data().status || 'pending');
-            }
-          });
-          setAccessRequestsMap(reqMap);
-        }, (err) => {
-          console.error("Access requests sync error:", err);
-        });
-
         return () => {
           unsubJobs();
-          unsubAssigned();
-          unsubRequests();
         };
       } else {
         setJobsRaw([]);
         setAssignedJobIds(new Set());
         setAccessRequestsMap(new Map());
         setLoading(false);
-        setCurrentUserInfo(null);
       }
     });
 
     return () => unsubscribeAuth();
   }, []);
+
+  // Sync access requests for open jobs individually to avoid collectionGroup index requirement
+  useEffect(() => {
+    const currentUid = auth.currentUser?.uid;
+    if (!currentUid || jobsRaw.length === 0) return;
+
+    const unsubs = jobsRaw.map(job => {
+      const docRef = doc(db, 'marketplace_jobs', job.id, 'access_requests', currentUid);
+      return onSnapshot(docRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          setAccessRequestsMap(prev => {
+            const next = new Map(prev);
+            next.set(job.id, data.status || 'pending');
+            return next;
+          });
+        } else {
+          setAccessRequestsMap(prev => {
+            if (prev.has(job.id)) {
+              const next = new Map(prev);
+              next.delete(job.id);
+              return next;
+            }
+            return prev;
+          });
+        }
+      }, (err) => {
+        console.error(`Error syncing access request for job ${job.id}:`, err);
+      });
+    });
+
+    return () => {
+      unsubs.forEach(unsub => unsub());
+    };
+  }, [jobsRaw]);
 
   // Map and compute the jobs with access statuses dynamically
   const jobs = useMemo(() => {
@@ -255,6 +247,10 @@ export default function AvailableJobsTab({ onNavigate }: AvailableJobsTabProps) 
 
   // Match filtering criteria
   const filteredJobs = jobs.filter(job => {
+    // Only show Assigned Jobs plus Open To All Jobs
+    const isAssignedOrOpenToAll = job.jobType === 'open' || job.accessStatus === 'approved';
+    if (!isAssignedOrOpenToAll) return false;
+
     const matchesSearch = job.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           job.company.toLowerCase().includes(searchQuery.toLowerCase());
     

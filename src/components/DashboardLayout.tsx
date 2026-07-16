@@ -28,6 +28,7 @@ import {
 import { UserRole } from '../types';
 import ThemeToggle from './common/ThemeToggle';
 import { useAuth } from '../context/AuthContext';
+import { useRecruiter } from '../context/RecruiterContext';
 import { db } from '../firebase/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 
@@ -46,16 +47,22 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
   const { user } = useAuth();
   const [bdmProfile, setBdmProfile] = useState<any>(null);
 
+  // Consume recruiter profile from centralized RecruiterContext if role matches
+  const recruiterCtx = role === 'm_recruiter' ? useRecruiter() : null;
+  const recruiterProfile = recruiterCtx ? recruiterCtx.recruiterProfile : null;
+
   useEffect(() => {
-    if (!user || role !== 'm_manager') return;
-    const unsub = onSnapshot(doc(db, 'marketplace_bdms', user.uid), (snap) => {
-      if (snap.exists()) {
-        setBdmProfile(snap.data());
-      }
-    }, (err) => {
-      console.error('Error fetching BDM profile for top navigation:', err);
-    });
-    return () => unsub();
+    if (!user) return;
+    if (role === 'm_manager') {
+      const unsub = onSnapshot(doc(db, 'marketplace_bdms', user.uid), (snap) => {
+        if (snap.exists()) {
+          setBdmProfile(snap.data());
+        }
+      }, (err) => {
+        console.error('Error fetching BDM profile for top navigation:', err);
+      });
+      return () => unsub();
+    }
   }, [user, role]);
 
   const menuItems = {
@@ -73,10 +80,14 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
     m_recruiter: [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'jobs', label: 'Available Jobs', icon: Briefcase },
+      { id: 'assigned_jobs', label: 'My Assigned Jobs', icon: ClipboardList },
+      { id: 'open_to_all_jobs', label: 'Open To All Jobs', icon: Activity },
+      { id: 'pending_requests', label: 'Pending Requests', icon: CheckSquare },
       { id: 'candidates', label: 'Candidate Pool', icon: Users },
-      { id: 'selections', label: 'My Selections', icon: CheckSquare },
-      { id: 'submissions', label: 'Submissions', icon: FileText },
+      { id: 'submissions', label: 'My Submissions', icon: FileText },
+      { id: 'analytics', label: 'Analytics', icon: BarChart3 },
       { id: 'profile', label: 'Profile', icon: User },
+      { id: 'settings', label: 'Settings', icon: Settings },
     ],
     m_manager: [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -269,6 +280,41 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
               </div>
               <div className="w-full h-1.5 bg-app-bg border border-app-border rounded-full overflow-hidden">
                 <div className="h-full bg-brand-violet rounded-full" style={{ width: '92%' }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {role === 'm_recruiter' && (
+          <div className="mx-4 p-4 rounded-3xl bg-app-surface/60 border border-app-border flex flex-col gap-3 font-semibold pb-4 mb-2 text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full blue-gradient p-0.5 shrink-0">
+                <img 
+                  src={recruiterProfile?.photoUrl || recruiterProfile?.profilePhotoUrl || recruiterProfile?.profile?.photoUrl || recruiterProfile?.profile?.profilePhotoUrl || "https://picsum.photos/seed/recruiter/100/100"} 
+                  alt="Avatar" 
+                  className="w-full h-full rounded-full object-cover border-2 border-app-bg"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div className="truncate text-left">
+                <div className="text-sm font-extrabold text-app-text leading-tight truncate">
+                  {recruiterProfile?.fullName || recruiterProfile?.name || recruiterProfile?.profile?.fullName || recruiterProfile?.profile?.name || user?.displayName || 'Anonymous Recruiter'}
+                </div>
+                <div className="text-[10px] font-bold text-app-muted truncate">
+                  {recruiterProfile?.dept || recruiterProfile?.department || recruiterProfile?.profile?.dept || recruiterProfile?.profile?.department || 'Marketplace Recruiter'}
+                </div>
+                <div className="text-[9px] font-bold text-brand-blue truncate font-mono">
+                  {recruiterProfile?.email || recruiterProfile?.profile?.email || user?.email || ''}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between items-center text-[10px] font-bold text-app-muted uppercase tracking-wider">
+                <span>Ecosystem Status</span>
+                <span className="text-emerald-500">System Live</span>
+              </div>
+              <div className="w-full h-1.5 bg-app-bg border border-app-border rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500 rounded-full" style={{ width: '100%' }} />
               </div>
             </div>
           </div>
@@ -498,7 +544,9 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
                 <div className="text-sm font-bold text-app-text">
                   {role === 'm_manager' && bdmProfile
                     ? (bdmProfile.fullName || bdmProfile.name || 'Anonymous Manager')
-                    : role === 'u_admin' ? 'Dr. Sandeep Jain' : role === 'u_officer' ? 'Priya Sharma' : role === 'c_admin' ? 'Vikram Singh' : role === 'c_manager' ? 'Amit Verma' : role === 'm_manager' || role === 'u_student' || role === 'c_employee' ? 'Rohit Kumar' : 'Rishi Kumar'}
+                    : role === 'm_recruiter' && recruiterProfile
+                    ? (recruiterProfile.fullName || recruiterProfile.name || recruiterProfile.profile?.fullName || recruiterProfile.profile?.name || user?.displayName || 'Anonymous Recruiter')
+                    : role === 'u_admin' ? 'Dr. Sandeep Jain' : role === 'u_officer' ? 'Priya Sharma' : role === 'c_admin' ? 'Vikram Singh' : role === 'c_manager' ? 'Amit Verma' : role === 'm_manager' || role === 'u_student' || role === 'c_employee' ? 'Rohit Kumar' : (user?.displayName || 'Rishi Kumar')}
                 </div>
                 <div className="text-[10px] font-bold uppercase tracking-widest text-brand-blue">{getRoleLabel(role)}</div>
               </div>
@@ -506,6 +554,8 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
                 <img 
                   src={role === 'm_manager' && bdmProfile
                     ? (bdmProfile.profilePhotoUrl || bdmProfile.img || 'https://picsum.photos/seed/manager/100/100')
+                    : role === 'm_recruiter' && recruiterProfile
+                    ? (recruiterProfile.photoUrl || recruiterProfile.profilePhotoUrl || recruiterProfile.profile?.photoUrl || recruiterProfile.profile?.profilePhotoUrl || 'https://picsum.photos/seed/recruiter/100/100')
                     : role === 'u_admin' ? 'https://picsum.photos/seed/sandeepjain/100/100' : role === 'u_officer' ? 'https://picsum.photos/seed/priyasharma/100/100' : role === 'c_admin' ? 'https://picsum.photos/seed/vikramsingh/100/100' : role === 'c_manager' ? 'https://picsum.photos/seed/amitverma/100/100' : 'https://picsum.photos/seed/user123/100/100'} 
                   alt="Avatar" 
                   className="w-full h-full rounded-full object-cover border-2 border-app-bg"

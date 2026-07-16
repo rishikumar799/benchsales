@@ -38,6 +38,7 @@ import {
   getDocFromServer
 } from 'firebase/firestore';
 import { recruiterStorage, RecruiterCandidate, RecruiterJob, CandidateAccessRequest, CandidateSelection } from '../utils/recruiterStorage';
+import { useRecruiter } from '../../../../context/RecruiterContext';
 
 export type CandidateProfile = RecruiterCandidate;
 
@@ -53,6 +54,8 @@ export default function CandidatePoolTab({
   onPreviewCandidate 
 }: CandidatePoolTabProps) {
   
+  const { recruiterProfile } = useRecruiter();
+
   // Auth state
   const [currentUser, setCurrentUser] = useState(auth.currentUser);
 
@@ -63,6 +66,13 @@ export default function CandidatePoolTab({
   const [jobs, setJobs] = useState<RecruiterJob[]>([]);
   const [accessRequests, setAccessRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Sync accessRequests from RecruiterContext when recruiterProfile changes
+  useEffect(() => {
+    if (recruiterProfile?.candidate_queue) {
+      setAccessRequests(recruiterProfile.candidate_queue);
+    }
+  }, [recruiterProfile?.candidate_queue]);
 
   // Page UI subtabs
   const [activeSubTab, setActiveSubTab] = useState<'available' | 'assigned' | 'saved' | 'pending' | 'suggested'>('available');
@@ -109,6 +119,10 @@ export default function CandidatePoolTab({
         const data = docSnap.data();
         const profile = data.profile || {};
         
+        // Filter: Recruiter only manages their own candidates. Never another recruiter's.
+        const candidateRecruiterId = profile.assignedRecruiterId || data.assignedRecruiterId || data.recruiterId || profile.recruiterId || null;
+        if (candidateRecruiterId !== uid) return;
+
         list.push({
           id: docSnap.id,
           name: profile.fullName || data.name || 'Anonymous',
@@ -196,22 +210,10 @@ export default function CandidatePoolTab({
       console.error("Error fetching jobs:", err);
     });
 
-    // 4. Listen to recruiter document for queue (candidate_queue) and submissions
-    const recruiterDocRef = doc(db, 'marketplace_recruiters', uid);
-    const unsubRecruiter = onSnapshot(recruiterDocRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        setAccessRequests(data.candidate_queue || []);
-      }
-    }, (err) => {
-      console.error("Error fetching recruiter profile info:", err);
-    });
-
     return () => {
       unsubCandidates();
       unsubSaved();
       unsubJobs();
-      unsubRecruiter();
     };
   }, [currentUser]);
 

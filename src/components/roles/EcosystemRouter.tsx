@@ -48,10 +48,15 @@ import SettingsTab from './candidate/pages/SettingsTab';
 // Recruiter component imports
 import RecruiterDashboardTab from './recruiter/pages/DashboardTab';
 import RecruiterAvailableJobsTab from './recruiter/pages/AvailableJobsTab';
+import MyAssignedJobsTab from './recruiter/pages/MyAssignedJobsTab';
+import OpenToAllJobsTab from './recruiter/pages/OpenToAllJobsTab';
+import PendingRequestsTab from './recruiter/pages/PendingRequestsTab';
 import RecruiterCandidatePoolTab, { CandidateProfile } from './recruiter/pages/CandidatePoolTab';
 import RecruiterMySelectionsTab from './recruiter/pages/MySelectionsTab';
 import RecruiterSubmissionsTab from './recruiter/pages/SubmissionsTab';
-import RecruiterProfileTab from './recruiter/pages/ProfileTab';
+import RecruiterProfileTab from './recruiter/pages/RecruiterProfileTab';
+import RecruiterAnalyticsTab from './recruiter/pages/RecruiterAnalyticsTab';
+import RecruiterSettingsTab from './recruiter/pages/SettingsTab';
 
 // BDM Manager custom page imports
 import ManagerDashboardTab from './manager/pages/DashboardTab';
@@ -455,160 +460,50 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
   const [editingMManagerJob, setEditingMManagerJob] = useState<any | null>(null);
 
   // Recruiter Specific States and Datasets
-  const [recruiterCandidates, setRecruiterCandidates] = useState<CandidateProfile[]>([
-    {
-      id: 'c1',
-      name: 'Ravi Kumar',
-      experience: '4 Years',
-      skills: ['React', 'Node.js', 'MongoDB'],
-      availability: 'Available',
-      details: {
-        role: 'Software Developer',
-        skillsFull: ['React', 'Node.js', 'MongoDB', 'Express.js', 'JavaScript', 'HTML', 'CSS', 'Bootstrap'],
-        years: 4,
-        currentCompany: 'Tech Solutions Pvt Ltd',
-        currentRole: 'Software Developer',
-        availabilityDetails: 'Available Immediately'
-      }
-    },
-    {
-      id: 'c2',
-      name: 'Priya Sharma',
-      experience: '3 Years',
-      skills: ['Java', 'Spring Boot', 'MySQL'],
-      availability: 'Available',
-      details: {
-        role: 'Backend Java Developer',
-        skillsFull: ['Java', 'Spring Boot', 'MySQL', 'Hibernate', 'REST APIs', 'AWS'],
-        years: 3,
-        currentCompany: 'Infosys Ltd',
-        currentRole: 'System Engineer',
-        availabilityDetails: 'Available Immediately'
-      }
-    },
-    {
-      id: 'c3',
-      name: 'Akash Reddy',
-      experience: '5 Years',
-      skills: ['AWS', 'DevOps', 'Docker'],
-      availability: 'Available',
-      details: {
-        role: 'DevOps & Site Reliability Engineer',
-        skillsFull: ['AWS', 'DevOps', 'Docker', 'Kubernetes', 'CI/CD', 'Terraform', 'Linux'],
-        years: 5,
-        currentCompany: 'Wipro Technologies',
-        currentRole: 'Infrastructure Engineer',
-        availabilityDetails: 'Available Immediately'
-      }
-    },
-    {
-      id: 'c4',
-      name: 'Sneha Iyer',
-      experience: '2 Years',
-      skills: ['Python', 'Django', 'PostgreSQL'],
-      availability: 'Available',
-      details: {
-        role: 'Junior PyDev Engineer',
-        skillsFull: ['Python', 'Django', 'Flask', 'PostgreSQL', 'API Development', 'Git'],
-        years: 2,
-        currentCompany: 'Cognizant Ltd',
-        currentRole: 'Software Associate',
-        availabilityDetails: 'Available Immediately'
-      }
-    },
-    {
-      id: 'c5',
-      name: 'Karthik Nair',
-      experience: '4 Years',
-      skills: ['React', 'TypeScript', 'Redux'],
-      availability: 'Available',
-      details: {
-        role: 'Sr. Frontend UI Engineer',
-        skillsFull: ['React', 'TypeScript', 'Redux', 'Tailwind CSS', 'Vite', 'GraphQL'],
-        years: 4,
-        currentCompany: 'Accenture Cloud Services',
-        currentRole: 'Frontend Analyst',
-        availabilityDetails: 'Available Immediately'
-      }
-    },
-    {
-      id: 'c6',
-      name: 'Neha Verma',
-      experience: '3 Years',
-      skills: ['UI/UX', 'Figma', 'Adobe XD'],
-      availability: 'Available',
-      details: {
-        role: 'Product Designer',
-        skillsFull: ['UI/UX Design', 'Figma', 'Adobe XD', 'Prototyping', 'User Research', 'Wireframing'],
-        years: 3,
-        currentCompany: 'Creative Agency Inc',
-        currentRole: 'UI/UX Lead Designer',
-        availabilityDetails: 'Available Immediately'
-      }
-    },
-    {
-      id: 'c7',
-      name: 'Pavan Kumar',
-      experience: '4 Years',
-      skills: ['Java', 'Microservices', 'Kafka'],
-      availability: 'Available',
-      details: {
-        role: 'Cloud Microservices Engineer',
-        skillsFull: ['Java', 'Spring Cloud', 'Microservices', 'Apache Kafka', 'Redis', 'Docker'],
-        years: 4,
-        currentCompany: 'LTI Mindtree',
-        currentRole: 'Backend Engineer',
-        availabilityDetails: 'Available Immediately'
-      }
-    },
-    {
-      id: 'c8',
-      name: 'Anjali Mehta',
-      experience: '2 Years',
-      skills: ['Manual Testing', 'Selenium'],
-      availability: 'Available',
-      details: {
-        role: 'QA Automation Engineer',
-        skillsFull: ['Manual Testing', 'Selenium', 'Java', 'JUnit', 'Regression Testing', 'Jira'],
-        years: 2,
-        currentCompany: 'HCL Technologies',
-        currentRole: 'QA Test Analyst',
-        availabilityDetails: 'Available Immediately'
-      }
-    },
-    {
-      id: 'c9',
-      name: 'Mohit Singh',
-      experience: '5 Years',
-      skills: ['.NET', 'C#', 'SQL Server'],
-      availability: 'Available',
-      details: {
-        role: 'Full Stack .NET Developer',
-        skillsFull: ['.NET Core', 'C#', 'SQL Server', 'ASP.NET Core', 'React', 'Azure Developer'],
-        years: 5,
-        currentCompany: 'Capgemini Tech',
-        currentRole: 'Senior .NET Developer',
-        availabilityDetails: 'Available Immediately'
-      }
-    },
-    {
-      id: 'c10',
-      name: 'Divya Reddy',
-      experience: '3 Years',
-      skills: ['Node.js', 'Express', 'MongoDB'],
-      availability: 'Available',
-      details: {
-        role: 'Fullstack Node.js Developer',
-        skillsFull: ['Node.js', 'Express.js', 'MongoDB', 'JavaScript', 'TypeScript', 'Jest', 'Git'],
-        years: 3,
-        currentCompany: 'Tech Mahindra',
-        currentRole: 'Software Developer',
-        availabilityDetails: 'Available Immediately'
-      }
-    }
-  ]);
+  const [recruiterCandidates, setRecruiterCandidates] = useState<CandidateProfile[]>([]);
 
-  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>(['c1', 'c2', 'c3']);
+  // Synchronize marketplace recruiter candidates in real-time from Firestore
+  React.useEffect(() => {
+    if (role !== 'm_recruiter') return;
+    const uid = userProfile?.uid || auth.currentUser?.uid;
+    if (!uid) return;
+
+    const candidatesCol = collection(db, 'marketplace_jobseekers');
+    const unsubscribe = onSnapshot(candidatesCol, (snapshot) => {
+      const list: CandidateProfile[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const profile = data.profile || {};
+        
+        // Only include candidates assigned to this recruiter
+        const candidateRecruiterId = profile.assignedRecruiterId || data.assignedRecruiterId || data.recruiterId || profile.recruiterId || null;
+        if (candidateRecruiterId !== uid) return;
+
+        list.push({
+          id: docSnap.id,
+          name: profile.fullName || data.name || 'Anonymous',
+          experience: profile.experience || data.experience || 'Entry Level',
+          skills: Array.isArray(profile.skills) ? profile.skills : (typeof profile.skills === 'string' ? profile.skills.split(',').map((s: string) => s.trim()) : []),
+          availability: profile.availability || data.availability || 'Available',
+          details: {
+            role: profile.role || data.role || 'Software Engineer',
+            skillsFull: Array.isArray(profile.skills) ? profile.skills : (typeof profile.skills === 'string' ? profile.skills.split(',').map((s: string) => s.trim()) : []),
+            years: Number(profile.experience?.split(' ')[0]) || 2,
+            currentCompany: profile.details?.currentCompany || data.currentCompany || 'N/A',
+            currentRole: profile.details?.currentRole || data.currentRole || 'N/A',
+            availabilityDetails: profile.details?.availabilityDetails || data.availabilityDetails || 'Immediate'
+          }
+        });
+      });
+      setRecruiterCandidates(list);
+    }, (err) => {
+      console.error("EcosystemRouter marketplace recruiter candidates sync error:", err);
+    });
+
+    return () => unsubscribe();
+  }, [role, userProfile?.uid]);
+
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
   const [previewCandidate, setPreviewCandidate] = useState<CandidateProfile | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   
@@ -1717,6 +1612,19 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                 onNavigate={(tab) => setActiveTab?.(tab)}
               />
             )}
+            {activeTab === 'assigned_jobs' && (
+              <MyAssignedJobsTab 
+                onNavigate={(tab) => setActiveTab?.(tab)}
+              />
+            )}
+            {activeTab === 'open_to_all_jobs' && (
+              <OpenToAllJobsTab 
+                onNavigate={(tab) => setActiveTab?.(tab)}
+              />
+            )}
+            {activeTab === 'pending_requests' && (
+              <PendingRequestsTab />
+            )}
             {activeTab === 'candidates' && (
               <RecruiterCandidatePoolTab 
                 selectedCandidates={selectedCandidateIds}
@@ -1751,8 +1659,14 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
             {activeTab === 'submissions' && (
               <RecruiterSubmissionsTab />
             )}
+            {activeTab === 'analytics' && (
+              <RecruiterAnalyticsTab />
+            )}
             {activeTab === 'profile' && (
               <RecruiterProfileTab />
+            )}
+            {activeTab === 'settings' && (
+              <RecruiterSettingsTab />
             )}
           </div>
 

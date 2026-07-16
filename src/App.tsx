@@ -24,6 +24,7 @@ import ScrollToTop from './components/marketing/common/ScrollToTop';
 import EcosystemRouter from './components/roles/EcosystemRouter';
 import { UserRole } from './types';
 import { useAuth, dbRoleToAppRole } from './context/AuthContext';
+import { useRecruiter } from './context/RecruiterContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 
 const isAppMode = import.meta.env.VITE_APP_MODE === 'true';
@@ -35,6 +36,7 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
   });
+  const recruiterContext = useRecruiter();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -47,18 +49,27 @@ export default function App() {
     }
   }, [userProfile]);
 
+  const isRecruiter = role === 'm_recruiter';
+  const activeTheme = isRecruiter ? (recruiterContext?.theme || 'light') : theme;
+
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
-    root.classList.add(theme);
-  }, [theme]);
+    root.classList.add(activeTheme);
+    localStorage.setItem('theme', activeTheme);
+  }, [activeTheme]);
 
   const toggleTheme = () => {
-    setTheme(prev => {
-      const next = prev === 'light' ? 'dark' : 'light';
-      localStorage.setItem('theme', next);
-      return next;
-    });
+    if (isRecruiter && recruiterContext) {
+      const nextTheme = recruiterContext.theme === 'light' ? 'dark' : 'light';
+      recruiterContext.setTheme(nextTheme);
+    } else {
+      setTheme(prev => {
+        const next = prev === 'light' ? 'dark' : 'light';
+        localStorage.setItem('theme', next);
+        return next;
+      });
+    }
   };
 
   const handleLogin = (selectedRole: UserRole, isApproved: boolean) => {
@@ -91,7 +102,7 @@ export default function App() {
               <AuthPage 
                 onBack={() => {}} 
                 onLogin={handleLogin} 
-                theme={theme}
+                theme={activeTheme}
                 toggleTheme={toggleTheme}
               />
             )
@@ -106,7 +117,7 @@ export default function App() {
                 onLogout={handleLogout} 
                 activeTab={activeTab} 
                 setActiveTab={setActiveTab}
-                theme={theme}
+                theme={activeTheme}
                 toggleTheme={toggleTheme}
               >
                 <EcosystemRouter role={role!} activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -125,14 +136,14 @@ export default function App() {
     <>
       <ScrollToTop />
       <Routes>
-        <Route path="/" element={<LandingPage theme={theme} toggleTheme={toggleTheme} />} />
-      <Route path="/how-it-works" element={<HowItWorksPage theme={theme} toggleTheme={toggleTheme} />} />
-      <Route path="/community" element={<CommunityPage theme={theme} toggleTheme={toggleTheme} />} />
-      <Route path="/community/discussions" element={<DiscussionsPage theme={theme} toggleTheme={toggleTheme} />} />
-      <Route path="/about" element={<AboutPage theme={theme} toggleTheme={toggleTheme} />} />
-      <Route path="/services" element={<ServicesPage theme={theme} toggleTheme={toggleTheme} />} />
-      <Route path="/contact" element={<ContactPage theme={theme} toggleTheme={toggleTheme} />} />
-      <Route path="/role/:role" element={<RolePage theme={theme} toggleTheme={toggleTheme} />} />
+        <Route path="/" element={<LandingPage theme={activeTheme} toggleTheme={toggleTheme} />} />
+      <Route path="/how-it-works" element={<HowItWorksPage theme={activeTheme} toggleTheme={toggleTheme} />} />
+      <Route path="/community" element={<CommunityPage theme={activeTheme} toggleTheme={toggleTheme} />} />
+      <Route path="/community/discussions" element={<DiscussionsPage theme={activeTheme} toggleTheme={toggleTheme} />} />
+      <Route path="/about" element={<AboutPage theme={activeTheme} toggleTheme={toggleTheme} />} />
+      <Route path="/services" element={<ServicesPage theme={activeTheme} toggleTheme={toggleTheme} />} />
+      <Route path="/contact" element={<ContactPage theme={activeTheme} toggleTheme={toggleTheme} />} />
+      <Route path="/role/:role" element={<RolePage theme={activeTheme} toggleTheme={toggleTheme} />} />
       
       <Route 
         path="/auth" 
@@ -143,7 +154,7 @@ export default function App() {
             <AuthPage 
               onBack={() => navigate('/')} 
               onLogin={handleLogin} 
-              theme={theme}
+              theme={activeTheme}
               toggleTheme={toggleTheme}
             />
           )
@@ -159,7 +170,7 @@ export default function App() {
               onLogout={handleLogout} 
               activeTab={activeTab} 
               setActiveTab={setActiveTab}
-              theme={theme}
+              theme={activeTheme}
               toggleTheme={toggleTheme}
             >
               <EcosystemRouter role={role!} activeTab={activeTab} setActiveTab={setActiveTab} />
