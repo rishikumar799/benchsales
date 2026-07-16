@@ -16,12 +16,14 @@ import {
   AlertTriangle,
   Check
 } from 'lucide-react';
-import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
-import { db } from '../../../../firebase/firebase';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
 import { useAuth } from '../../../../context/AuthContext';
+import { useJobSeeker } from '../../../../context/JobSeekerContext';
 
 export default function SettingsTab() {
   const { user, userProfile } = useAuth();
+  const { jobSeekerProfile, loading: profileLoading } = useJobSeeker();
   const uid = user?.uid || userProfile?.uid;
   const [loading, setLoading] = useState(true);
 
@@ -55,40 +57,36 @@ export default function SettingsTab() {
 
   const [showSavedMsg, setShowSavedMsg] = useState(false);
 
-  // Real-time Firestore Sync
+  // Real-time Firestore Sync from JobSeekerContext
   useEffect(() => {
+    if (profileLoading) {
+      setLoading(true);
+      return;
+    }
     if (!uid) {
       setLoading(false);
       return;
     }
 
-    const docRef = doc(db, 'marketplace_jobseekers', uid);
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const prof = data.profile || {};
-        const sets = data.settings || {};
+    if (jobSeekerProfile) {
+      const data = jobSeekerProfile;
+      const prof = data.profile || {};
+      const sets = data.settings || {};
 
-        setFullName(prof.fullName || data.fullName || 'Rishi Kumar');
-        setEmail(prof.email || data.email || 'rishi.kumar@email.com');
-        setPhone(prof.phone || prof.phoneNumber || data.phone || data.phoneNumber || '+91 98765 43210');
+      setFullName(prof.fullName || data.fullName || 'Rishi Kumar');
+      setEmail(prof.email || data.email || 'rishi.kumar@email.com');
+      setPhone(prof.phone || prof.phoneNumber || data.phone || data.phoneNumber || '+91 98765 43210');
 
-        setEmailAlerts(sets.emailNotifications !== undefined ? sets.emailNotifications : true);
-        setPushAlerts(sets.pushAlerts !== undefined ? sets.pushAlerts : true);
-        setSmsAlerts(sets.smsAlerts !== undefined ? sets.smsAlerts : false);
-        setRecomAlerts(sets.recomAlerts !== undefined ? sets.recomAlerts : true);
-        setSearchableByRecruiters(sets.searchableByRecruiters !== undefined ? sets.searchableByRecruiters : true);
-        setShowActiveStatus(sets.showActiveStatus !== undefined ? sets.showActiveStatus : true);
-        setAutoHandshake(sets.autoHandshake !== undefined ? sets.autoHandshake : false);
-      }
-      setLoading(false);
-    }, (error) => {
-      console.error("Error subscribing to settings:", error);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [uid]);
+      setEmailAlerts(sets.emailNotifications !== undefined ? sets.emailNotifications : true);
+      setPushAlerts(sets.pushAlerts !== undefined ? sets.pushAlerts : true);
+      setSmsAlerts(sets.smsAlerts !== undefined ? sets.smsAlerts : false);
+      setRecomAlerts(sets.recomAlerts !== undefined ? sets.recomAlerts : true);
+      setSearchableByRecruiters(sets.searchableByRecruiters !== undefined ? sets.searchableByRecruiters : true);
+      setShowActiveStatus(sets.showActiveStatus !== undefined ? sets.showActiveStatus : true);
+      setAutoHandshake(sets.autoHandshake !== undefined ? sets.autoHandshake : false);
+    }
+    setLoading(false);
+  }, [uid, jobSeekerProfile, profileLoading]);
 
   const updateSettingsInFirestore = async (overrideFields: any = {}) => {
     if (!uid) return;
@@ -122,7 +120,7 @@ export default function SettingsTab() {
         })
       });
     } catch (err) {
-      console.error("Error updating settings:", err);
+      handleFirestoreError(err, OperationType.WRITE, `marketplace_jobseekers/${uid}`);
     }
   };
 

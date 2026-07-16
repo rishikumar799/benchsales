@@ -33,9 +33,10 @@ import {
   ChevronDown,
   AlertTriangle
 } from 'lucide-react';
-import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
-import { db } from '../../../../firebase/firebase';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
 import { useAuth } from '../../../../context/AuthContext';
+import { useJobSeeker } from '../../../../context/JobSeekerContext';
 
 interface ExperienceItem {
   id: string;
@@ -83,6 +84,7 @@ interface SocialLinks {
 
 export default function ProfileTab() {
   const { user, userProfile } = useAuth();
+  const { jobSeekerProfile, loading: profileLoading } = useJobSeeker();
   const uid = user?.uid || userProfile?.uid;
   const [loading, setLoading] = useState(true);
 
@@ -237,87 +239,83 @@ export default function ProfileTab() {
     setTimeout(() => setShowSavedMsg(false), 3000);
   };
 
-  // Real-time Firestore Sync
+  // Real-time Firestore Sync from JobSeekerContext
   useEffect(() => {
+    if (profileLoading) {
+      setLoading(true);
+      return;
+    }
     if (!uid) {
       setLoading(false);
       return;
     }
 
-    const docRef = doc(db, 'marketplace_jobseekers', uid);
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const prof = data.profile || {};
-        const resData = data.resume || {};
-        
-        setDbResumeScore(resData.resumeCompletion || resData.completion || 85);
-        setDbCreatedAt(data.createdAt || prof.createdAt || '');
+    if (jobSeekerProfile) {
+      const data = jobSeekerProfile;
+      const prof = data.profile || {};
+      const resData = data.resume || {};
+      
+      setDbResumeScore(resData.resumeCompletion || resData.completion || 85);
+      setDbCreatedAt(data.createdAt || prof.createdAt || '');
 
-        setFullName(prof.fullName || data.fullName || '');
-        setEmail(prof.email || data.email || '');
-        setPhone(prof.phone || prof.phoneNumber || data.phone || data.phoneNumber || '');
-        setDob(prof.dateOfBirth || data.dateOfBirth || '');
-        setGender(prof.gender || data.gender || 'Male');
-        setCity(data.city || '');
-        setState(data.state || '');
-        setCountry(data.country || '');
-        setAddress(prof.address || data.address || '');
-        setAboutMe(prof.bio || data.bio || prof.aboutMe || data.aboutMe || '');
-        setHeadline(prof.headline || data.headline || 'Student / Job Seeker');
-        setLanguages(prof.languages || data.languages || 'English, Telugu, Hindi');
-        setExperienceStr(prof.experience || data.experience || 'Entry Level');
-        setEducationStr(prof.education || data.education || 'B.Tech in Computer Science & Engineering');
-        setProfilePhoto(prof.profilePhoto || data.profilePhoto || 'https://picsum.photos/seed/user123/200/200');
-        setZip(data.zip || '500081');
+      setFullName(prof.fullName || data.fullName || '');
+      setEmail(prof.email || data.email || '');
+      setPhone(prof.phone || prof.phoneNumber || data.phone || data.phoneNumber || '');
+      setDob(prof.dateOfBirth || data.dateOfBirth || '');
+      setGender(prof.gender || data.gender || 'Male');
+      setCity(data.city || '');
+      setState(data.state || '');
+      setCountry(data.country || '');
+      setAddress(prof.address || data.address || '');
+      setAboutMe(prof.bio || data.bio || prof.aboutMe || data.aboutMe || '');
+      setHeadline(prof.headline || data.headline || 'Student / Job Seeker');
+      setLanguages(prof.languages || data.languages || 'English, Telugu, Hindi');
+      setExperienceStr(prof.experience || data.experience || 'Entry Level');
+      setEducationStr(prof.education || data.education || 'B.Tech in Computer Science & Engineering');
+      setProfilePhoto(prof.profilePhoto || data.profilePhoto || 'https://picsum.photos/seed/user123/200/200');
+      setZip(data.zip || '500081');
 
-        setExperiences(data.experiences || prof.experiences || []);
-        setEducations(data.educations || prof.educations || []);
-        if (data.skillsCategories) {
-          setSkillsCategories(data.skillsCategories);
-        }
-
-        const currentLinks = data.links || {};
-        setLinks({
-          github: currentLinks.github || data.github || '',
-          linkedin: currentLinks.linkedin || data.linkedin || '',
-          portfolio: currentLinks.portfolio || data.portfolio || '',
-          website: currentLinks.website || data.website || '',
-          leetcode: currentLinks.leetcode || data.leetcode || '',
-          hackerrank: currentLinks.hackerrank || data.hackerrank || '',
-          codeforces: currentLinks.codeforces || data.codeforces || '',
-          behance: currentLinks.behance || data.behance || '',
-          dribbble: currentLinks.dribbble || data.dribbble || '',
-          medium: currentLinks.medium || data.medium || '',
-          youtube: currentLinks.youtube || data.youtube || '',
-          x: currentLinks.x || data.x || ''
-        });
-
-        const prefs = data.preferences || {};
-        setPrefSalary(prefs.prefSalary || data.expectedSalary || '₹12 - 18 LPA');
-        setPrefNoticePeriod(prefs.prefNoticePeriod || data.noticePeriod || 'Immediate');
-        setPrefRoles(prefs.prefRoles || data.prefRoles || ['Frontend Developer', 'Full Stack Developer']);
-        setPrefLocations(prefs.prefLocations || data.preferredLocation || data.prefLocations || ['Hyderabad', 'Bangalore']);
-        setPrefRemote(prefs.prefRemote !== undefined ? prefs.prefRemote : true);
-        setPrefHybrid(prefs.prefHybrid !== undefined ? prefs.prefHybrid : true);
-        setPrefOnsite(prefs.prefOnsite !== undefined ? prefs.prefOnsite : false);
-        setPrefRelocation(prefs.prefRelocation !== undefined ? prefs.prefRelocation : true);
-        setPrefInternational(prefs.prefInternational !== undefined ? prefs.prefInternational : false);
-        setPrefEmploymentType(prefs.prefEmploymentType || ['Full-Time']);
-        setPrefIndustries(prefs.prefIndustries || ['SaaS', 'AI/Deep Tech']);
-        setJobAlerts(prefs.jobAlerts !== undefined ? prefs.jobAlerts : true);
-        setAiRecommendation(prefs.aiRecommendation !== undefined ? prefs.aiRecommendation : true);
-        setRecruiterVisibility(prefs.recruiterVisibility !== undefined ? prefs.recruiterVisibility : true);
-        setAvailabilityStatus(prefs.availabilityStatus || data.availability || 'Actively Looking');
+      setExperiences(data.experiences || prof.experiences || []);
+      setEducations(data.educations || prof.educations || []);
+      if (data.skillsCategories) {
+        setSkillsCategories(data.skillsCategories);
       }
-      setLoading(false);
-    }, (error) => {
-      console.error("Error subscribing to profile:", error);
-      setLoading(false);
-    });
 
-    return () => unsubscribe();
-  }, [uid]);
+      const currentLinks = data.links || {};
+      setLinks({
+        github: currentLinks.github || data.github || '',
+        linkedin: currentLinks.linkedin || data.linkedin || '',
+        portfolio: currentLinks.portfolio || data.portfolio || '',
+        website: currentLinks.website || data.website || '',
+        leetcode: currentLinks.leetcode || data.leetcode || '',
+        hackerrank: currentLinks.hackerrank || data.hackerrank || '',
+        codeforces: currentLinks.codeforces || data.codeforces || '',
+        behance: currentLinks.behance || data.behance || '',
+        dribbble: currentLinks.dribbble || data.dribbble || '',
+        medium: currentLinks.medium || data.medium || '',
+        youtube: currentLinks.youtube || data.youtube || '',
+        x: currentLinks.x || data.x || ''
+      });
+
+      const prefs = data.preferences || {};
+      setPrefSalary(prefs.prefSalary || data.expectedSalary || '₹12 - 18 LPA');
+      setPrefNoticePeriod(prefs.prefNoticePeriod || data.noticePeriod || 'Immediate');
+      setPrefRoles(prefs.prefRoles || data.prefRoles || ['Frontend Developer', 'Full Stack Developer']);
+      setPrefLocations(prefs.prefLocations || data.preferredLocation || data.prefLocations || ['Hyderabad', 'Bangalore']);
+      setPrefRemote(prefs.prefRemote !== undefined ? prefs.prefRemote : true);
+      setPrefHybrid(prefs.prefHybrid !== undefined ? prefs.prefHybrid : true);
+      setPrefOnsite(prefs.prefOnsite !== undefined ? prefs.prefOnsite : false);
+      setPrefRelocation(prefs.prefRelocation !== undefined ? prefs.prefRelocation : true);
+      setPrefInternational(prefs.prefInternational !== undefined ? prefs.prefInternational : false);
+      setPrefEmploymentType(prefs.prefEmploymentType || ['Full-Time']);
+      setPrefIndustries(prefs.prefIndustries || ['SaaS', 'AI/Deep Tech']);
+      setJobAlerts(prefs.jobAlerts !== undefined ? prefs.jobAlerts : true);
+      setAiRecommendation(prefs.aiRecommendation !== undefined ? prefs.aiRecommendation : true);
+      setRecruiterVisibility(prefs.recruiterVisibility !== undefined ? prefs.recruiterVisibility : true);
+      setAvailabilityStatus(prefs.availabilityStatus || data.availability || 'Actively Looking');
+    }
+    setLoading(false);
+  }, [uid, jobSeekerProfile, profileLoading]);
 
   // Unified Update Helper
   const updateProfileInFirestore = async (overrideFields: any = {}) => {
@@ -492,7 +490,7 @@ export default function ProfileTab() {
       const docRef = doc(db, 'marketplace_jobseekers', uid);
       await updateDoc(docRef, updatePayload);
     } catch (err) {
-      console.error("Error updating profile in Firestore:", err);
+      handleFirestoreError(err, OperationType.WRITE, `marketplace_jobseekers/${uid}`);
       triggerToast("Failed to save changes to Firestore.");
     }
   };

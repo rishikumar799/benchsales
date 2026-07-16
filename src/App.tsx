@@ -25,6 +25,7 @@ import EcosystemRouter from './components/roles/EcosystemRouter';
 import { UserRole } from './types';
 import { useAuth, dbRoleToAppRole } from './context/AuthContext';
 import { useRecruiter } from './context/RecruiterContext';
+import { useJobSeeker } from './context/JobSeekerContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 
 const isAppMode = import.meta.env.VITE_APP_MODE === 'true';
@@ -37,6 +38,7 @@ export default function App() {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
   });
   const recruiterContext = useRecruiter();
+  const candidateContext = useJobSeeker();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -50,7 +52,12 @@ export default function App() {
   }, [userProfile]);
 
   const isRecruiter = role === 'm_recruiter';
-  const activeTheme = isRecruiter ? (recruiterContext?.theme || 'light') : theme;
+  const isCandidate = role === 'm_candidate';
+  const activeTheme = isRecruiter 
+    ? (recruiterContext?.theme || 'light') 
+    : isCandidate 
+    ? (candidateContext?.theme || 'light')
+    : theme;
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -63,6 +70,9 @@ export default function App() {
     if (isRecruiter && recruiterContext) {
       const nextTheme = recruiterContext.theme === 'light' ? 'dark' : 'light';
       recruiterContext.setTheme(nextTheme);
+    } else if (isCandidate && candidateContext) {
+      const nextTheme = candidateContext.theme === 'light' ? 'dark' : 'light';
+      candidateContext.setTheme(nextTheme);
     } else {
       setTheme(prev => {
         const next = prev === 'light' ? 'dark' : 'light';

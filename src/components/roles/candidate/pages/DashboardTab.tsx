@@ -15,8 +15,9 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
-import { db } from '../../../../firebase/firebase';
+import { db, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
 import { useAuth } from '../../../../context/AuthContext';
+import { useJobSeeker } from '../../../../context/JobSeekerContext';
 import RecruiterHandshakeGateway from '../components/RecruiterHandshakeGateway';
 
 interface DashboardTabProps {
@@ -59,10 +60,10 @@ const getRelativeTime = (ts: any) => {
 
 export default function DashboardTab({ onNavigate }: DashboardTabProps) {
   const { user, userProfile } = useAuth();
+  const { jobSeekerProfile, loading: profileLoading, profileCompletion, resumeCompletion } = useJobSeeker();
   const uid = user?.uid || userProfile?.uid;
 
   const [loading, setLoading] = useState(true);
-  const [candidateData, setCandidateData] = useState<any>(null);
   const [myApplications, setMyApplications] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
 
@@ -72,13 +73,7 @@ export default function DashboardTab({ onNavigate }: DashboardTabProps) {
       return;
     }
 
-    // Subscribe to candidate profile
-    const candidateDocRef = doc(db, 'marketplace_jobseekers', uid);
-    const unsubscribeCandidate = onSnapshot(candidateDocRef, (snap) => {
-      if (snap.exists()) {
-        setCandidateData(snap.data());
-      }
-    });
+    setLoading(true);
 
     // Subscribe to applications
     const qApps = query(
@@ -91,6 +86,8 @@ export default function DashboardTab({ onNavigate }: DashboardTabProps) {
         ...docSnap.data()
       }));
       setMyApplications(fetched);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'marketplace_applications');
     });
 
     // Subscribe to open jobs
@@ -106,12 +103,11 @@ export default function DashboardTab({ onNavigate }: DashboardTabProps) {
       setJobs(fetched);
       setLoading(false);
     }, (error) => {
-      console.error(error);
+      handleFirestoreError(error, OperationType.GET, 'marketplace_jobs');
       setLoading(false);
     });
 
     return () => {
-      unsubscribeCandidate();
       unsubscribeApps();
       unsubscribeJobs();
     };
@@ -131,20 +127,20 @@ export default function DashboardTab({ onNavigate }: DashboardTabProps) {
     return appDate.toDateString() === new Date().toDateString();
   }).length;
 
-  const rawResumeScore = candidateData?.ai_profile?.resumeScore || candidateData?.ai_profile?.profileScore || 85;
-  const resumeScore = `${rawResumeScore}%`;
+  const resumeScore = `${resumeCompletion}%`;
+  const profileScore = `${profileCompletion}%`;
 
   const jobMatchesCount = jobs.length > 0 ? jobs.length : 12;
 
   const stats = [
     { label: 'Applications Today', value: String(appsToday), trend: appsToday > 0 ? `+${appsToday} today` : 'No new application', trendColor: 'text-emerald-500 bg-emerald-500/10', color: 'text-amber-500' },
     { label: 'Total Applications', value: String(totalApps), trend: 'All-time submissions', trendColor: 'text-blue-500 bg-blue-500/10', color: 'text-blue-500' },
-    { label: 'Resume Score', value: resumeScore, trend: rawResumeScore >= 90 ? 'Outstanding' : 'Needs tuning', trendColor: 'text-emerald-500 bg-emerald-500/10', color: 'text-emerald-500' },
-    { label: 'Job Matches', value: String(jobMatchesCount), trend: 'Active openings matching profile', trendColor: 'text-violet-500 bg-violet-500/10', color: 'text-violet-500' }
+    { label: 'Resume Score', value: resumeScore, trend: resumeCompletion >= 90 ? 'Outstanding' : 'Needs tuning', trendColor: 'text-emerald-500 bg-emerald-500/10', color: 'text-emerald-500' },
+    { label: 'Profile Completion', value: profileScore, trend: profileCompletion >= 80 ? 'Good' : 'Incomplete', trendColor: 'text-violet-500 bg-violet-500/10', color: 'text-violet-500' }
   ];
 
   // AI recommendations pulled from profile metrics
-  const rawRecommendations = candidateData?.ai_profile?.recommendations || [];
+  const rawRecommendations = jobSeekerProfile?.ai_profile?.recommendations || [];
   const aiRecommendations = rawRecommendations.length > 0 
     ? rawRecommendations.map((rec: string, index: number) => ({
         text: rec,
@@ -174,7 +170,7 @@ export default function DashboardTab({ onNavigate }: DashboardTabProps) {
     status: 'Applied'
   }));
 
-  if (loading) {
+  if (loading || profileLoading) {
     return (
       <div className="min-h-[400px] flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-brand-blue border-t-transparent rounded-full animate-spin" />

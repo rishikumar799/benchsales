@@ -22,6 +22,7 @@ import {
 
 import { db } from '../../../../firebase/firebase';
 import { useAuth } from '../../../../context/AuthContext';
+import { useJobSeeker } from '../../../../context/JobSeekerContext';
 import { 
   collection, 
   doc, 
@@ -133,9 +134,9 @@ const formatTimestamp = (ts: any) => {
 
 export default function JobsTab() {
   const { userProfile } = useAuth();
+  const { jobSeekerProfile, loading: profileLoading } = useJobSeeker();
   const [jobs, setJobs] = useState<any[]>([]);
   const [myApplications, setMyApplications] = useState<any[]>([]);
-  const [candidateData, setCandidateData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState('');
@@ -148,16 +149,8 @@ export default function JobsTab() {
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [isSubmitSuccess, setIsSubmitSuccess] = useState(false);
 
-  // Sync Resume Builder default name if present
-  const [existingResumeName] = useState(() => {
-    const savedUploaded = localStorage.getItem('aryx_uploaded_resume');
-    if (savedUploaded) {
-      try {
-        return JSON.parse(savedUploaded).name;
-      } catch (e) {}
-    }
-    return "Primary Resume (from Resume Builder)";
-  });
+  // Sync Resume Builder default name if present - Cloud-first, fallback-safe
+  const existingResumeName = jobSeekerProfile?.resume?.uploadedResume?.name || "Primary Resume (from Resume Builder)";
 
   // 1. Subscribe to open jobs in real-time
   useEffect(() => {
@@ -177,25 +170,7 @@ export default function JobsTab() {
     return () => unsubscribeJobs();
   }, []);
 
-  // 2. Subscribe to candidate data (saved jobs list) in real-time
-  useEffect(() => {
-    if (!userProfile?.uid) return;
-
-    const docRef = doc(db, 'marketplace_jobseekers', userProfile.uid);
-    const unsubscribeCandidate = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setCandidateData(docSnap.data());
-      } else {
-        setCandidateData({});
-      }
-    }, (error) => {
-      console.error("Error listening to candidate profile:", error);
-    });
-
-    return () => unsubscribeCandidate();
-  }, [userProfile?.uid]);
-
-  // 3. Subscribe to candidate applications in real-time
+  // 2. Subscribe to candidate applications in real-time
   useEffect(() => {
     if (!userProfile?.uid) return;
 
@@ -216,7 +191,7 @@ export default function JobsTab() {
     return () => unsubscribeApps();
   }, [userProfile?.uid]);
 
-  const savedJobIds: string[] = candidateData?.saved_jobs || [];
+  const savedJobIds: string[] = jobSeekerProfile?.saved_jobs || [];
   const appliedJobIds: string[] = myApplications.map(app => app.jobId);
 
   const getAppliedResumeForJob = (jobId: string) => {

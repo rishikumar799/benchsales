@@ -29,6 +29,7 @@ import { UserRole } from '../types';
 import ThemeToggle from './common/ThemeToggle';
 import { useAuth } from '../context/AuthContext';
 import { useRecruiter } from '../context/RecruiterContext';
+import { useJobSeeker } from '../context/JobSeekerContext';
 import { db } from '../firebase/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 
@@ -50,6 +51,10 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
   // Consume recruiter profile from centralized RecruiterContext if role matches
   const recruiterCtx = role === 'm_recruiter' ? useRecruiter() : null;
   const recruiterProfile = recruiterCtx ? recruiterCtx.recruiterProfile : null;
+
+  // Consume job seeker profile from centralized JobSeekerContext if role matches
+  const candidateCtx = role === 'm_candidate' ? useJobSeeker() : null;
+  const candidateProfile = candidateCtx ? candidateCtx.jobSeekerProfile : null;
 
   useEffect(() => {
     if (!user) return;
@@ -546,6 +551,8 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
                     ? (bdmProfile.fullName || bdmProfile.name || 'Anonymous Manager')
                     : role === 'm_recruiter' && recruiterProfile
                     ? (recruiterProfile.fullName || recruiterProfile.name || recruiterProfile.profile?.fullName || recruiterProfile.profile?.name || user?.displayName || 'Anonymous Recruiter')
+                    : role === 'm_candidate' && candidateProfile
+                    ? (candidateProfile.profile?.fullName || candidateProfile.fullName || user?.displayName || 'Job Seeker')
                     : role === 'u_admin' ? 'Dr. Sandeep Jain' : role === 'u_officer' ? 'Priya Sharma' : role === 'c_admin' ? 'Vikram Singh' : role === 'c_manager' ? 'Amit Verma' : role === 'm_manager' || role === 'u_student' || role === 'c_employee' ? 'Rohit Kumar' : (user?.displayName || 'Rishi Kumar')}
                 </div>
                 <div className="text-[10px] font-bold uppercase tracking-widest text-brand-blue">{getRoleLabel(role)}</div>
@@ -556,6 +563,8 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
                     ? (bdmProfile.profilePhotoUrl || bdmProfile.img || 'https://picsum.photos/seed/manager/100/100')
                     : role === 'm_recruiter' && recruiterProfile
                     ? (recruiterProfile.photoUrl || recruiterProfile.profilePhotoUrl || recruiterProfile.profile?.photoUrl || recruiterProfile.profile?.profilePhotoUrl || 'https://picsum.photos/seed/recruiter/100/100')
+                    : role === 'm_candidate' && candidateProfile
+                    ? (candidateProfile.profile?.photoURL || candidateProfile.profile?.profilePhoto || candidateProfile.profilePhoto || 'https://picsum.photos/seed/candidate/100/100')
                     : role === 'u_admin' ? 'https://picsum.photos/seed/sandeepjain/100/100' : role === 'u_officer' ? 'https://picsum.photos/seed/priyasharma/100/100' : role === 'c_admin' ? 'https://picsum.photos/seed/vikramsingh/100/100' : role === 'c_manager' ? 'https://picsum.photos/seed/amitverma/100/100' : 'https://picsum.photos/seed/user123/100/100'} 
                   alt="Avatar" 
                   className="w-full h-full rounded-full object-cover border-2 border-app-bg"
