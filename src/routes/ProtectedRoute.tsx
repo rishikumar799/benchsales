@@ -8,15 +8,32 @@ interface ProtectedRouteProps {
   allowedRoles?: UserRole[];
 }
 
+const isValidOrgId = (id: any): boolean => {
+  return typeof id === 'string' && id !== 'undefined' && id.trim() !== '';
+};
+
+const rolesRequiringOrg = [
+  'organization_admin',
+  'placement_officer',
+  'student',
+  'company_admin',
+  'company_recruiter',
+  'company_manager',
+  'employee'
+];
+
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { user, userProfile, loading } = useAuth();
 
-  if (loading) {
+  const isOrgRole = userProfile && rolesRequiringOrg.includes(userProfile.role);
+  const isOrgIdPending = isOrgRole && !isValidOrgId(userProfile.organizationId);
+
+  if (loading || isOrgIdPending) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
         <div className="w-12 h-12 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin" />
         <p className="mt-4 text-xs font-semibold text-slate-500 dark:text-slate-400">
-          Loading your secure workspace...
+          {isOrgIdPending ? "Resolving organization workspace..." : "Loading your secure workspace..."}
         </p>
       </div>
     );

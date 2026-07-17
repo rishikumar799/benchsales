@@ -273,6 +273,10 @@ interface EcosystemRouterProps {
   setActiveTab?: (tab: string) => void;
 }
 
+const isValidOrgId = (id: any): boolean => {
+  return typeof id === 'string' && id !== 'undefined' && id.trim() !== '';
+};
+
 // ==========================================
 // CENTRALIZED MOCK CENTRAL FOR ALL ECOSYSTEMS 
 // (Strictly Segregated by Ecosystem)
@@ -323,11 +327,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
 
   // Real-time Sync for Corporate Recruiter (c_recruiter)
   React.useEffect(() => {
-    if (role !== 'c_recruiter' || !userProfile?.organizationId) {
+    if (role !== 'c_recruiter' || !isValidOrgId(userProfile?.organizationId)) {
       return;
     }
 
-    const orgId = userProfile.organizationId;
+    const orgId = userProfile.organizationId!;
 
     // A. Sync Jobs
     const jobsCol = collection(db, 'organizations_companies', orgId, 'jobs');
@@ -549,11 +553,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
 
   // Firestore listener for Placement Officers
   React.useEffect(() => {
-    if (role !== 'u_admin' || !userProfile?.organizationId) {
+    if (role !== 'u_admin' || !isValidOrgId(userProfile?.organizationId)) {
       return;
     }
 
-    const colRef = collection(db, 'organizations_universities', userProfile.organizationId, 'placement_officers');
+    const colRef = collection(db, 'organizations_universities', userProfile.organizationId!, 'placement_officers');
     const unsubscribe = onSnapshot(colRef, (snapshot) => {
       const officers = snapshot.docs.map(doc => {
         const data = doc.data();
@@ -622,11 +626,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
   
   // 1. Root Company Document standardization & real-time Sync
   React.useEffect(() => {
-    if (role !== 'c_admin' || !userProfile?.organizationId) {
+    if (role !== 'c_admin' || !isValidOrgId(userProfile?.organizationId)) {
       return;
     }
 
-    const docRef = doc(db, 'organizations_companies', userProfile.organizationId);
+    const docRef = doc(db, 'organizations_companies', userProfile.organizationId!);
     const unsubscribe = onSnapshot(docRef, (snap) => {
       if (snap.exists()) {
         setCompanyData({ id: snap.id, ...snap.data() });
@@ -661,11 +665,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
 
   // 2. Admin Personal Profile real-time Sync
   React.useEffect(() => {
-    if (role !== 'c_admin' || !userProfile?.organizationId || !userProfile?.uid) {
+    if (role !== 'c_admin' || !isValidOrgId(userProfile?.organizationId) || !userProfile?.uid) {
       return;
     }
 
-    const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'admins', userProfile.uid);
+    const docRef = doc(db, 'organizations_companies', userProfile.organizationId!, 'admins', userProfile.uid);
     const unsubscribe = onSnapshot(docRef, (snap) => {
       if (snap.exists()) {
         setAdminProfileData({ id: snap.id, ...snap.data() });
@@ -695,11 +699,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
 
   // 3. Departments real-time Sync
   React.useEffect(() => {
-    if (role !== 'c_admin' || !userProfile?.organizationId) {
+    if (role !== 'c_admin' || !isValidOrgId(userProfile?.organizationId)) {
       return;
     }
 
-    const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'departments');
+    const colRef = collection(db, 'organizations_companies', userProfile.organizationId!, 'departments');
     const unsubscribe = onSnapshot(colRef, (snapshot) => {
       const depts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAdminDepartmentsList(depts);
@@ -711,11 +715,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
 
   // 4. Recruiters real-time Sync
   React.useEffect(() => {
-    if (role !== 'c_admin' || !userProfile?.organizationId) {
+    if (role !== 'c_admin' || !isValidOrgId(userProfile?.organizationId)) {
       return;
     }
 
-    const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'recruiters');
+    const colRef = collection(db, 'organizations_companies', userProfile.organizationId!, 'recruiters');
     const unsubscribe = onSnapshot(colRef, (snapshot) => {
       const recruiters = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAdminRecruitersList(recruiters);
@@ -727,11 +731,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
 
   // 5. Employees real-time Sync
   React.useEffect(() => {
-    if (role !== 'c_admin' || !userProfile?.organizationId) {
+    if (role !== 'c_admin' || !isValidOrgId(userProfile?.organizationId)) {
       return;
     }
 
-    const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'employees');
+    const colRef = collection(db, 'organizations_companies', userProfile.organizationId!, 'employees');
     const unsubscribe = onSnapshot(colRef, (snapshot) => {
       const emps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAdminEmployeesList(emps);
@@ -743,11 +747,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
 
   // 6. Managers real-time Sync
   React.useEffect(() => {
-    if (role !== 'c_admin' || !userProfile?.organizationId) {
+    if (role !== 'c_admin' || !isValidOrgId(userProfile?.organizationId)) {
       return;
     }
 
-    const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'managers');
+    const colRef = collection(db, 'organizations_companies', userProfile.organizationId!, 'managers');
     const unsubscribe = onSnapshot(colRef, (snapshot) => {
       const mgrs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAdminManagersList(mgrs);
@@ -759,11 +763,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
 
   // 7. Jobs real-time Sync
   React.useEffect(() => {
-    if (role !== 'c_admin' || !userProfile?.organizationId) {
+    if (role !== 'c_admin' || !isValidOrgId(userProfile?.organizationId)) {
       return;
     }
 
-    const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'jobs');
+    const colRef = collection(db, 'organizations_companies', userProfile.organizationId!, 'jobs');
     const unsubscribe = onSnapshot(colRef, (snapshot) => {
       const jobs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAdminJobsList(jobs);
@@ -775,11 +779,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
 
   // 8. Recent Activities Sync
   React.useEffect(() => {
-    if (role !== 'c_admin' || !userProfile?.organizationId) {
+    if (role !== 'c_admin' || !isValidOrgId(userProfile?.organizationId)) {
       return;
     }
 
-    const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'activity');
+    const colRef = collection(db, 'organizations_companies', userProfile.organizationId!, 'activity');
     const unsubscribe = onSnapshot(colRef, (snapshot) => {
       const acts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setActivityList(acts);
@@ -791,11 +795,11 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
 
   // 9. Applications real-time Sync
   React.useEffect(() => {
-    if (role !== 'c_admin' || !userProfile?.organizationId) {
+    if (role !== 'c_admin' || !isValidOrgId(userProfile?.organizationId)) {
       return;
     }
 
-    const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'applications');
+    const colRef = collection(db, 'organizations_companies', userProfile.organizationId!, 'applications');
     const unsubscribe = onSnapshot(colRef, (snapshot) => {
       const apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setApplicationsList(apps);
@@ -810,6 +814,9 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
   // ==========================================
 
   React.useEffect(() => {
+    if (!userProfile?.uid) {
+      return;
+    }
     const unsub = onSnapshot(collection(db, 'marketplace_submissions'), async (snapshot) => {
       try {
         const allSubs = snapshot.docs.map(d => ({ id: d.id, ...d.data() as any }));
@@ -874,10 +881,12 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
       } catch (err) {
         console.error("Error in submissions-to-jobs auto-sync:", err);
       }
+    }, (error) => {
+      console.error("Error listening to marketplace_submissions:", error);
     });
 
     return () => unsub();
-  }, []);
+  }, [userProfile?.uid]);
 
   const handleInitializeDemoWorkspace = async () => {
     if (!userProfile?.organizationId) return;
@@ -1537,6 +1546,18 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
   // ==========================================
   // ECOSYSTEM VIEW DISPATCHERS
   // ==========================================
+
+  const isOrgRole = ['u_admin', 'u_officer', 'u_student', 'c_admin', 'c_recruiter', 'c_manager', 'c_employee'].includes(role);
+  if (isOrgRole && !isValidOrgId(userProfile?.organizationId)) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 space-y-4">
+        <div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin animate-infinite duration-1000" />
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 animate-pulse">
+          Resolving organization workspace...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
