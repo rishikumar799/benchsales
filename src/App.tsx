@@ -28,6 +28,7 @@ import { useAuth, dbRoleToAppRole } from './context/AuthContext';
 import { useRecruiter } from './context/RecruiterContext';
 import { useJobSeeker } from './context/JobSeekerContext';
 import ProtectedRoute from './routes/ProtectedRoute';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 const isAppMode = import.meta.env.VITE_APP_MODE === 'true';
 
@@ -141,16 +142,18 @@ export default function App() {
           path="/dashboard" 
           element={
             <ProtectedRoute>
-              <DashboardLayout 
-                role={role!} 
-                onLogout={handleLogout} 
-                activeTab={activeTab} 
-                setActiveTab={setActiveTab}
-                theme={activeTheme}
-                toggleTheme={toggleTheme}
-              >
-                <EcosystemRouter role={role!} activeTab={activeTab} setActiveTab={setActiveTab} />
-              </DashboardLayout>
+              <ErrorBoundary>
+                <DashboardLayout 
+                  role={role!} 
+                  onLogout={handleLogout} 
+                  activeTab={activeTab} 
+                  setActiveTab={setActiveTab}
+                  theme={activeTheme}
+                  toggleTheme={toggleTheme}
+                >
+                  <EcosystemRouter role={role!} activeTab={activeTab} setActiveTab={setActiveTab} />
+                </DashboardLayout>
+              </ErrorBoundary>
             </ProtectedRoute>
           } 
         />
@@ -212,16 +215,18 @@ export default function App() {
         path="/dashboard" 
         element={
           <ProtectedRoute>
-            <DashboardLayout 
-              role={role!} 
-              onLogout={handleLogout} 
-              activeTab={activeTab} 
-              setActiveTab={setActiveTab}
-              theme={activeTheme}
-              toggleTheme={toggleTheme}
-            >
-              <EcosystemRouter role={role!} activeTab={activeTab} setActiveTab={setActiveTab} />
-            </DashboardLayout>
+            <ErrorBoundary>
+              <DashboardLayout 
+                role={role!} 
+                onLogout={handleLogout} 
+                activeTab={activeTab} 
+                setActiveTab={setActiveTab}
+                theme={activeTheme}
+                toggleTheme={toggleTheme}
+              >
+                <EcosystemRouter role={role!} activeTab={activeTab} setActiveTab={setActiveTab} />
+              </DashboardLayout>
+            </ErrorBoundary>
           </ProtectedRoute>
         } 
       />

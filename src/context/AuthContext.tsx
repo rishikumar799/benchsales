@@ -29,6 +29,7 @@ export interface DbUser {
   accountType: 'individual' | 'organization';
   organizationType?: 'university' | 'company';
   organizationId?: string;
+  organizationName?: string;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -39,6 +40,7 @@ interface AuthContextType {
   user: FirebaseUser | null;
   userProfile: DbUser | null;
   loading: boolean;
+  profileError: string | null;
   login: (email: string, pass: string) => Promise<DbUser>;
   signupIndividual: (
     fullName: string, 
@@ -213,6 +215,7 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<DbUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   // Sync with App's state role when profile loads
   useEffect(() => {
@@ -231,25 +234,79 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         try {
+          setProfileError(null);
           const userSnap = await getDoc(userDocRef);
           let profile: DbUser;
           
           if (userSnap.exists()) {
             profile = userSnap.data() as DbUser;
+            
+            // 1. Validation: Verify role exists, ecosystem exists, and organizationId exists for company users
+            const isCompanyRole = ['company_admin', 'company_recruiter', 'company_manager', 'employee'].includes(profile.role);
+            if (!profile.role) {
+              const errMsg = "Login validation failed: User record is missing a 'role' field.";
+              console.error(errMsg);
+              setProfileError(errMsg);
+              setUserProfile(null);
+              setLoading(false);
+              return;
+            }
+            if (!profile.ecosystem) {
+              const errMsg = "Login validation failed: User record is missing an 'ecosystem' field.";
+              console.error(errMsg);
+              setProfileError(errMsg);
+              setUserProfile(null);
+              setLoading(false);
+              return;
+            }
+            if (isCompanyRole && !profile.organizationId) {
+              const errMsg = "Login validation failed: Company user record is missing an 'organizationId' field.";
+              console.error(errMsg);
+              setProfileError(errMsg);
+              setUserProfile(null);
+              setLoading(false);
+              return;
+            }
+
+            let resolvedOrgName = profile.organizationName || '';
+            if (!resolvedOrgName && profile.organizationId) {
+              try {
+                const parentCol = isCompanyRole ? 'organizations_companies' : 'organizations_universities';
+                const orgSnap = await getDoc(doc(db, parentCol, profile.organizationId));
+                if (orgSnap.exists()) {
+                  resolvedOrgName = orgSnap.data()?.organizationName || '';
+                }
+              } catch (e) {
+                console.error('Failed to resolve organizationName on user validation:', e);
+              }
+            }
+            if (!resolvedOrgName && ['company_admin', 'company_recruiter', 'company_manager', 'employee', 'organization_admin', 'placement_officer', 'student'].includes(profile.role)) {
+              resolvedOrgName = 'Organization';
+            }
+
             profile.lastLogin = new Date().toISOString();
-            await setDoc(userDocRef, {
-              uid: profile.uid,
-              email: profile.email,
+            const healedUserDoc = {
+              uid: profile.uid || firebaseUser.uid,
+              email: profile.email || firebaseUser.email || '',
               displayName: profile.displayName || profile.fullName || firebaseUser.displayName || 'System User',
               photoURL: profile.photoURL || firebaseUser.photoURL || '',
               role: profile.role,
-              ecosystem: getEcosystemForRole(profile.role),
+              ecosystem: profile.ecosystem || getEcosystemForRole(profile.role),
               organizationId: profile.organizationId || null,
+              organizationName: resolvedOrgName || null,
               organizationType: profile.organizationType || null,
               status: profile.status || 'approved',
               createdAt: profile.createdAt || new Date().toISOString(),
+              updatedAt: profile.updatedAt || new Date().toISOString(),
               lastLogin: profile.lastLogin
-            }, { merge: true });
+            };
+
+            await setDoc(userDocRef, healedUserDoc, { merge: true });
+            profile = {
+              ...profile,
+              ...healedUserDoc,
+              fullName: healedUserDoc.displayName
+            };
           } else {
             // Automatically detect role and create user document
             let detectedRole = 'marketplace_jobseeker';
@@ -259,6 +316,15 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
               detectedRole = 'marketplace_recruiter';
             } else if (firebaseUser.email?.includes('bdm') || firebaseUser.email?.includes('manager')) {
               detectedRole = 'marketplace_bdm';
+            } else {
+              // If we are here and they are not any of the special emails, and they have no users doc,
+              // it's an unprovisioned or invalid user (e.g. from deleted Firestore but remaining in Auth).
+              const errMsg = `Login validation failed: Identity record 'users/${firebaseUser.uid}' does not exist in the database.`;
+              console.error(errMsg);
+              setProfileError(errMsg);
+              setUserProfile(null);
+              setLoading(false);
+              return;
             }
             
             const displayName = firebaseUser.displayName || 'System User';
@@ -286,17 +352,90 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
               role: profile.role,
               ecosystem: profile.ecosystem,
               organizationId: null,
+              organizationName: null,
               status: profile.status,
               createdAt: profile.createdAt,
+              updatedAt: profile.updatedAt,
               lastLogin: profile.lastLogin
             });
             console.log(`Created missing users/${firebaseUser.uid} document`);
           }
           
+          // 2. Validation: Load corresponding company subcollection document and check fields
+          const targetRoleString = profile.role;
+          const isCompanyUser = ['company_admin', 'company_recruiter', 'company_manager', 'employee'].includes(targetRoleString);
+          const roleDocRef = getRoleDocRef(db, profile);
+          if (roleDocRef) {
+            const roleSnap = await getDoc(roleDocRef);
+            if (isCompanyUser) {
+              if (!roleSnap.exists()) {
+                const errMsg = `Login validation failed: Subcollection record '${roleDocRef.path}' is missing in the database.`;
+                console.error(errMsg);
+                setProfileError(errMsg);
+                setUserProfile(null);
+                setLoading(false);
+                return;
+              } else {
+                const roleData = (roleSnap.data() || {}) as any;
+                
+                // Heal organizationName if missing
+                let resolvedOrgName = roleData.organizationName || profile.organizationName || '';
+                if (!resolvedOrgName && profile.organizationId) {
+                  try {
+                    const orgSnap = await getDoc(doc(db, 'organizations_companies', profile.organizationId));
+                    if (orgSnap.exists()) {
+                      resolvedOrgName = orgSnap.data()?.organizationName || '';
+                    }
+                  } catch (e) {
+                    console.error('Failed to load organization name:', e);
+                  }
+                }
+                if (!resolvedOrgName) {
+                  resolvedOrgName = 'Company';
+                }
+
+                // Compile all 12 required fields
+                const updatedRoleData = {
+                  ...roleData,
+                  uid: roleData.uid || profile.uid || firebaseUser.uid,
+                  organizationId: roleData.organizationId || profile.organizationId || '',
+                  organizationName: resolvedOrgName,
+                  role: roleData.role || targetRoleString,
+                  displayName: roleData.displayName || roleData.fullName || roleData.name || profile.displayName || profile.fullName || 'System User',
+                  email: roleData.email || profile.email || firebaseUser.email || '',
+                  department: roleData.department || roleData.dept || 'Executive',
+                  designation: roleData.designation || (targetRoleString === 'company_admin' ? 'Company Administrator' : 'Staff'),
+                  phone: roleData.phone || roleData.phoneNumber || profile.phoneNumber || '',
+                  status: roleData.status || profile.status || 'approved',
+                  createdAt: roleData.createdAt || profile.createdAt || new Date().toISOString(),
+                  updatedAt: roleData.updatedAt || new Date().toISOString()
+                };
+
+                // Check missing fields to see if we need to set/merge
+                const requiredFields = ['uid', 'organizationId', 'organizationName', 'role', 'displayName', 'email', 'status', 'department', 'designation', 'phone', 'createdAt', 'updatedAt'];
+                const missing = requiredFields.filter(f => !updatedRoleData[f]);
+                if (missing.length > 0) {
+                  const errMsg = `Login validation failed: Subcollection record '${roleDocRef.path}' is missing required fields: ${missing.join(', ')}.`;
+                  console.error(errMsg);
+                  setProfileError(errMsg);
+                  setUserProfile(null);
+                  setLoading(false);
+                  return;
+                }
+
+                // If roleData was missing any of the required fields, we perform a merge-write to self-heal
+                const needsWrite = requiredFields.some(f => !roleData[f]);
+                if (needsWrite) {
+                  await setDoc(roleDocRef, updatedRoleData, { merge: true });
+                  console.log(`Self-healed company user role document fields: ${roleDocRef.path}`);
+                }
+              }
+            }
+          }
+
           setUserProfile(profile);
 
           // Dynamically initialize and standardize the role profile document if it does not exist or lacks fields
-          const targetRoleString = profile.role;
           if (targetRoleString === 'platform_admin') {
             try {
               const { seedDefaultPlatformData, LoginLogService } = await import('../services/platformAdminService');
@@ -306,7 +445,6 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
               console.error('Failed to initialize Platform Admin logs and seeding:', err);
             }
           }
-          const roleDocRef = getRoleDocRef(db, profile);
           if (roleDocRef) {
             const roleSnap = await getDoc(roleDocRef);
             const isUniversityUser = ['organization_admin', 'placement_officer', 'student'].includes(targetRoleString);
@@ -718,9 +856,11 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
         role: profile.role,
         ecosystem: profile.ecosystem,
         organizationId: profile.organizationId,
+        organizationName: orgName,
         organizationType: profile.organizationType || null,
         status: profile.status,
         createdAt: profile.createdAt,
+        updatedAt: profile.updatedAt,
         lastLogin: profile.lastLogin
       });
     } catch (err) {
@@ -733,11 +873,18 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
       await setDoc(roleDocRef, {
         uid,
         fullName: adminName,
+        displayName: adminName,
+        role: targetRoleString,
         email,
+        phone,
         phoneNumber: phone,
         organizationId,
+        organizationName: orgName,
+        department: orgType === 'company' ? 'Executive' : 'Administration',
+        designation: orgType === 'company' ? 'Company Administrator' : 'University Administrator',
         status: 'approved',
-        createdAt: profile.createdAt
+        createdAt: profile.createdAt,
+        updatedAt: profile.createdAt
       });
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, roleDocRef.path);
@@ -855,6 +1002,7 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
       user, 
       userProfile, 
       loading, 
+      profileError,
       login, 
       signupIndividual, 
       signupOrganization, 

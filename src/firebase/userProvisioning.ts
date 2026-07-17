@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db, firebaseConfig } from './firebase';
 
 /**
@@ -32,7 +32,7 @@ function getSecondaryAuth() {
 interface ProvisionUserParams {
   email: string;
   name: string;
-  role: 'c_manager' | 'c_recruiter' | 'c_employee';
+  role: 'c_manager' | 'c_recruiter' | 'c_employee' | 'company_manager' | 'company_recruiter' | 'employee';
   organizationId: string;
   organizationName: string;
   dept?: string;
@@ -40,6 +40,25 @@ interface ProvisionUserParams {
   phone?: string;
   status?: 'Active' | 'Inactive';
   extraFields?: Record<string, any>;
+}
+
+/**
+ * Maps any incoming role string to the standardized DB role and collection name
+ */
+export function getStandardizedRoleAndCollection(role: string): { dbRole: string; roleCollection: string } {
+  switch (role) {
+    case 'c_manager':
+    case 'company_manager':
+      return { dbRole: 'company_manager', roleCollection: 'managers' };
+    case 'c_recruiter':
+    case 'company_recruiter':
+      return { dbRole: 'company_recruiter', roleCollection: 'recruiters' };
+    case 'c_employee':
+    case 'employee':
+      return { dbRole: 'employee', roleCollection: 'employees' };
+    default:
+      throw new Error(`Unsupported provisioning role: ${role}`);
+  }
 }
 
 /**
@@ -69,61 +88,89 @@ export async function provisionCompanyUser(params: ProvisionUserParams): Promise
   try {
     const secondaryAuth = getSecondaryAuth();
 
+    let uid: string | null = null;
+
     // 1. Create Firebase Authentication user
-    const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email.trim(), password);
-    const uid = userCredential.user.uid;
+    try {
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email.trim(), password);
+      uid = userCredential.user.uid;
+    } catch (err: any) {
+      if (err?.code === 'auth/email-already-in-use' || String(err).includes('email-already-in-use')) {
+        console.log('Email already in use. Attempting to retrieve existing user UID...');
+        
+        // Strategy A: Query users collection in Firestore
+        try {
+          const q = query(collection(db, 'users'), where('email', '==', email.trim()));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            uid = snap.docs[0].id;
+            console.log('Resolved existing UID from users collection:', uid);
+          }
+        } catch (queryErr) {
+          console.error('Failed to query users collection for existing email:', queryErr);
+        }
+
+        // Strategy B: If Firestore query yielded nothing, try to sign in using the expected default password
+        if (!uid) {
+          try {
+            const userCredential = await signInWithEmailAndPassword(secondaryAuth, email.trim(), password);
+            uid = userCredential.user.uid;
+            console.log('Resolved existing UID from auth sign-in:', uid);
+          } catch (signInErr) {
+            console.error('Failed to sign in with expected default password:', signInErr);
+          }
+        }
+
+        if (!uid) {
+          throw new Error('This email address is already registered in the system, and its unique user identifier could not be retrieved. Please verify the email or try a different one.');
+        }
+      } else {
+        throw err;
+      }
+    }
 
     if (!uid) {
       throw new Error('Failed to obtain a valid Firebase Authentication UID.');
     }
 
-    // 2. Create users/{uid} document
+    // Standardize role and role collection
+    const { dbRole, roleCollection } = getStandardizedRoleAndCollection(role);
+
+    // 2. Create users/{uid} document with precise standardized fields
     const userDocRef = doc(db, 'users', uid);
     await setDoc(userDocRef, {
       uid,
       email: email.trim(),
       displayName: name,
-      name,
-      role,
-      ecosystem: 'company',
+      fullName: name,
+      role: dbRole, // "role value is identical everywhere"
+      ecosystem: 'company', // "ecosystem value is 'company'"
       organizationId,
       organizationName,
-      status,
-      dept,
-      department: dept,
+      status: status === 'Active' ? 'approved' : 'inactive',
+      photoURL: extraFields?.avatar || extraFields?.photoURL || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
 
-    // Determine the role collection name
-    let roleCollection = '';
-    if (role === 'c_manager') {
-      roleCollection = 'managers';
-    } else if (role === 'c_recruiter') {
-      roleCollection = 'recruiters';
-    } else if (role === 'c_employee') {
-      roleCollection = 'employees';
-    } else {
-      throw new Error(`Unsupported provisioning role: ${role}`);
-    }
-
     // 3. Create role document: organizations_companies/{organizationId}/{roleCollection}/{uid}
+    // and include all required fields
     const roleDocRef = doc(db, 'organizations_companies', organizationId, roleCollection, uid);
     await setDoc(roleDocRef, {
+      ...extraFields,
       uid,
       organizationId,
       organizationName,
-      email: email.trim(),
+      role: dbRole, // "role value is identical everywhere"
       displayName: name,
-      name,
+      email: email.trim(),
       department: dept,
       dept,
       designation,
       phone,
       status,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      ...extraFields
+      updatedAt: new Date().toISOString()
     });
 
     // 4. Sign out the newly created user from the secondary auth instance
