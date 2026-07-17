@@ -21,6 +21,7 @@ import {
   Tooltip, 
   CartesianGrid 
 } from 'recharts';
+import { usePlatformAdmin } from '../../../context/PlatformAdminContext';
 
 const liveSystemTelemetry = [
   { time: '00:00', response: 138, errors: 0.2, tokens: 1.2 },
@@ -32,21 +33,40 @@ const liveSystemTelemetry = [
 ];
 
 export default function PlatformSystem() {
-  const [activeServices] = useState([
-    { name: 'Authentication Layer', status: 'Healthy', latency: '4ms', load: '1.2%', icon: Key },
-    { name: 'AI Services (L1-L8 Routing)', status: 'Healthy', latency: '68ms', load: '32.1%', icon: Cpu },
-    { name: 'Relational Cloud SQL Database', status: 'Healthy', latency: '12ms', load: '14.5%', icon: Database },
-    { name: 'Secured Object Storage', status: 'Healthy', latency: '18ms', load: '24.8%', icon: Server },
-    { name: 'Ecosystem Dispatch Webhooks', status: 'Healthy', latency: '45ms', load: '8.4%', icon: Bell },
-  ]);
+  const { systemMetrics, auditLogs, loginLogs, platformAnalytics } = usePlatformAdmin();
 
-  const [logs] = useState([
-    { event: 'Database connection pools validated successfully', category: 'DB_CORE', time: '16:32:10', type: 'info' },
-    { event: 'AI Inference Gateway successfully completed vector routing', category: 'AI_GATEWAY', time: '16:30:15', type: 'info' },
-    { event: 'Tenant isolated cluster XYZ-402 database backup completed', category: 'DB_BACKUP', time: '16:15:00', type: 'info' },
-    { event: 'L6 internal corporate grade indices schema cached', category: 'APP_CACHE', time: '16:08:44', type: 'info' },
-    { event: 'Slight latency spike resolved automatically in replica server 4', category: 'SYSTEM_AUTOSCALE', time: '15:45:12', type: 'warn' },
-  ]);
+  const activeServices = [
+    { name: 'Authentication Layer', status: systemMetrics?.apiStatus === '0' ? 'Inactive' : 'Healthy', latency: '0ms', load: '0%', icon: Key },
+    { name: 'AI Services (L1-L8 Routing)', status: systemMetrics?.apiStatus === '0' ? 'Inactive' : 'Healthy', latency: systemMetrics?.aiLatency || '0ms', load: '0%', icon: Cpu },
+    { name: 'Relational Cloud SQL Database', status: systemMetrics?.dbReplicaStatus || 'Inactive', latency: '0ms', load: '0%', icon: Database },
+    { name: 'Secured Object Storage', status: systemMetrics?.apiStatus === '0' ? 'Inactive' : 'Healthy', latency: '0ms', load: '0%', icon: Server },
+    { name: 'Ecosystem Dispatch Webhooks', status: systemMetrics?.apiStatus === '0' ? 'Inactive' : 'Healthy', latency: '0ms', load: '0%', icon: Bell },
+  ];
+
+  const mergedLogs = [
+    ...loginLogs.map(log => ({
+      event: `User ${log.email} successfully authenticated from IP ${log.ip || 'Unknown'}`,
+      category: 'AUTH_GATEWAY',
+      time: new Date(log.timestamp).toLocaleTimeString('en-US', { hour12: false }),
+      type: 'info',
+      rawTime: log.timestamp
+    })),
+    ...auditLogs.map(log => ({
+      event: `Action "${log.action}" performed on target "${log.target}"`,
+      category: 'AUDIT_LOG',
+      time: new Date(log.timestamp).toLocaleTimeString('en-US', { hour12: false }),
+      type: log.action.toLowerCase().includes('delete') || log.action.toLowerCase().includes('suspend') ? 'warn' : 'info',
+      rawTime: log.timestamp
+    }))
+  ].sort((a, b) => new Date(b.rawTime).getTime() - new Date(a.rawTime).getTime()).slice(0, 20);
+
+  const logsToDisplay = mergedLogs;
+
+  const storageUsed = systemMetrics?.storageUsedGB || 0;
+  const storageTotal = systemMetrics?.storageTotalGB || 0;
+  const storageUsagePct = storageTotal > 0 ? ((storageUsed / storageTotal) * 100).toFixed(0) : '0';
+
+  const liveSystemTelemetry = platformAnalytics?.trends || [];
 
   return (
     <div id="platform-system-view" className="space-y-6">
@@ -67,7 +87,9 @@ export default function PlatformSystem() {
                 <div className="p-2 bg-emerald-500/10 rounded-xl">
                   <Icon className="w-4 h-4 text-emerald-500" />
                 </div>
-                <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                  srv.status === 'Healthy' ? 'text-emerald-500 bg-emerald-500/10' : 'text-rose-500 bg-rose-500/10'
+                }`}>
                   {srv.status}
                 </span>
               </div>
@@ -83,10 +105,10 @@ export default function PlatformSystem() {
       {/* Key system load metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { label: 'API Response Time (AVG)', value: '142 ms', change: '12% faster than last hour', status: 'text-emerald-500' },
-          { label: 'Core System Error Rate', value: '0.28%', change: '0.15% reduction today', status: 'text-emerald-500' },
-          { label: 'AI Inference Tokens (24h)', value: '2.4M', change: '8% spike from last hour', status: 'text-indigo-500' },
-          { label: 'Cloud SQL Storage usage', value: '68%', change: 'Normal expansion scale', status: 'text-blue-500' },
+          { label: 'API Response Time (AVG)', value: systemMetrics?.aiLatency || '0ms', change: 'Real-Time Telemetry', status: 'text-emerald-500' },
+          { label: 'Core System Error Rate', value: '0.00%', change: 'Real-Time Telemetry', status: 'text-emerald-500' },
+          { label: 'AI Inference Tokens (24h)', value: '0.0M', change: 'Real-Time Telemetry', status: 'text-indigo-500' },
+          { label: 'Cloud SQL Storage usage', value: `${storageUsagePct}%`, change: 'Real-Time Telemetry', status: 'text-blue-500' },
         ].map((met, idx) => (
           <div key={idx} className="p-6 rounded-[28px] bg-app-surface/40 border border-app-border select-none">
             <span className="text-[10px] uppercase tracking-wider text-app-muted font-bold block">{met.label}</span>
@@ -102,15 +124,21 @@ export default function PlatformSystem() {
         <div className="p-6 sm:p-8 rounded-[32px] glass border-app-border card-shadow space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-widest text-app-muted">API Core Latency Trend (ms)</h3>
           <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={liveSystemTelemetry} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                <XAxis dataKey="time" fontSize={10} stroke="#9ca3af" />
-                <YAxis fontSize={10} stroke="#9ca3af" />
-                <Tooltip />
-                <Line type="monotone" dataKey="response" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            {liveSystemTelemetry.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-app-muted font-bold text-sm">
+                No Records Found
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={liveSystemTelemetry} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                  <XAxis dataKey="time" fontSize={10} stroke="#9ca3af" />
+                  <YAxis fontSize={10} stroke="#9ca3af" />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="response" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -118,15 +146,21 @@ export default function PlatformSystem() {
         <div className="p-6 sm:p-8 rounded-[32px] glass border-app-border card-shadow space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-widest text-app-muted">HTTP Router Error Rate (%)</h3>
           <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={liveSystemTelemetry} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                <XAxis dataKey="time" fontSize={10} stroke="#9ca3af" />
-                <YAxis fontSize={10} stroke="#9ca3af" />
-                <Tooltip />
-                <Line type="monotone" dataKey="errors" stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            {liveSystemTelemetry.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-app-muted font-bold text-sm">
+                No Records Found
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={liveSystemTelemetry} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                  <XAxis dataKey="time" fontSize={10} stroke="#9ca3af" />
+                  <YAxis fontSize={10} stroke="#9ca3af" />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="errors" stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>
@@ -141,15 +175,21 @@ export default function PlatformSystem() {
         </div>
 
         <div className="p-5 rounded-2xl bg-slate-950 font-mono text-xs text-slate-300 border border-slate-900 space-y-2.5 max-h-60 overflow-y-auto">
-          {logs.map((log, idx) => (
-            <div key={idx} className="flex gap-4 items-start py-0.5 border-b border-slate-900/50 hover:bg-slate-900/20">
-              <span className="text-slate-500 text-[10px] select-none">[{log.time}]</span>
-              <span className={`text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded ${
-                log.type === 'warn' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-400'
-              }`}>{log.category}</span>
-              <span className="flex-1 text-slate-300 font-medium">{log.event}</span>
+          {logsToDisplay.length === 0 ? (
+            <div className="text-center text-slate-500 py-8 font-bold">
+              No Records Found
             </div>
-          ))}
+          ) : (
+            logsToDisplay.map((log, idx) => (
+              <div key={idx} className="flex gap-4 items-start py-0.5 border-b border-slate-900/50 hover:bg-slate-900/20">
+                <span className="text-slate-500 text-[10px] select-none">[{log.time}]</span>
+                <span className={`text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded ${
+                  log.type === 'warn' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-400'
+                }`}>{log.category}</span>
+                <span className="flex-1 text-slate-300 font-medium">{log.event}</span>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

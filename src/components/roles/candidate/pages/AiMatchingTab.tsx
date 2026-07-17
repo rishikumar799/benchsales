@@ -49,7 +49,7 @@ export default function AiMatchingTab({ onNavigate }: AiMatchingTabProps) {
   }, []);
 
   // 1. Determine Candidate's Skills (with an elegant default fallback if not configured yet)
-  const defaultSkills = ['React', 'Node.js', 'JavaScript', 'HTML/CSS', 'TypeScript', 'Tailwind CSS'];
+  const defaultSkills: string[] = [];
   const hasConfiguredSkills = jobSeekerProfile?.skills && jobSeekerProfile.skills.length > 0;
   const candidateSkills = (hasConfiguredSkills ? jobSeekerProfile.skills : defaultSkills) as string[];
 
@@ -64,7 +64,7 @@ export default function AiMatchingTab({ onNavigate }: AiMatchingTabProps) {
     // Premium scale mapping: more frequent skills rank higher
     const pct = jobs.length > 0
       ? Math.round((frequency / jobs.length) * 40) + 60 // scale 60% - 100%
-      : Math.floor(Math.random() * 15) + 80; // beautiful mock fallbacks if no jobs exist yet
+      : 0; // beautiful mock fallbacks if no jobs exist yet
 
     return { skill, pct };
   }).sort((a, b) => b.pct - a.pct);
@@ -87,12 +87,7 @@ export default function AiMatchingTab({ onNavigate }: AiMatchingTabProps) {
     })
     .sort((a, b) => b.frequency - a.frequency); // Highly requested missing skills first
 
-  const defaultImprovements = [
-    { skill: 'AWS', matchValue: '30% Match', action: 'Watch', color: 'text-amber-500 bg-amber-500/10 border-amber-500/15' },
-    { skill: 'Docker', matchValue: '20% Match', action: 'Learn', color: 'text-blue-500 bg-blue-500/10 border-blue-500/15' },
-    { skill: 'Redux', matchValue: '10% Match', action: 'Read', color: 'text-red-500 bg-red-500/10 border-red-500/15' },
-    { skill: 'CI/CD', matchValue: '25% Match', action: 'Build', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/15' }
-  ];
+  const defaultImprovements: any[] = [];
 
   const suggestedImprovements = missingSkillsWithFreq.length > 0
     ? missingSkillsWithFreq.slice(0, 4).map((item, idx) => {
@@ -121,7 +116,7 @@ export default function AiMatchingTab({ onNavigate }: AiMatchingTabProps) {
     // Scale match between 50% and 98% based on overlap
     const match = strings.length > 0
       ? Math.max(50, Math.min(98, 45 + Math.round((matching.length / strings.length) * 53)))
-      : Math.floor(Math.random() * 10) + 75;
+      : 0;
 
     return {
       id: job.id,
@@ -133,13 +128,7 @@ export default function AiMatchingTab({ onNavigate }: AiMatchingTabProps) {
   .sort((a, b) => b.match - a.match)
   .slice(0, 5);
 
-  const defaultRecommendedRoles = [
-    { role: 'Frontend Developer', match: 95 },
-    { role: 'Full Stack Developer', match: 92 },
-    { role: 'React Developer', match: 91 },
-    { role: 'UI Developer', match: 88 },
-    { role: 'Web Developer', match: 86 }
-  ];
+  const defaultRecommendedRoles: any[] = [];
 
   const recommendedRoles = computedRecommendedRoles.length > 0
     ? computedRecommendedRoles
@@ -177,15 +166,11 @@ export default function AiMatchingTab({ onNavigate }: AiMatchingTabProps) {
         
         return { title, level, duration };
       })
-    : [
-        { title: 'AWS Cloud Fundamentals', level: 'Beginner', duration: '4h' },
-        { title: 'Docker Basics & Containerization', level: 'Beginner', duration: '3h' },
-        { title: 'CI/CD with GitHub Actions', level: 'Intermediate', duration: '5h' }
-      ];
+    : [];
 
   // 6. Overall Employability Score from AI profile inside Firestore seeker document
-  const overallScore = jobSeekerProfile?.ai_profile?.matchScore || 85;
-  const scoreBadge = overallScore >= 90 ? 'Excellent' : overallScore >= 75 ? 'Good' : 'Developing';
+  const overallScore = jobSeekerProfile?.ai_profile?.matchScore || 0;
+  const scoreBadge = overallScore >= 90 ? 'Excellent' : overallScore >= 75 ? 'Good' : overallScore > 0 ? 'Developing' : 'No Score';
 
   if (profileLoading || jobsLoading) {
     return (

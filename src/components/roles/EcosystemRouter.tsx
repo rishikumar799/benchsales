@@ -34,6 +34,7 @@ import { UserRole } from '../../types';
 import { auth, db } from '../../firebase/firebase';
 import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, setDoc, deleteDoc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { provisionCompanyUser } from '../../firebase/userProvisioning';
 
 // Candidate custom page imports
 import DashboardTab from './candidate/pages/DashboardTab';
@@ -2176,15 +2177,31 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
               onAddManager={async (newMgr) => {
                 if (!userProfile?.organizationId) return false;
                 try {
-                  const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'managers');
-                  await addDoc(colRef, {
-                    ...newMgr,
-                    createdAt: new Date().toISOString()
+                  const res = await provisionCompanyUser({
+                    email: newMgr.email,
+                    name: newMgr.name,
+                    role: 'c_manager',
+                    organizationId: userProfile.organizationId,
+                    organizationName: userProfile.organizationName || 'Company',
+                    dept: newMgr.dept,
+                    status: newMgr.status,
+                    extraFields: {
+                      jobs: newMgr.jobs || 0,
+                      applications: newMgr.applications || 0,
+                      hires: newMgr.hires || 0,
+                      avatar: newMgr.avatar || `https://picsum.photos/seed/${newMgr.name}/100/100`
+                    }
                   });
-                  setSuccessMsg?.('Manager profile added.');
-                  return true;
-                } catch (e) {
+                  if (res.success) {
+                    setSuccessMsg?.('Manager profile added and account provisioned successfully.');
+                    return true;
+                  } else {
+                    alert(`Failed to provision manager: ${res.error}`);
+                    return false;
+                  }
+                } catch (e: any) {
                   console.error("Error adding manager:", e);
+                  alert(`Error: ${e?.message || e}`);
                   return false;
                 }
               }}
@@ -2229,15 +2246,31 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                   return false;
                 }
                 try {
-                  const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'recruiters');
-                  await addDoc(colRef, {
-                    ...newRec,
-                    createdAt: new Date().toISOString()
+                  const res = await provisionCompanyUser({
+                    email: newRec.email,
+                    name: newRec.name,
+                    role: 'c_recruiter',
+                    organizationId: userProfile.organizationId,
+                    organizationName: userProfile.organizationName || 'Company',
+                    dept: newRec.dept,
+                    status: newRec.status,
+                    extraFields: {
+                      jobs: newRec.jobs || 0,
+                      applications: newRec.applications || 0,
+                      selections: newRec.selections || 0,
+                      avatar: newRec.avatar || `https://picsum.photos/seed/${newRec.name}/100/100`
+                    }
                   });
-                  setSuccessMsg?.('Recruiter added successfully.');
-                  return true;
-                } catch (e) {
+                  if (res.success) {
+                    setSuccessMsg?.('Recruiter added and account provisioned successfully.');
+                    return true;
+                  } else {
+                    alert(`Failed to provision recruiter: ${res.error}`);
+                    return false;
+                  }
+                } catch (e: any) {
                   console.error("Error adding recruiter:", e);
+                  alert(`Error: ${e?.message || e}`);
                   return false;
                 }
               }}
@@ -2283,15 +2316,30 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                   return false;
                 }
                 try {
-                  const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'employees');
-                  await addDoc(colRef, {
-                    ...newEmp,
-                    createdAt: new Date().toISOString()
+                  const res = await provisionCompanyUser({
+                    email: newEmp.email,
+                    name: newEmp.name,
+                    role: 'c_employee',
+                    organizationId: userProfile.organizationId,
+                    organizationName: userProfile.organizationName || 'Company',
+                    dept: newEmp.dept,
+                    designation: newEmp.designation,
+                    status: newEmp.status,
+                    extraFields: {
+                      empId: newEmp.empId,
+                      avatar: newEmp.avatar || `https://picsum.photos/seed/${newEmp.name}/100/100`
+                    }
                   });
-                  setSuccessMsg?.('Employee registered successfully.');
-                  return true;
-                } catch (e) {
+                  if (res.success) {
+                    setSuccessMsg?.('Employee registered and account provisioned successfully.');
+                    return true;
+                  } else {
+                    alert(`Failed to provision employee: ${res.error}`);
+                    return false;
+                  }
+                } catch (e: any) {
                   console.error("Error registering employee:", e);
+                  alert(`Error: ${e?.message || e}`);
                   return false;
                 }
               }}
@@ -2324,21 +2372,40 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
               onBulkUpload={async (bulkEmployees) => {
                 if (!userProfile?.organizationId) return;
                 try {
-                  const colRef = collection(db, 'organizations_companies', userProfile.organizationId, 'employees');
                   let count = 0;
+                  let failedCount = 0;
                   for (const emp of bulkEmployees) {
                     const duplicate = adminEmployeesList.some(
                       e => e.email?.toLowerCase() === emp.email?.toLowerCase() || e.empId?.toLowerCase() === emp.empId?.toLowerCase()
                     );
                     if (!duplicate) {
-                      await addDoc(colRef, {
-                        ...emp,
-                        createdAt: new Date().toISOString()
+                      const res = await provisionCompanyUser({
+                        email: emp.email,
+                        name: emp.name,
+                        role: 'c_employee',
+                        organizationId: userProfile.organizationId,
+                        organizationName: userProfile.organizationName || 'Company',
+                        dept: emp.dept,
+                        designation: emp.designation,
+                        status: emp.status,
+                        extraFields: {
+                          empId: emp.empId,
+                          avatar: emp.avatar || `https://picsum.photos/seed/${emp.name}/100/100`
+                        }
                       });
-                      count++;
+                      if (res.success) {
+                        count++;
+                      } else {
+                        console.error(`Failed to provision bulk employee ${emp.email}:`, res.error);
+                        failedCount++;
+                      }
                     }
                   }
-                  setSuccessMsg?.(`Bulk upload processed successfully! Registered ${count} new profiles.`);
+                  if (failedCount > 0) {
+                    setSuccessMsg?.(`Bulk upload processed: successfully provisioned ${count} profiles, ${failedCount} failed.`);
+                  } else {
+                    setSuccessMsg?.(`Bulk upload processed successfully! Registered and provisioned ${count} new profiles.`);
+                  }
                 } catch (e) {
                   console.error("Error bulk uploading employees:", e);
                 }

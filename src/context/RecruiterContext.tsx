@@ -55,7 +55,7 @@ interface RecruiterContextType {
   setTheme: (theme: 'light' | 'dark') => Promise<void>;
 }
 
-const RecruiterContext = createContext<RecruiterContextType | null>(null);
+export const RecruiterContext = createContext<RecruiterContextType | null>(null);
 
 export function useRecruiter() {
   const context = useContext(RecruiterContext);

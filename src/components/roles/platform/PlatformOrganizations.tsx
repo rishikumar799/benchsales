@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { usePlatformAdmin } from '../../../context/PlatformAdminContext';
 import { 
   Building2, 
   Search, 
@@ -33,11 +34,16 @@ interface PlatformOrganizationsProps {
 }
 
 export default function PlatformOrganizations({ 
-  organizationsList, 
-  onAddOrg, 
-  onEditOrg, 
-  onDeleteOrg 
+  organizationsList: propsOrganizationsList, 
+  onAddOrg: propsOnAddOrg, 
+  onEditOrg: propsOnEditOrg, 
+  onDeleteOrg: propsOnDeleteOrg 
 }: PlatformOrganizationsProps) {
+  const { organizations, addOrg, editOrg, deleteOrg } = usePlatformAdmin();
+  const organizationsList = organizations && organizations.length > 0 ? organizations : propsOrganizationsList;
+  const onAddOrg = addOrg || propsOnAddOrg;
+  const onEditOrg = editOrg || propsOnEditOrg;
+  const onDeleteOrg = deleteOrg || propsOnDeleteOrg;
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
   const [planFilter, setPlanFilter] = useState('All');

@@ -464,6 +464,77 @@
         "status": { "type": "string" }
       },
       "required": ["id", "title", "createdAt", "organizationId"]
+    },
+    "PlatformAdmin": {
+      "title": "Platform Admin Profile",
+      "description": "Information about a platform administrator",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "fullName", "email", "role"]
+    },
+    "PlatformSetting": {
+      "title": "Platform Setting",
+      "description": "System wide configuration",
+      "type": "object",
+      "properties": {
+        "systemName": { "type": "string" },
+        "maintenanceMode": { "type": "boolean" },
+        "allowNewRegistrations": { "type": "boolean" },
+        "primaryContact": { "type": "string" }
+      }
+    },
+    "SystemMetric": {
+      "title": "System Metric",
+      "description": "Platform performance and telemetry metrics",
+      "type": "object",
+      "properties": {
+        "apiStatus": { "type": "string" },
+        "aiLatency": { "type": "string" },
+        "dbReplicaStatus": { "type": "string" },
+        "uptime": { "type": "string" }
+      }
+    },
+    "DashboardMetric": {
+      "title": "Dashboard Metric",
+      "description": "Platform aggregate user/org/job counts",
+      "type": "object",
+      "properties": {
+        "totalOrganizations": { "type": "integer" },
+        "totalUsers": { "type": "integer" },
+        "activeJobs": { "type": "integer" },
+        "monthlyRevenue": { "type": "number" }
+      }
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "Log of admin operations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "actorUid": { "type": "string" },
+        "actorEmail": { "type": "string" },
+        "action": { "type": "string" },
+        "target": { "type": "string" },
+        "timestamp": { "type": "string" }
+      }
+    },
+    "LoginLog": {
+      "title": "Login Log",
+      "description": "User login session record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "timestamp": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -598,6 +669,30 @@
     "notifications/{uid}": {
       "schema": "NotificationContainer",
       "description": "User specific notifications"
+    },
+    "platform_admins/{uid}": {
+      "schema": "PlatformAdmin",
+      "description": "Platform administrator accounts"
+    },
+    "platform_settings/{docId}": {
+      "schema": "PlatformSetting",
+      "description": "Platform settings document"
+    },
+    "system_metrics/{docId}": {
+      "schema": "SystemMetric",
+      "description": "Real-time system telemetry and latency values"
+    },
+    "dashboard_metrics/{docId}": {
+      "schema": "DashboardMetric",
+      "description": "Aggregated platform counters"
+    },
+    "audit_logs/{id}": {
+      "schema": "AuditLog",
+      "description": "Log of admin user activities"
+    },
+    "login_logs/{id}": {
+      "schema": "LoginLog",
+      "description": "Log of login sessions"
     }
   }
 }

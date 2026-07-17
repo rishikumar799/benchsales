@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
+import { usePlatformAdmin } from '../../../context/PlatformAdminContext';
 import { 
   Users, 
   Search, 
@@ -32,11 +33,16 @@ interface PlatformUsersProps {
 }
 
 export default function PlatformUsers({ 
-  usersList, 
-  onToggleStatus, 
-  onDeleteUser,
-  onAddUser 
+  usersList: propsUsersList, 
+  onToggleStatus: propsOnToggleStatus, 
+  onDeleteUser: propsOnDeleteUser,
+  onAddUser: propsOnAddUser 
 }: PlatformUsersProps) {
+  const { users, toggleUserStatus, deleteUser, addUser } = usePlatformAdmin();
+  const usersList = users && users.length > 0 ? users : propsUsersList;
+  const onToggleStatus = toggleUserStatus || propsOnToggleStatus;
+  const onDeleteUser = deleteUser || propsOnDeleteUser;
+  const onAddUser = addUser || propsOnAddUser;
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [orgFilter, setOrgFilter] = useState('All');

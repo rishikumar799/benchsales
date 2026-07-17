@@ -19,6 +19,7 @@ import RolePage from './screens/roles/RolePage';
 
 // App Screens
 import AuthPage from './components/auth/AuthPage';
+import PlatformBootstrapPage from './components/auth/PlatformBootstrapPage';
 import DashboardLayout from './components/DashboardLayout';
 import ScrollToTop from './components/marketing/common/ScrollToTop';
 import EcosystemRouter from './components/roles/EcosystemRouter';
@@ -119,6 +120,24 @@ export default function App() {
           } 
         />
         <Route 
+          path="/system/bootstrap-platform-admin" 
+          element={
+            role ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <PlatformBootstrapPage 
+                onBack={() => navigate('/')} 
+                onSuccess={(selectedRole) => {
+                  handleLogin(selectedRole, true);
+                  navigate('/dashboard');
+                }} 
+                theme={activeTheme}
+                toggleTheme={toggleTheme}
+              />
+            )
+          } 
+        />
+        <Route 
           path="/dashboard" 
           element={
             <ProtectedRoute>
@@ -164,6 +183,24 @@ export default function App() {
             <AuthPage 
               onBack={() => navigate('/')} 
               onLogin={handleLogin} 
+              theme={activeTheme}
+              toggleTheme={toggleTheme}
+            />
+          )
+        } 
+      />
+      <Route 
+        path="/system/bootstrap-platform-admin" 
+        element={
+          role ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <PlatformBootstrapPage 
+              onBack={() => navigate('/')} 
+              onSuccess={(selectedRole) => {
+                handleLogin(selectedRole, true);
+                navigate('/dashboard');
+              }} 
               theme={activeTheme}
               toggleTheme={toggleTheme}
             />

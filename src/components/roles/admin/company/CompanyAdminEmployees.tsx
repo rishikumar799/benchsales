@@ -13,8 +13,10 @@ import {
 interface Employee {
   id: string;
   name: string;
+  displayName?: string;
   empId: string;
   dept: string;
+  department?: string;
   designation: string;
   status: 'Active' | 'Inactive';
   avatar: string;
@@ -46,11 +48,16 @@ export default function CompanyAdminEmployees({ employeesList, onAddEmployee, on
   const [formStatus, setFormStatus] = useState<'Active' | 'Inactive'>('Active');
 
   const filteredEmployees = employeesList.filter(emp => {
-    const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          emp.empId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          emp.designation.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDept = deptFilter === 'All' ? true : emp.dept === deptFilter;
-    const matchesStatus = statusFilter === 'All' ? true : emp.status === statusFilter;
+    const nameLower = (emp?.name || emp?.displayName || '').toLowerCase();
+    const empIdLower = (emp?.empId || '').toLowerCase();
+    const designationLower = (emp?.designation || '').toLowerCase();
+    const searchLower = searchTerm.toLowerCase();
+
+    const matchesSearch = nameLower.includes(searchLower) || 
+                          empIdLower.includes(searchLower) ||
+                          designationLower.includes(searchLower);
+    const matchesDept = deptFilter === 'All' ? true : (emp?.dept || emp?.department) === deptFilter;
+    const matchesStatus = statusFilter === 'All' ? true : emp?.status === statusFilter;
     return matchesSearch && matchesDept && matchesStatus;
   });
 
@@ -209,20 +216,20 @@ export default function CompanyAdminEmployees({ employeesList, onAddEmployee, on
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
                         <img 
-                          src={emp.avatar} 
-                          alt={emp.name} 
+                          src={emp.avatar || `https://picsum.photos/seed/${emp.id}/100/100`} 
+                          alt={emp.name || emp.displayName || 'Employee'} 
                           className="w-10 h-10 rounded-full object-cover border-2 border-app-bg" 
                         />
                         <div>
-                          <p className="font-extrabold text-sm text-app-text">{emp.name}</p>
+                          <p className="font-extrabold text-sm text-app-text">{emp.name || emp.displayName || 'N/A'}</p>
                           <p className="text-[10px] text-app-muted font-bold font-mono mt-0.5">{emp.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-6 font-bold text-brand-blue font-mono">{emp.empId}</td>
+                    <td className="py-4 px-6 font-bold text-brand-blue font-mono">{emp.empId || 'N/A'}</td>
                     <td className="py-4 px-6">
                       <span className="font-bold text-app-muted uppercase tracking-wider text-[10px] bg-app-surface border border-app-border px-2.5 py-1 rounded-lg">
-                        {emp.dept}
+                        {emp.dept || emp.department || 'N/A'}
                       </span>
                     </td>
                     <td className="py-4 px-6 text-app-text font-bold">{emp.designation}</td>

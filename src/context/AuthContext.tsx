@@ -148,6 +148,7 @@ export function getRoleCollectionName(role: string): string {
       return 'marketplace_jobseekers';
     case 'marketplace_recruiter': return 'marketplace_recruiters';
     case 'marketplace_bdm': return 'marketplace_bdms';
+    case 'platform_admin': return 'platform_admins';
     default: return 'marketplace_jobseekers';
   }
 }
@@ -296,6 +297,15 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
 
           // Dynamically initialize and standardize the role profile document if it does not exist or lacks fields
           const targetRoleString = profile.role;
+          if (targetRoleString === 'platform_admin') {
+            try {
+              const { seedDefaultPlatformData, LoginLogService } = await import('../services/platformAdminService');
+              await seedDefaultPlatformData();
+              await LoginLogService.logLogin(profile.uid, profile.email, 'Success');
+            } catch (err) {
+              console.error('Failed to initialize Platform Admin logs and seeding:', err);
+            }
+          }
           const roleDocRef = getRoleDocRef(db, profile);
           if (roleDocRef) {
             const roleSnap = await getDoc(roleDocRef);
@@ -821,6 +831,7 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
       return;
     }
     const dbRole = appRoleToDbRole(role);
+    const eco = getEcosystemForRole(dbRole);
     setUserProfile({
       uid: `bypass_${role}`,
       fullName: `Test ${role} Profile`,
@@ -828,8 +839,10 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
       email: `${role}@test.com`,
       phoneNumber: '1234567890',
       role: dbRole,
-      ecosystem: getEcosystemForRole(dbRole),
+      ecosystem: eco,
       accountType: 'individual',
+      organizationId: eco === 'university' ? 'test_university' : eco === 'company' ? 'test_company' : undefined,
+      organizationType: eco === 'university' ? 'university' : eco === 'company' ? 'company' : undefined,
       status: 'approved',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

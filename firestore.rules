@@ -12,36 +12,21 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == uid;
     }
 
-    // Core users metadata: read/write allowed if you are authenticated
-    match /users/{uid} {
-      allow read, write: if isAuthenticated();
+    // Helper function to check if user is a Platform Admin
+    function isPlatformAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'admin@AryxAI.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'platform_admin')
+      );
     }
 
-    // BDM specific profile: read/write allowed only for the BDM owner
-    match /marketplace_bdms/{uid} {
-      allow read, write: if isOwner(uid);
-    }
-
-    // Recruiter specific profile: read/write allowed only for the Recruiter owner
-    match /marketplace_recruiters/{uid} {
-      allow read, write: if isOwner(uid);
-
-      match /saved_candidates/{candidateId} {
-        allow read, write: if isOwner(uid);
-      }
-    }
-
-    // Jobseeker (student) specific profile: read allowed by authenticated users, write restricted strictly to the document owner
-    match /marketplace_jobseekers/{uid} {
-      allow read: if isAuthenticated();
-      allow write: if isOwner(uid);
-    }
-
-    // Helper functions for University Authorization
+    // Helper function for fetching user document
     function getUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    // Helper functions for University Authorization
     function isMemberOfUniversity(universityId) {
       return isAuthenticated() && getUserData().organizationId == universityId && getUserData().organizationType == 'university';
     }
@@ -75,170 +60,230 @@ service cloud.firestore {
       return isMemberOfCompany(companyId) && getUserData().role == 'employee';
     }
 
+    // Core users metadata
+    match /users/{uid} {
+      allow read: if isAuthenticated() || isPlatformAdmin() || (resource != null && resource.data.role == 'platform_admin');
+      allow write: if isAuthenticated() || isPlatformAdmin();
+    }
+
+    // BDM specific profile
+    match /marketplace_bdms/{uid} {
+      allow read, write: if isOwner(uid) || isPlatformAdmin();
+    }
+
+    // Recruiter specific profile
+    match /marketplace_recruiters/{uid} {
+      allow read, write: if isOwner(uid) || isPlatformAdmin();
+
+      match /saved_candidates/{candidateId} {
+        allow read, write: if isOwner(uid) || isPlatformAdmin();
+      }
+    }
+
+    // Jobseeker (student) specific profile
+    match /marketplace_jobseekers/{uid} {
+      allow read: if isAuthenticated() || isPlatformAdmin();
+      allow write: if isOwner(uid) || isPlatformAdmin();
+    }
+
     // University collection rules
     match /organizations_universities/{universityId} {
-      allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
-      allow write: if isAuthenticated() && isUnivAdmin(universityId);
+      allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId));
+      allow write: if isPlatformAdmin() || (isAuthenticated() && isUnivAdmin(universityId));
 
       match /admins/{uid} {
-        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
-        allow write: if isAuthenticated() && isUnivAdmin(universityId);
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && isUnivAdmin(universityId));
 
         match /activity/{activityId} {
-          allow read, write: if isAuthenticated() && isUnivAdmin(universityId) && isOwner(uid);
+          allow read, write: if isPlatformAdmin() || (isAuthenticated() && isUnivAdmin(universityId) && isOwner(uid));
         }
       }
 
       match /placement_officers/{uid} {
-        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
-        allow write: if isAuthenticated() && (isUnivAdmin(universityId) || (isOwner(uid) && isPlacementOfficer(universityId)));
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && (isUnivAdmin(universityId) || (isOwner(uid) && isPlacementOfficer(universityId))));
 
         match /activity/{activityId} {
-          allow read, write: if isAuthenticated() && isPlacementOfficer(universityId) && isOwner(uid);
+          allow read, write: if isPlatformAdmin() || (isAuthenticated() && isPlacementOfficer(universityId) && isOwner(uid));
         }
       }
 
       match /students/{uid} {
-        allow read: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId) || isOwner(uid));
-        allow write: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId) || (isOwner(uid) && isStudent(universityId)));
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId) || isOwner(uid)));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId) || (isOwner(uid) && isStudent(universityId))));
 
         match /activity/{activityId} {
-          allow read, write: if isAuthenticated() && isStudent(universityId) && isOwner(uid);
+          allow read, write: if isPlatformAdmin() || (isAuthenticated() && isStudent(universityId) && isOwner(uid));
         }
       }
 
       match /departments/{deptId} {
-        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
-        allow write: if isAuthenticated() && isUnivAdmin(universityId);
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && isUnivAdmin(universityId));
       }
 
       match /opportunities/{oppId} {
-        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
-        allow write: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId));
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId)));
       }
 
       match /placements/{placId} {
-        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
-        allow write: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId));
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId)));
       }
 
       match /applications/{appId} {
-        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
-        allow write: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId) || isStudent(universityId));
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId) || isStudent(universityId)));
       }
 
       match /activity/{activityId} {
-        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
-        allow write: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId));
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId));
       }
 
       match /notifications/{notificationId} {
-        allow read: if isAuthenticated() && isMemberOfUniversity(universityId);
-        allow write: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId));
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId)));
       }
 
       match /reports/{reportId} {
-        allow read, write: if isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId));
+        allow read, write: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId) && (isUnivAdmin(universityId) || isPlacementOfficer(universityId)));
       }
     }
 
     // Company collection rules
     match /organizations_companies/{companyId} {
-      allow read: if isAuthenticated() && isMemberOfCompany(companyId);
-      allow write: if isAuthenticated() && isCompanyAdmin(companyId);
+      allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId));
+      allow write: if isPlatformAdmin() || (isAuthenticated() && isCompanyAdmin(companyId));
 
       match /admins/{uid} {
-        allow read: if isAuthenticated() && isMemberOfCompany(companyId);
-        allow write: if isAuthenticated() && isCompanyAdmin(companyId);
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && isCompanyAdmin(companyId));
 
         match /activity/{activityId} {
-          allow read, write: if isAuthenticated() && isCompanyAdmin(companyId) && isOwner(uid);
+          allow read, write: if isPlatformAdmin() || (isAuthenticated() && isCompanyAdmin(companyId) && isOwner(uid));
         }
       }
 
       match /recruiters/{uid} {
-        allow read: if isAuthenticated() && isMemberOfCompany(companyId);
-        allow write: if isAuthenticated() && (isCompanyAdmin(companyId) || (isOwner(uid) && isCompanyRecruiter(companyId)));
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && (isCompanyAdmin(companyId) || (isOwner(uid) && isCompanyRecruiter(companyId))));
 
         match /activity/{activityId} {
-          allow read, write: if isAuthenticated() && isCompanyRecruiter(companyId) && isOwner(uid);
+          allow read, write: if isPlatformAdmin() || (isAuthenticated() && isCompanyRecruiter(companyId) && isOwner(uid));
         }
       }
 
       match /employees/{uid} {
-        allow read: if isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId) || isOwner(uid));
-        allow write: if isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || (isOwner(uid) && isCompanyEmployee(companyId)));
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId) || isOwner(uid)));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || (isOwner(uid) && isCompanyEmployee(companyId))));
 
         match /activity/{activityId} {
-          allow read, write: if isAuthenticated() && isCompanyEmployee(companyId) && isOwner(uid);
+          allow read, write: if isPlatformAdmin() || (isAuthenticated() && isCompanyEmployee(companyId) && isOwner(uid));
         }
       }
 
       match /departments/{deptId} {
-        allow read: if isAuthenticated() && isMemberOfCompany(companyId);
-        allow write: if isAuthenticated() && isCompanyAdmin(companyId);
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && isCompanyAdmin(companyId));
       }
 
       match /jobs/{jobId} {
-        allow read, write: if isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId));
+        allow read, write: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId)));
       }
 
       match /applications/{appId} {
-        allow read, write: if isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId));
+        allow read, write: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId)));
       }
 
       match /documents/{docId} {
-        allow read: if isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId) || (isCompanyEmployee(companyId) && request.auth.uid == resource.data.employeeUid));
-        allow write: if isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId) || (isCompanyEmployee(companyId) && request.auth.uid == request.resource.data.employeeUid));
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId) || (isCompanyEmployee(companyId) && request.auth.uid == resource.data.employeeUid)));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId) || (isCompanyEmployee(companyId) && request.auth.uid == request.resource.data.employeeUid)));
       }
 
       match /activity/{activityId} {
-        allow read: if isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId));
-        allow write: if isAuthenticated() && isCompanyAdmin(companyId);
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId)));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && isCompanyAdmin(companyId));
       }
 
       match /notifications/{notificationId} {
-        allow read: if isAuthenticated() && isMemberOfCompany(companyId);
-        allow write: if isAuthenticated() && isCompanyAdmin(companyId);
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && isCompanyAdmin(companyId));
       }
 
       match /reports/{reportId} {
-        allow read, write: if isAuthenticated() && isCompanyAdmin(companyId);
+        allow read, write: if isPlatformAdmin() || (isAuthenticated() && isCompanyAdmin(companyId));
       }
     }
 
-    // Global jobs: read allowed by all authenticated, write allowed by BDM or authorized managers
+    // Global jobs
     match /marketplace_jobs/{jobId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.createdBy;
-      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.createdBy;
+      allow read: if isAuthenticated() || isPlatformAdmin();
+      allow create: if isPlatformAdmin() || (isAuthenticated() && request.auth.uid == request.resource.data.createdBy);
+      allow update, delete: if isPlatformAdmin() || (isAuthenticated() && request.auth.uid == resource.data.createdBy);
 
-      // Subcollections of marketplace_jobs (activity, timeline, assigned_recruiters, submissions, etc.)
       match /{subcollection}/{documentId} {
-        allow read: if isAuthenticated();
-        allow write: if isAuthenticated() && get(/databases/$(database)/documents/marketplace_jobs/$(jobId)).data.createdBy == request.auth.uid;
+        allow read: if isAuthenticated() || isPlatformAdmin();
+        allow write: if isPlatformAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/marketplace_jobs/$(jobId)).data.createdBy == request.auth.uid);
       }
     }
 
-    // Global job applications: read and write by any authenticated marketplace member (students apply, recruiters/BDMs view)
+    // Global job applications
     match /marketplace_applications/{applicationId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() || isPlatformAdmin();
     }
 
-    // Global submissions: read and write by any authenticated recruiter/BDM/student involved
+    // Global submissions
     match /marketplace_submissions/{submissionId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() || isPlatformAdmin();
     }
 
-    // Notifications: read and write allowed only for the target user owner
+    // User specific notifications
     match /notifications/{uid} {
-      allow read, write: if isOwner(uid);
+      allow read, write: if isOwner(uid) || isPlatformAdmin();
+    }
+
+    // Platform Specific Collections
+    match /platform_admins/{uid} {
+      allow read, write: if isOwner(uid) || isPlatformAdmin();
+    }
+
+    match /platform_settings/{docId} {
+      allow read: if isAuthenticated() || isPlatformAdmin();
+      allow write: if isPlatformAdmin();
+    }
+
+    match /system_metrics/{docId} {
+      allow read: if isAuthenticated() || isPlatformAdmin();
+      allow write: if isPlatformAdmin();
+    }
+
+    match /dashboard_metrics/{docId} {
+      allow read: if isAuthenticated() || isPlatformAdmin();
+      allow write: if isPlatformAdmin();
+    }
+
+    match /platform_analytics/{docId} {
+      allow read: if isAuthenticated() || isPlatformAdmin();
+      allow write: if isPlatformAdmin();
+    }
+
+    match /audit_logs/{id} {
+      allow read: if isAuthenticated() || isPlatformAdmin();
+      allow write: if isAuthenticated() || isPlatformAdmin();
+    }
+
+    match /login_logs/{id} {
+      allow read: if isAuthenticated() || isPlatformAdmin();
+      allow write: if isAuthenticated() || isPlatformAdmin();
     }
 
     // System collection: read-only for authenticated, write-only by platform admins
     match /system/{document=**} {
-      allow read: if isAuthenticated();
-      allow write: if false; // Only manageable via Firebase Console / Admin SDK
+      allow read: if isAuthenticated() || isPlatformAdmin();
+      allow write: if isPlatformAdmin();
     }
   }
 }

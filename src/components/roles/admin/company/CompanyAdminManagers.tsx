@@ -32,7 +32,9 @@ const RECRUITER_META: Record<string, { avatar: string; role: string; email: stri
 interface Manager {
   id: string;
   name: string;
+  displayName?: string;
   dept: string;
+  department?: string;
   jobs: number;
   applications: number;
   hires: number;
@@ -66,9 +68,12 @@ export default function CompanyAdminManagers({ managersList, onAddManager, onEdi
   const departments = ['All', 'Engineering', 'Product', 'Data Science', 'Sales', 'Operations', 'Finance'];
 
   const filteredManagers = managersList.filter(mgr => {
-    const matchesSearch = mgr.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          mgr.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDept = deptFilter === 'All' ? true : mgr.dept === deptFilter;
+    const nameLower = (mgr?.name || mgr?.displayName || '').toLowerCase();
+    const emailLower = (mgr?.email || '').toLowerCase();
+    const searchLower = searchTerm.toLowerCase();
+
+    const matchesSearch = nameLower.includes(searchLower) || emailLower.includes(searchLower);
+    const matchesDept = deptFilter === 'All' ? true : (mgr?.dept || mgr?.department) === deptFilter;
     return matchesSearch && matchesDept;
   });
 
@@ -194,35 +199,35 @@ export default function CompanyAdminManagers({ managersList, onAddManager, onEdi
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
                         <img 
-                           src={mgr.avatar} 
-                           alt={mgr.name} 
+                           src={mgr.avatar || `https://picsum.photos/seed/${mgr.id}/100/100`} 
+                           alt={mgr.name || mgr.displayName || 'Manager'} 
                            className="w-10 h-10 rounded-full object-cover border-2 border-app-bg" 
                         />
                         <div>
-                          <p className="font-extrabold text-sm text-app-text">{mgr.name}</p>
+                          <p className="font-extrabold text-sm text-app-text">{mgr.name || mgr.displayName || 'N/A'}</p>
                           <p className="text-[10px] text-app-muted font-bold font-mono mt-0.5">{mgr.email}</p>
                         </div>
                       </div>
                     </td>
                     <td className="py-4 px-6">
                       <span className="font-bold text-app-text bg-app-surface border border-app-border px-2.5 py-1 rounded-lg">
-                        {mgr.dept}
+                        {mgr.dept || mgr.department || 'N/A'}
                       </span>
                     </td>
                     <td className="py-4 px-6 text-center">
                       <button 
                         onClick={() => {
-                          setActiveManagerName(mgr.name);
+                          setActiveManagerName(mgr.name || mgr.displayName || null);
                           setShowRecruitersModal(true);
                         }}
                         className="font-bold text-brand-blue hover:underline cursor-pointer bg-brand-blue/5 border border-brand-blue/10 px-2.5 py-1.5 rounded-2xl text-xs hover:bg-brand-blue/10 transition-all whitespace-nowrap"
                       >
-                        {ASSIGNED_RECRUITERS_MAP[mgr.name]?.length || 2} Recruiters
+                        {ASSIGNED_RECRUITERS_MAP[mgr.name || mgr.displayName || '']?.length || 2} Recruiters
                       </button>
                     </td>
-                    <td className="py-4 px-6 text-center text-sm font-bold text-app-text">{mgr.jobs}</td>
-                    <td className="py-4 px-6 text-center text-sm font-semibold text-app-text">{mgr.applications}</td>
-                    <td className="py-4 px-6 text-center text-sm font-bold text-emerald-500">{mgr.hires}</td>
+                    <td className="py-4 px-6 text-center text-sm font-bold text-app-text">{mgr.jobs || 0}</td>
+                    <td className="py-4 px-6 text-center text-sm font-semibold text-app-text">{mgr.applications || 0}</td>
+                    <td className="py-4 px-6 text-center text-sm font-bold text-emerald-500">{mgr.hires || 0}</td>
                     <td className="py-4 px-6 text-center">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black border ${
                         mgr.status === 'Active' 

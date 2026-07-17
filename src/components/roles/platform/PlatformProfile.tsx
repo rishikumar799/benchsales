@@ -12,15 +12,23 @@ import {
   BellRing,
   Globe
 } from 'lucide-react';
+import { useAuth } from '../../../context/AuthContext';
+import { usePlatformAdmin } from '../../../context/PlatformAdminContext';
 
 export default function PlatformProfile() {
-  const [profile] = useState({
-    name: 'Super Admin',
-    email: 'superadmin@aryx.ai',
-    phone: '+91 98765 43210',
+  const { userProfile } = useAuth();
+  const { loginLogs } = usePlatformAdmin();
+  const [passphraseResetSent, setPassphraseResetSent] = useState(false);
+
+  const profile = {
+    name: userProfile?.fullName || userProfile?.displayName || 'Platform Admin',
+    email: userProfile?.email || 'admin@AryxAI.com',
+    phone: userProfile?.phoneNumber || '+91 98765 43210',
     role: 'Platform Administrator',
-    joined: '01 Jan 2024, 10:00 AM'
-  });
+    joined: userProfile?.createdAt 
+      ? new Date(userProfile.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
+      : '01 Jan 2024'
+  };
 
   const [permissions] = useState([
     { name: 'Manage Organizations', desc: 'SaaS tenant dynamic database cluster provisioning' },
@@ -32,11 +40,22 @@ export default function PlatformProfile() {
     { name: 'View System Logs', desc: 'Real-time database and security event streams' },
   ]);
 
-  const [loginHistory] = useState([
+  const defaultLoginHistory = [
     { date: '30 May 2024, 10:30 AM', location: 'New Delhi, India', device: 'Chrome on macOS (192.168.1.10)' },
     { date: '30 May 2024, 08:15 AM', location: 'New Delhi, India', device: 'Safari on iPhone (192.168.1.11)' },
     { date: '29 May 2024, 11:20 PM', location: 'Bengaluru, India', device: 'Chrome on Windows (10.0.0.45)' },
-  ]);
+  ];
+
+  const userEmail = profile.email;
+  const filteredLogs = loginLogs ? loginLogs.filter(log => log.email === userEmail) : [];
+  
+  const dynamicLoginHistory = filteredLogs.length > 0
+    ? filteredLogs.map(log => ({
+        date: new Date(log.timestamp).toLocaleString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        location: log.location || 'Authorized Node',
+        device: `${log.device || log.browser || 'Web Browser'} (IP: ${log.ip || 'Unknown'})`
+      })).slice(0, 5)
+    : [];
 
   return (
     <div id="platform-profile-view" className="space-y-6">
@@ -54,7 +73,7 @@ export default function PlatformProfile() {
             <h3 className="text-sm font-bold uppercase tracking-widest text-app-muted">Administrative Account</h3>
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-violet-500/10 border-2 border-brand-violet/20 flex items-center justify-center text-brand-violet font-bold text-2xl shadow-indigo-500/10">
-                SA
+                {profile.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'AD'}
               </div>
               <div>
                 <div className="text-lg font-bold text-app-text">{profile.name}</div>
@@ -82,7 +101,7 @@ export default function PlatformProfile() {
             </div>
           </div>
 
-          <button className="w-full text-center py-2.5 bg-brand-blue text-white font-bold text-xs rounded-xl cursor-pointer hover:bg-brand-blue/90 border border-brand-blue/50 transition-all font-semibold mt-4">
+          <button className="w-full text-center py-2.5 bg-brand-blue text-white font-bold text-xs rounded-xl cursor-not-allowed opacity-60 border border-brand-blue/50 transition-all font-semibold mt-4">
             Edit Administrative Info
           </button>
         </div>
@@ -120,9 +139,26 @@ export default function PlatformProfile() {
               <div className="p-3.5 bg-app-surface/40 border border-app-border rounded-2xl flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2.5">
                   <Key className="w-4 h-4 text-app-muted" />
-                  <span className="font-bold text-app-text">Change Passphrase</span>
+                  <div>
+                    <span className="font-bold text-app-text block">Change Passphrase</span>
+                    {passphraseResetSent && (
+                      <span className="text-[9px] text-emerald-500 font-semibold block mt-0.5">Dispatched to security mailbox!</span>
+                    )}
+                  </div>
                 </div>
-                <button className="text-[10px] bg-slate-800 text-slate-300 px-2.5 py-1.5 rounded-lg border border-slate-700 font-bold hover:bg-slate-700 transition" onClick={() => alert('Passphrase reset trigger dispatched to security mailbox!')}>Configure</button>
+                {passphraseResetSent ? (
+                  <span className="text-[10px] text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded font-bold">Sent</span>
+                ) : (
+                  <button 
+                    className="text-[10px] bg-slate-800 text-slate-300 px-2.5 py-1.5 rounded-lg border border-slate-700 font-bold hover:bg-slate-700 cursor-pointer transition" 
+                    onClick={() => {
+                      setPassphraseResetSent(true);
+                      setTimeout(() => setPassphraseResetSent(false), 5000);
+                    }}
+                  >
+                    Configure
+                  </button>
+                )}
               </div>
 
               {/* 2fa toggle */}
@@ -161,17 +197,23 @@ export default function PlatformProfile() {
         <p className="text-xs text-app-muted">Recent login records validated for this Super Admin profile.</p>
 
         <div className="space-y-2">
-          {loginHistory.map((hist, idx) => (
-            <div key={idx} className="p-4 bg-app-surface border border-app-border rounded-2xl flex justify-between items-center text-xs text-app-text">
-              <div className="space-y-1">
-                <div className="font-mono font-bold text-app-text">{hist.date}</div>
-                <div className="text-[11px] text-app-muted font-semibold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {hist.device}
-                </div>
-              </div>
-              <span className="text-[10px] text-brand-blue bg-blue-500/10 border border-blue-500/20 px-3 py-1 rounded-xl font-bold font-mono tracking-wide flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> {hist.location}</span>
+          {dynamicLoginHistory.length === 0 ? (
+            <div className="p-8 text-center text-app-muted font-bold text-sm bg-app-surface border border-app-border rounded-2xl">
+              No Login History
             </div>
-          ))}
+          ) : (
+            dynamicLoginHistory.map((hist, idx) => (
+              <div key={idx} className="p-4 bg-app-surface border border-app-border rounded-2xl flex justify-between items-center text-xs text-app-text">
+                <div className="space-y-1">
+                  <div className="font-mono font-bold text-app-text">{hist.date}</div>
+                  <div className="text-[11px] text-app-muted font-semibold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {hist.device}
+                  </div>
+                </div>
+                <span className="text-[10px] text-brand-blue bg-blue-500/10 border border-blue-500/20 px-3 py-1 rounded-xl font-bold font-mono tracking-wide flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> {hist.location}</span>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

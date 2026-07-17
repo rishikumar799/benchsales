@@ -93,7 +93,7 @@ interface JobSeekerContextType {
   addActivity: (action: string, details: string) => Promise<void>;
 }
 
-const JobSeekerContext = createContext<JobSeekerContextType | null>(null);
+export const JobSeekerContext = createContext<JobSeekerContextType | null>(null);
 
 export function useJobSeeker() {
   const context = useContext(JobSeekerContext);

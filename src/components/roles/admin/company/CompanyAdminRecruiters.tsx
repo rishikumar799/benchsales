@@ -20,7 +20,9 @@ const REPORTS_TO_MAP: Record<string, string> = {
 interface Recruiter {
   id: string;
   name: string;
+  displayName?: string;
   dept: string;
+  department?: string;
   jobs: number;
   applications: number;
   selections: number;
@@ -52,9 +54,12 @@ export default function CompanyAdminRecruiters({ recruitersList, onAddRecruiter,
   const departments = ['All', 'Engineering', 'Product', 'Data Science', 'Sales', 'Operations', 'Finance'];
 
   const filteredRecruiters = recruitersList.filter(rec => {
-    const matchesSearch = rec.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          rec.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDept = deptFilter === 'All' ? true : rec.dept === deptFilter;
+    const nameLower = (rec?.name || rec?.displayName || '').toLowerCase();
+    const emailLower = (rec?.email || '').toLowerCase();
+    const searchLower = searchTerm.toLowerCase();
+
+    const matchesSearch = nameLower.includes(searchLower) || emailLower.includes(searchLower);
+    const matchesDept = deptFilter === 'All' ? true : (rec?.dept || rec?.department) === deptFilter;
     return matchesSearch && matchesDept;
   });
 
@@ -180,12 +185,12 @@ export default function CompanyAdminRecruiters({ recruitersList, onAddRecruiter,
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
                         <img 
-                          src={rec.avatar} 
-                          alt={rec.name} 
+                          src={rec.avatar || `https://picsum.photos/seed/${rec.id}/100/100`} 
+                          alt={rec.name || rec.displayName || 'Recruiter'} 
                           className="w-10 h-10 rounded-full object-cover border-2 border-app-bg" 
                         />
                         <div>
-                          <p className="font-extrabold text-sm text-app-text">{rec.name}</p>
+                          <p className="font-extrabold text-sm text-app-text">{rec.name || rec.displayName || 'N/A'}</p>
                           <p className="text-[10px] text-app-muted font-bold font-mono mt-0.5">{rec.email}</p>
                         </div>
                       </div>
@@ -196,18 +201,18 @@ export default function CompanyAdminRecruiters({ recruitersList, onAddRecruiter,
                           Reports To:
                         </span>
                         <span className="text-xs text-brand-blue font-extrabold">
-                          {REPORTS_TO_MAP[rec.name] || 'Amit Verma'}
+                          {REPORTS_TO_MAP[rec.name || rec.displayName || ''] || 'Amit Verma'}
                         </span>
                       </div>
                     </td>
                     <td className="py-4 px-6">
                       <span className="font-bold text-app-text bg-app-surface border border-app-border px-2.5 py-1 rounded-lg">
-                        {rec.dept}
+                        {rec.dept || rec.department || 'N/A'}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-center text-sm font-bold text-app-text">{rec.jobs}</td>
-                    <td className="py-4 px-6 text-center text-sm font-semibold text-app-text">{rec.applications}</td>
-                    <td className="py-4 px-6 text-center text-sm font-bold text-emerald-500">{rec.selections}</td>
+                    <td className="py-4 px-6 text-center text-sm font-bold text-app-text">{rec.jobs || 0}</td>
+                    <td className="py-4 px-6 text-center text-sm font-semibold text-app-text">{rec.applications || 0}</td>
+                    <td className="py-4 px-6 text-center text-sm font-bold text-emerald-500">{rec.selections || 0}</td>
                     <td className="py-4 px-6 text-center">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black border ${
                         rec.status === 'Active' 

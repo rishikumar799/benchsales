@@ -19,29 +19,39 @@ import {
   Tooltip, 
   CartesianGrid 
 } from 'recharts';
+import { usePlatformAdmin } from '../../../context/PlatformAdminContext';
 
-const billingHistory = [
-  { id: 'TX-901', org: 'TechCorp Solutions', plan: 'Enterprise Elite', amount: '₹1,20,000', date: '01 Jun 2024', status: 'Paid' },
-  { id: 'TX-902', org: 'ABC University', plan: 'Enterprise Elite', amount: '₹1,50,000', date: '03 Jun 2024', status: 'Paid' },
-  { id: 'TX-903', org: 'InnovateX Inc', plan: 'Professional', amount: '₹75,000', date: '05 Jun 2024', status: 'Paid' },
-  { id: 'TX-904', org: 'Global Recruiters Ltd', plan: 'Professional', amount: '₹75,000', date: '07 Jun 2024', status: 'Failed' },
-  { id: 'TX-905', org: 'Future Education Group', plan: 'Enterprise Sandbox', amount: '₹1,20,000', date: '08 Jun 2024', status: 'Paid' },
-];
+const billingHistory: any[] = [];
 
-const revenueOverviewData = [
-  { month: 'Dec', rev: 12.5 },
-  { month: 'Jan', rev: 14.1 },
-  { month: 'Feb', rev: 15.8 },
-  { month: 'Mar', rev: 16.9 },
-  { month: 'Apr', rev: 17.8 },
-  { month: 'May', rev: 18.6 },
-];
+const revenueOverviewData: any[] = [];
 
 export default function PlatformBilling() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const { dashboardMetrics, platformAnalytics, organizations } = usePlatformAdmin();
 
-  const filteredHistory = billingHistory.filter(tx => {
+  const monthlyRevenue = dashboardMetrics?.monthlyRevenue || 0;
+  const annualProjected = monthlyRevenue * 12 / 100; // in Cr
+  const totalPaidSubs = (organizations && organizations.length > 0) 
+    ? organizations.filter(o => o.status === 'Active').length 
+    : 0;
+
+  const currentRevenueData = platformAnalytics?.trends || revenueOverviewData;
+
+  const dynamicBillingHistory = (organizations && organizations.length > 0) 
+    ? organizations.map((org, i) => ({
+        id: `TX-${900 + i + 1}`,
+        org: org.name,
+        plan: org.plan === 'Enterprise' ? 'Enterprise Elite' : org.plan === 'Professional' ? 'Professional' : 'Starter',
+        amount: org.plan === 'Enterprise' ? '₹1,50,000' : org.plan === 'Professional' ? '₹75,000' : '₹30,000',
+        date: org.joinedDate || '01 Jun 2024',
+        status: org.status === 'Active' ? 'Paid' : 'Failed'
+      }))
+    : billingHistory;
+
+  const failedPaymentsCount = dynamicBillingHistory.filter(tx => tx.status === 'Failed').length;
+
+  const filteredHistory = dynamicBillingHistory.filter(tx => {
     const matchesSearch = tx.org.toLowerCase().includes(search.toLowerCase()) || tx.id.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'All' || tx.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -64,10 +74,10 @@ export default function PlatformBilling() {
       {/* Finances Overview Counter Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { label: 'Monthly Revenue', value: '₹18.6L', change: '+14.8% MoM growth', icon: DollarSign, color: 'text-amber-500' },
-          { label: 'Annual Projected Revenue', value: '₹2.18Cr', change: '+17.2% YoY growth', icon: CreditCard, color: 'text-emerald-500' },
-          { label: 'Active Paid Subscriptions', value: '42 Tenants', change: '+12.9% client addition', icon: CheckCircle, color: 'text-indigo-500' },
-          { label: 'Failed Payments (30d)', value: '3 invoices', change: 'Flagged or retrying', icon: AlertTriangle, color: 'text-rose-500' },
+          { label: 'Monthly Revenue', value: `₹${monthlyRevenue.toFixed(1)}L`, change: '+14.8% MoM growth', icon: DollarSign, color: 'text-amber-500' },
+          { label: 'Annual Projected Revenue', value: `₹${annualProjected.toFixed(2)}Cr`, change: '+17.2% YoY growth', icon: CreditCard, color: 'text-emerald-500' },
+          { label: 'Active Paid Subscriptions', value: `${totalPaidSubs} Tenants`, change: '+12.9% client addition', icon: CheckCircle, color: 'text-indigo-500' },
+          { label: 'Failed Payments (30d)', value: `${failedPaymentsCount} invoice${failedPaymentsCount !== 1 ? 's' : ''}`, change: 'Flagged or retrying', icon: AlertTriangle, color: 'text-rose-500' },
         ].map((st, idx) => {
           const Icon = st.icon;
           return (
@@ -87,16 +97,22 @@ export default function PlatformBilling() {
         {/* Revenue Growth Graph */}
         <div className="lg:col-span-2 p-6 sm:p-8 rounded-[32px] glass border-app-border card-shadow space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-widest text-app-muted">Aryx Platform Revenue (INR Lakhs)</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={revenueOverviewData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                <XAxis dataKey="month" stroke="#9ca3af" fontSize={10} tickLine={false} />
-                <YAxis stroke="#9ca3af" fontSize={10} axisLine={false} tickLine={false} />
-                <Tooltip />
-                <Bar dataKey="rev" fill="#f59e0b" radius={[12, 12, 0, 0]} barSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="h-64 flex flex-col justify-center">
+            {currentRevenueData.length === 0 ? (
+              <div className="py-12 text-center text-app-muted font-bold text-xs">
+                No Records Found
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={currentRevenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                  <XAxis dataKey="month" stroke="#9ca3af" fontSize={10} tickLine={false} />
+                  <YAxis stroke="#9ca3af" fontSize={10} axisLine={false} tickLine={false} />
+                  <Tooltip />
+                  <Bar dataKey="rev" fill="#f59e0b" radius={[12, 12, 0, 0]} barSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 

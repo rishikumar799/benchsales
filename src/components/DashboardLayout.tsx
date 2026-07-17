@@ -1,4 +1,4 @@
-import { useState, ReactNode, useEffect } from 'react';
+import { useState, ReactNode, useEffect, useContext } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, 
@@ -28,8 +28,8 @@ import {
 import { UserRole } from '../types';
 import ThemeToggle from './common/ThemeToggle';
 import { useAuth } from '../context/AuthContext';
-import { useRecruiter } from '../context/RecruiterContext';
-import { useJobSeeker } from '../context/JobSeekerContext';
+import { RecruiterContext } from '../context/RecruiterContext';
+import { JobSeekerContext } from '../context/JobSeekerContext';
 import { db } from '../firebase/firebase';
 import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 
@@ -45,17 +45,17 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children, role, onLogout, activeTab, setActiveTab, theme, toggleTheme }: DashboardLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [bdmProfile, setBdmProfile] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
-  // Consume recruiter profile from centralized RecruiterContext if role matches
-  const recruiterCtx = role === 'm_recruiter' ? useRecruiter() : null;
+  // Consume recruiter profile from centralized RecruiterContext
+  const recruiterCtx = useContext(RecruiterContext);
   const recruiterProfile = recruiterCtx ? recruiterCtx.recruiterProfile : null;
 
-  // Consume job seeker profile from centralized JobSeekerContext if role matches
-  const candidateCtx = role === 'm_candidate' ? useJobSeeker() : null;
+  // Consume job seeker profile from centralized JobSeekerContext
+  const candidateCtx = useContext(JobSeekerContext);
   const candidateProfile = candidateCtx ? candidateCtx.jobSeekerProfile : null;
 
   useEffect(() => {
@@ -688,25 +688,29 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
             <div className="flex items-center gap-3 pl-2 sm:pl-6 border-l border-app-border">
               <div className="text-right hidden sm:block">
                 <div className="text-sm font-bold text-app-text">
-                  {role === 'm_manager' && bdmProfile
+                  {role === 'platform_admin'
+                    ? (userProfile?.fullName || userProfile?.displayName || user?.displayName || 'Rishi Kumar')
+                    : role === 'm_manager' && bdmProfile
                     ? (bdmProfile.fullName || bdmProfile.name || 'Anonymous Manager')
                     : role === 'm_recruiter' && recruiterProfile
                     ? (recruiterProfile.fullName || recruiterProfile.name || recruiterProfile.profile?.fullName || recruiterProfile.profile?.name || user?.displayName || 'Anonymous Recruiter')
                     : role === 'm_candidate' && candidateProfile
                     ? (candidateProfile.profile?.fullName || candidateProfile.fullName || user?.displayName || 'Job Seeker')
-                    : role === 'u_admin' ? 'Dr. Sandeep Jain' : role === 'u_officer' ? 'Priya Sharma' : role === 'c_admin' ? 'Vikram Singh' : role === 'c_manager' ? 'Amit Verma' : role === 'm_manager' || role === 'u_student' || role === 'c_employee' ? 'Rohit Kumar' : (user?.displayName || 'Rishi Kumar')}
+                    : (userProfile?.fullName || userProfile?.displayName || user?.displayName || (role === 'u_admin' ? 'Dr. Sandeep Jain' : role === 'u_officer' ? 'Priya Sharma' : role === 'c_admin' ? 'Vikram Singh' : role === 'c_manager' ? 'Amit Verma' : role === 'm_manager' || role === 'u_student' || role === 'c_employee' ? 'Rohit Kumar' : 'Rishi Kumar'))}
                 </div>
                 <div className="text-[10px] font-bold uppercase tracking-widest text-brand-blue">{getRoleLabel(role)}</div>
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full blue-gradient p-0.5">
                 <img 
-                  src={role === 'm_manager' && bdmProfile
+                  src={role === 'platform_admin'
+                    ? (userProfile?.photoURL || userProfile?.photoUrl || user?.photoURL || 'https://picsum.photos/seed/platform_admin/100/100')
+                    : role === 'm_manager' && bdmProfile
                     ? (bdmProfile.profilePhotoUrl || bdmProfile.img || 'https://picsum.photos/seed/manager/100/100')
                     : role === 'm_recruiter' && recruiterProfile
                     ? (recruiterProfile.photoUrl || recruiterProfile.profilePhotoUrl || recruiterProfile.profile?.photoUrl || recruiterProfile.profile?.profilePhotoUrl || 'https://picsum.photos/seed/recruiter/100/100')
                     : role === 'm_candidate' && candidateProfile
                     ? (candidateProfile.profile?.photoURL || candidateProfile.profile?.profilePhoto || candidateProfile.profilePhoto || 'https://picsum.photos/seed/candidate/100/100')
-                    : role === 'u_admin' ? 'https://picsum.photos/seed/sandeepjain/100/100' : role === 'u_officer' ? 'https://picsum.photos/seed/priyasharma/100/100' : role === 'c_admin' ? 'https://picsum.photos/seed/vikramsingh/100/100' : role === 'c_manager' ? 'https://picsum.photos/seed/amitverma/100/100' : 'https://picsum.photos/seed/user123/100/100'} 
+                    : (userProfile?.photoURL || userProfile?.photoUrl || user?.photoURL || (role === 'u_admin' ? 'https://picsum.photos/seed/sandeepjain/100/100' : role === 'u_officer' ? 'https://picsum.photos/seed/priyasharma/100/100' : role === 'c_admin' ? 'https://picsum.photos/seed/vikramsingh/100/100' : role === 'c_manager' ? 'https://picsum.photos/seed/amitverma/100/100' : 'https://picsum.photos/seed/user123/100/100'))} 
                   alt="Avatar" 
                   className="w-full h-full rounded-full object-cover border-2 border-app-bg"
                   referrerPolicy="no-referrer"
