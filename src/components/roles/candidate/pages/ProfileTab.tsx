@@ -252,8 +252,8 @@ export default function ProfileTab() {
 
     if (jobSeekerProfile) {
       const data = jobSeekerProfile;
-      const prof = data.profile || {};
-      const resData = data.resume || {};
+      const prof: any = data.profile || {};
+      const resData: any = data.resume || {};
       
       setDbResumeScore(resData.resumeCompletion || resData.completion || 85);
       setDbCreatedAt(data.createdAt || prof.createdAt || '');

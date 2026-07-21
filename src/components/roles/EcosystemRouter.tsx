@@ -2210,10 +2210,12 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                 try {
                   const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'managers', updatedMgr.id);
                   const { id, ...data } = updatedMgr;
-                  await updateDoc(docRef, {
+                  const updatePayload = {
                     ...data,
                     updatedAt: new Date().toISOString()
-                  });
+                  };
+                  await updateDoc(docRef, updatePayload);
+                  await updateDoc(doc(db, 'organizations_companies_managers', updatedMgr.id), updatePayload);
                   setSuccessMsg?.('Manager updated successfully!');
                   return true;
                 } catch (e) {
@@ -2226,6 +2228,7 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                 try {
                   const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'managers', mgrId);
                   await deleteDoc(docRef);
+                  await deleteDoc(doc(db, 'organizations_companies_managers', mgrId));
                   setSuccessMsg?.('Manager profile deleted.');
                 } catch (e) {
                   console.error("Error deleting manager:", e);
@@ -2279,10 +2282,12 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                 try {
                   const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'recruiters', updatedRec.id);
                   const { id, ...data } = updatedRec;
-                  await updateDoc(docRef, {
+                  const updatePayload = {
                     ...data,
                     updatedAt: new Date().toISOString()
-                  });
+                  };
+                  await updateDoc(docRef, updatePayload);
+                  await updateDoc(doc(db, 'organizations_companies_recruiters', updatedRec.id), updatePayload);
                   setSuccessMsg?.('Recruiter updated successfully!');
                   return true;
                 } catch (e) {
@@ -2295,6 +2300,7 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                 try {
                   const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'recruiters', recId);
                   await deleteDoc(docRef);
+                  await deleteDoc(doc(db, 'organizations_companies_recruiters', recId));
                   setSuccessMsg?.('Recruiter profile deleted.');
                 } catch (e) {
                   console.error("Error deleting recruiter:", e);
@@ -2348,10 +2354,12 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                 try {
                   const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'employees', updatedEmp.id);
                   const { id, ...data } = updatedEmp;
-                  await updateDoc(docRef, {
+                  const updatePayload = {
                     ...data,
                     updatedAt: new Date().toISOString()
-                  });
+                  };
+                  await updateDoc(docRef, updatePayload);
+                  await updateDoc(doc(db, 'organizations_companies_employees', updatedEmp.id), updatePayload);
                   setSuccessMsg?.('Employee profile updated successfully!');
                   return true;
                 } catch (e) {
@@ -2364,6 +2372,7 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                 try {
                   const docRef = doc(db, 'organizations_companies', userProfile.organizationId, 'employees', empId);
                   await deleteDoc(docRef);
+                  await deleteDoc(doc(db, 'organizations_companies_employees', empId));
                   setSuccessMsg?.('Employee profile deleted.');
                 } catch (e) {
                   console.error("Error deleting employee:", e);
@@ -2766,7 +2775,7 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                       action: 'created a new job opening',
                       subject: newJob.title,
                       time: 'Just Now',
-                      avatar: userProfile.avatar || 'https://picsum.photos/seed/rec/100/100',
+                      avatar: (userProfile as any).avatar || userProfile.photoURL || 'https://picsum.photos/seed/rec/100/100',
                       createdAt: new Date().toISOString()
                     });
 
@@ -2795,7 +2804,7 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                       action: 'updated job opening',
                       subject: updatedJob.title,
                       time: 'Just Now',
-                      avatar: userProfile.avatar || 'https://picsum.photos/seed/rec/100/100',
+                      avatar: (userProfile as any).avatar || userProfile.photoURL || 'https://picsum.photos/seed/rec/100/100',
                       createdAt: new Date().toISOString()
                     });
 
@@ -2833,7 +2842,7 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                       action: `updated candidacy status of ${candName} to "${status}"`,
                       subject: candName,
                       time: 'Just Now',
-                      avatar: userProfile.avatar || 'https://picsum.photos/seed/rec/100/100',
+                      avatar: (userProfile as any).avatar || userProfile.photoURL || 'https://picsum.photos/seed/rec/100/100',
                       createdAt: new Date().toISOString()
                     });
 
@@ -2901,7 +2910,7 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
                       action: `moved ${candName} to "${status}"`,
                       subject: candName,
                       time: 'Just Now',
-                      avatar: userProfile.avatar || 'https://picsum.photos/seed/rec/100/100',
+                      avatar: (userProfile as any).avatar || userProfile.photoURL || 'https://picsum.photos/seed/rec/100/100',
                       createdAt: new Date().toISOString()
                     });
 

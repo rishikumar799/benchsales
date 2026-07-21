@@ -136,6 +136,14 @@ export async function provisionCompanyUser(params: ProvisionUserParams): Promise
     // Standardize role and role collection
     const { dbRole, roleCollection } = getStandardizedRoleAndCollection(role);
 
+    const resolvedPhone = phone || extraFields?.phone || extraFields?.phoneNumber || 'N/A';
+    const resolvedDesignation = designation || extraFields?.designation || (dbRole === 'company_manager' ? 'Manager' : dbRole === 'company_recruiter' ? 'Recruiter' : 'Staff');
+    const resolvedDept = dept || extraFields?.department || extraFields?.dept || 'Executive';
+    const resolvedStatus = status || extraFields?.status || 'approved';
+    const resolvedPhotoURL = extraFields?.avatar || extraFields?.photoURL || '';
+
+    const timestamp = new Date().toISOString();
+
     // 2. Create users/{uid} document with precise standardized fields
     const userDocRef = doc(db, 'users', uid);
     await setDoc(userDocRef, {
@@ -147,31 +155,39 @@ export async function provisionCompanyUser(params: ProvisionUserParams): Promise
       ecosystem: 'company', // "ecosystem value is 'company'"
       organizationId,
       organizationName,
-      status: status === 'Active' ? 'approved' : 'inactive',
-      photoURL: extraFields?.avatar || extraFields?.photoURL || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      status: resolvedStatus === 'Active' || resolvedStatus === 'approved' ? 'approved' : 'inactive',
+      photoURL: resolvedPhotoURL,
+      createdAt: timestamp,
+      updatedAt: timestamp
     });
 
-    // 3. Create role document: organizations_companies/{organizationId}/{roleCollection}/{uid}
-    // and include all required fields
-    const roleDocRef = doc(db, 'organizations_companies', organizationId, roleCollection, uid);
-    await setDoc(roleDocRef, {
+    const payload = {
       ...extraFields,
       uid,
       organizationId,
       organizationName,
       role: dbRole, // "role value is identical everywhere"
       displayName: name,
+      fullName: name,
       email: email.trim(),
-      department: dept,
-      dept,
-      designation,
-      phone,
-      status,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
+      department: resolvedDept,
+      dept: resolvedDept,
+      designation: resolvedDesignation,
+      phone: resolvedPhone,
+      phoneNumber: resolvedPhone,
+      status: resolvedStatus === 'Active' || resolvedStatus === 'approved' ? 'approved' : 'inactive',
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+
+    // 3. Create role document: organizations_companies/{organizationId}/{roleCollection}/{uid}
+    const roleDocRef = doc(db, 'organizations_companies', organizationId, roleCollection, uid);
+    await setDoc(roleDocRef, payload);
+
+    // 3.5. Create top-level quick-access role document: organizations_companies_{roleCollection}/{uid}
+    const topLevelColName = `organizations_companies_${roleCollection}`;
+    const topRoleDocRef = doc(db, topLevelColName, uid);
+    await setDoc(topRoleDocRef, payload);
 
     // 4. Sign out the newly created user from the secondary auth instance
     await signOut(secondaryAuth);

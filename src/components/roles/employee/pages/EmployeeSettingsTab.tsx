@@ -87,6 +87,7 @@ export default function EmployeeSettingsTab() {
       };
 
       await updateDoc(docRef, payload);
+      await updateDoc(doc(db, 'organizations_companies_employees', userProfile.uid), payload);
 
       setSuccessMsg('✓ Employee preferences updated successfully in real-time!');
       setTimeout(() => setSuccessMsg(''), 4000);

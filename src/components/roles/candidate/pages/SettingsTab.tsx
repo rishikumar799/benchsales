@@ -70,8 +70,8 @@ export default function SettingsTab() {
 
     if (jobSeekerProfile) {
       const data = jobSeekerProfile;
-      const prof = data.profile || {};
-      const sets = data.settings || {};
+      const prof: any = data.profile || {};
+      const sets: any = data.settings || {};
 
       setFullName(prof.fullName || data.fullName || 'Rishi Kumar');
       setEmail(prof.email || data.email || 'rishi.kumar@email.com');

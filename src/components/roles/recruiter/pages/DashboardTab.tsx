@@ -318,7 +318,7 @@ export default function DashboardTab({
         <div>
           <h1 className="text-3xl font-display font-bold text-app-text">Dashboard</h1>
           <p className="text-app-muted mt-1">
-            Welcome back, {recruiterProfile?.profile?.fullName || recruiterProfile?.fullName || userProfile?.fullName || user?.displayName || 'Rohit'}! Here's your recruitment overview.
+            Welcome back, {(recruiterProfile as any)?.profile?.fullName || (recruiterProfile as any)?.fullName || userProfile?.fullName || user?.displayName || 'Rohit'}! Here's your recruitment overview.
           </p>
         </div>
       </div>

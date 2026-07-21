@@ -36,7 +36,7 @@ export default function StudentSettings() {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setStudentData(data);
-        setFullName(data.fullName || data.name || userProfile?.name || '');
+        setFullName(data.fullName || data.name || (userProfile as any)?.name || (userProfile as any)?.fullName || '');
         setPhone(data.phoneNumber || data.phone || '');
       }
       setLoading(false);

@@ -32,18 +32,19 @@ export default function RecruiterProfileTab() {
   // Sync internal fields with RecruiterContext once it loads
   useEffect(() => {
     if (recruiterProfile) {
-      const prof = recruiterProfile.profile || {};
-      setName(prof.fullName || recruiterProfile.fullName || '');
-      setEmail(prof.email || recruiterProfile.email || '');
-      setPhone(prof.phone || prof.phoneNumber || recruiterProfile.phone || '');
-      setLocation(prof.location || prof.address || recruiterProfile.location || '');
-      setDept(prof.dept || prof.department || recruiterProfile.dept || '');
-      setBio(prof.bio || recruiterProfile.bio || '');
-      setSkills(prof.skills || recruiterProfile.skills || '');
-      setExperience(prof.experience || recruiterProfile.experience || '');
-      setPortfolio(prof.portfolio || recruiterProfile.portfolio || '');
-      setLinkedin(prof.linkedin || recruiterProfile.linkedin || '');
-      setPhotoUrl(prof.photoUrl || prof.profilePhotoUrl || recruiterProfile.photoUrl || '');
+      const prof: any = recruiterProfile.profile || {};
+      const rec: any = recruiterProfile;
+      setName(prof.fullName || rec.fullName || '');
+      setEmail(prof.email || rec.email || '');
+      setPhone(prof.phone || prof.phoneNumber || rec.phone || '');
+      setLocation(prof.location || prof.address || rec.location || '');
+      setDept(prof.dept || prof.department || rec.dept || '');
+      setBio(prof.bio || rec.bio || '');
+      setSkills(prof.skills || rec.skills || '');
+      setExperience(prof.experience || rec.experience || '');
+      setPortfolio(prof.portfolio || rec.portfolio || '');
+      setLinkedin(prof.linkedin || rec.linkedin || '');
+      setPhotoUrl(prof.photoUrl || prof.profilePhotoUrl || rec.photoUrl || '');
     }
   }, [recruiterProfile]);
 

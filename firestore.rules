@@ -86,6 +86,20 @@ service cloud.firestore {
       allow write: if isOwner(uid) || isPlatformAdmin();
     }
 
+    // Top-level collections for company roles
+    match /organizations_companies_admins/{uid} {
+      allow read, write: if isAuthenticated();
+    }
+    match /organizations_companies_managers/{uid} {
+      allow read, write: if isAuthenticated();
+    }
+    match /organizations_companies_recruiters/{uid} {
+      allow read, write: if isAuthenticated();
+    }
+    match /organizations_companies_employees/{uid} {
+      allow read, write: if isAuthenticated();
+    }
+
     // University collection rules
     match /organizations_universities/{universityId} {
       allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfUniversity(universityId));

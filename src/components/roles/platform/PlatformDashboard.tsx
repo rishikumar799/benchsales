@@ -70,7 +70,7 @@ export default function PlatformDashboard({ onNavigate, onExport }: PlatformDash
   const universityJobs = 0;
   const companyJobs = 0;
 
-  const monthlyRevenue = dashboardMetrics?.revenue || (dashboardMetrics as any)?.current?.revenue || dashboardMetrics?.monthlyRevenue || 0;
+  const monthlyRevenue = (dashboardMetrics as any)?.revenue || (dashboardMetrics as any)?.current?.revenue || (dashboardMetrics as any)?.monthlyRevenue || 0;
   const subscriptionRev = 0;
   const marketplaceRev = 0;
   const otherRev = 0;

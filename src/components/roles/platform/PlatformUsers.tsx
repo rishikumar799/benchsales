@@ -38,11 +38,8 @@ export default function PlatformUsers({
   onDeleteUser: propsOnDeleteUser,
   onAddUser: propsOnAddUser 
 }: PlatformUsersProps) {
-  const { users, toggleUserStatus, deleteUser, addUser } = usePlatformAdmin();
-  const usersList = users && users.length > 0 ? users : propsUsersList;
-  const onToggleStatus = toggleUserStatus || propsOnToggleStatus;
-  const onDeleteUser = deleteUser || propsOnDeleteUser;
-  const onAddUser = addUser || propsOnAddUser;
+  const { sysUsers, toggleUserStatus: contextToggleUserStatus, deleteUser: contextDeleteUser, addUser: contextAddUser } = usePlatformAdmin();
+  const usersList = sysUsers && sysUsers.length > 0 ? sysUsers : propsUsersList;
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [orgFilter, setOrgFilter] = useState('All');
@@ -56,8 +53,8 @@ export default function PlatformUsers({
   const [newOrg, setNewOrg] = useState('TechCorp Solutions');
 
   // Extracted unique roles & orgs for filters
-  const roles = ['All', ...Array.from(new Set(usersList.map(u => u.role)))];
-  const organizations = ['All', ...Array.from(new Set(usersList.map(u => u.organization)))];
+  const roles: string[] = ['All', ...Array.from(new Set(usersList.map((u: any) => String(u.role || ''))))];
+  const organizations: string[] = ['All', ...Array.from(new Set(usersList.map((u: any) => String(u.organization || ''))))];
 
   const filteredUsers = usersList.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -75,13 +72,18 @@ export default function PlatformUsers({
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newEmail) return;
-    onAddUser?.({
+    const newUserPayload = {
       name: newName,
       email: newEmail,
       role: newRole,
       organization: newOrg,
-      status: 'Active'
-    });
+      status: 'Active' as const
+    };
+    if (contextAddUser) {
+      contextAddUser(newUserPayload);
+    } else if (propsOnAddUser) {
+      propsOnAddUser(newUserPayload);
+    }
     setNewName('');
     setNewEmail('');
     setIsAddOpen(false);
@@ -112,7 +114,7 @@ export default function PlatformUsers({
             <h3 className="text-2xl font-display font-bold">Manage Platform Users</h3>
             <p className="text-app-muted text-xs mt-1">Audit permissions, suspend/reactivate global credentials, and regulate administrative accounts.</p>
           </div>
-          {onAddUser && (
+          {(contextAddUser || propsOnAddUser) && (
             <button 
               onClick={() => setIsAddOpen(true)}
               className="px-5 py-3 bg-brand-blue text-white font-bold text-xs rounded-xl flex items-center gap-2 w-max cursor-pointer hover:bg-brand-blue/90"
@@ -222,7 +224,13 @@ export default function PlatformUsers({
                       <td className="py-4 px-6 text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button 
-                            onClick={() => onToggleStatus(user.id)}
+                            onClick={() => {
+                              if (contextToggleUserStatus) {
+                                contextToggleUserStatus(user.id, user.status);
+                              } else {
+                                propsOnToggleStatus(user.id);
+                              }
+                            }}
                             className={`px-3 py-1.5 border border-app-border rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer hover:bg-app-surface/60 transition-all ${
                               user.status === 'Active' ? 'text-amber-500' : 'text-emerald-500'
                             }`}
@@ -238,7 +246,13 @@ export default function PlatformUsers({
                             )}
                           </button>
                           <button 
-                            onClick={() => onDeleteUser(user.id)}
+                            onClick={() => {
+                              if (contextDeleteUser) {
+                                contextDeleteUser(user.id);
+                              } else {
+                                propsOnDeleteUser(user.id);
+                              }
+                            }}
                             className="p-1.5 border border-rose-500/20 text-rose-500 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 transition-all cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />

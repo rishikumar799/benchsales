@@ -39,16 +39,13 @@ export default function PlatformOrganizations({
   onEditOrg: propsOnEditOrg, 
   onDeleteOrg: propsOnDeleteOrg 
 }: PlatformOrganizationsProps) {
-  const { organizations, addOrg, editOrg, deleteOrg } = usePlatformAdmin();
+  const { organizations, addOrg: contextAddOrg, editOrg: contextEditOrg, deleteOrg: contextDeleteOrg } = usePlatformAdmin();
   const organizationsList = organizations && organizations.length > 0 ? organizations : propsOrganizationsList;
-  const onAddOrg = addOrg || propsOnAddOrg;
-  const onEditOrg = editOrg || propsOnEditOrg;
-  const onDeleteOrg = deleteOrg || propsOnDeleteOrg;
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
   const [planFilter, setPlanFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
-
+  
   // Modal State
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
@@ -91,20 +88,37 @@ export default function PlatformOrganizations({
     if (!formName.trim()) return;
 
     if (editingOrg) {
-      onEditOrg({
-        ...editingOrg,
-        name: formName,
-        type: formType,
-        plan: formPlan,
-        status: formStatus
-      });
+      if (contextEditOrg) {
+        contextEditOrg(editingOrg.id, editingOrg.type, {
+          name: formName,
+          plan: formPlan,
+          status: formStatus
+        });
+      } else if (propsOnEditOrg) {
+        propsOnEditOrg({
+          ...editingOrg,
+          name: formName,
+          type: formType,
+          plan: formPlan,
+          status: formStatus
+        });
+      }
     } else {
-      onAddOrg({
-        name: formName,
-        type: formType,
-        plan: formPlan,
-        status: formStatus
-      });
+      if (contextAddOrg) {
+        contextAddOrg({
+          name: formName,
+          type: formType,
+          plan: formPlan,
+          status: formStatus
+        });
+      } else if (propsOnAddOrg) {
+        propsOnAddOrg({
+          name: formName,
+          type: formType,
+          plan: formPlan,
+          status: formStatus
+        });
+      }
     }
     setIsAddOpen(false);
   };
@@ -249,7 +263,13 @@ export default function PlatformOrganizations({
                           <Edit className="w-3.5 h-3.5" /> Toggle
                         </button>
                         <button 
-                          onClick={() => onDeleteOrg(org.id)}
+                          onClick={() => {
+                            if (contextDeleteOrg) {
+                              contextDeleteOrg(org.id, org.type);
+                            } else if (propsOnDeleteOrg) {
+                              propsOnDeleteOrg(org.id);
+                            }
+                          }}
                           className="p-1.5 border border-rose-500/20 text-rose-500 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 transition-all cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

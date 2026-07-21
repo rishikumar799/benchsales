@@ -43,7 +43,7 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
   const [candidates, setCandidates] = useState<RecruiterCandidate[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const recruiterName = recruiterProfile?.profile?.fullName || recruiterProfile?.fullName || auth.currentUser?.displayName || 'Rohit Kumar';
+  const recruiterName = recruiterProfile?.profile?.fullName || (recruiterProfile as any)?.fullName || auth.currentUser?.displayName || 'Rohit Kumar';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [jobFilter, setJobFilter] = useState('All');
@@ -377,19 +377,21 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
                         <button 
                           onClick={() => {
                             const matchingJob = jobs.find(j => j.id === sub.jobId);
-                            setSelectedJobDetails(matchingJob || {
+                            setSelectedJobDetails(matchingJob || ({
                               id: sub.jobId,
                               title: sub.jobTitle,
-                              company: sub.companyName,
+                              company: sub.companyName || 'N/A',
                               experience: '3-5 Years',
                               skills: ['React', 'TypeScript'],
                               location: 'Bangalore',
                               positions: 'N/A',
                               priority: 'Medium',
                               posted: 'Posted recently',
-                              bdm: sub.assignedBdm,
-                              status: 'open'
-                            });
+                              bdm: sub.assignedBdm || 'N/A',
+                              status: 'open',
+                              jobType: 'open',
+                              accessStatus: 'approved'
+                            } as RecruiterJob));
                           }}
                           className="font-bold text-app-text text-left hover:text-brand-blue hover:underline"
                         >
@@ -468,19 +470,21 @@ export default function SubmissionsTab({ onAddLogMessage }: SubmissionsTabProps)
                           <button 
                             onClick={() => {
                               const matchingJob = jobs.find(j => j.id === sub.jobId);
-                              setSelectedJobDetails(matchingJob || {
+                              setSelectedJobDetails(matchingJob || ({
                                 id: sub.jobId,
                                 title: sub.jobTitle,
-                                company: sub.companyName,
+                                company: sub.companyName || 'N/A',
                                 experience: '3-5 Years',
                                 skills: ['React', 'TypeScript'],
                                 location: 'Bangalore',
                                 positions: 'N/A',
                                 priority: 'Medium',
                                 posted: 'Posted recently',
-                                bdm: sub.assignedBdm,
-                                status: 'open'
-                              });
+                                bdm: sub.assignedBdm || 'N/A',
+                                status: 'open',
+                                jobType: 'open',
+                                accessStatus: 'approved'
+                              } as RecruiterJob));
                             }}
                             className="p-1.5 bg-app-surface border border-app-border rounded-lg text-app-muted hover:text-brand-violet"
                             title="View Job"

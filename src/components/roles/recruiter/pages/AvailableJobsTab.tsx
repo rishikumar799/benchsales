@@ -48,8 +48,8 @@ export default function AvailableJobsTab({ onNavigate }: AvailableJobsTabProps) 
 
   const currentUserInfo = useMemo(() => {
     return {
-      name: recruiterProfile?.profile?.fullName || recruiterProfile?.fullName || auth.currentUser?.displayName || 'Recruiter Partner',
-      email: recruiterProfile?.profile?.email || recruiterProfile?.email || auth.currentUser?.email || ''
+      name: (recruiterProfile as any)?.profile?.fullName || (recruiterProfile as any)?.fullName || auth.currentUser?.displayName || 'Recruiter Partner',
+      email: (recruiterProfile as any)?.profile?.email || (recruiterProfile as any)?.email || auth.currentUser?.email || ''
     };
   }, [recruiterProfile]);
 

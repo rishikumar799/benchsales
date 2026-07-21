@@ -275,7 +275,7 @@ export default function JobsTab() {
         candidateName: userProfile.fullName || userProfile.displayName || 'Anonymous Seeker',
         candidateEmail: userProfile.email || '',
         jobId,
-        jobTitle: selectedJobForApply.role || selectedJobForApply.title || '',
+        jobTitle: selectedJobForApply.role || (selectedJobForApply as any).title || '',
         companyId: selectedJobForApply.companyId || 'company-1',
         companyName: selectedJobForApply.company || selectedJobForApply.companyName || 'Unknown Company',
         recruiterUid: (selectedJobForApply.assignedRecruiters && selectedJobForApply.assignedRecruiters.length > 0)

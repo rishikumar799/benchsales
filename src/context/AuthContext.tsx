@@ -11,6 +11,7 @@ import {
   setDoc, 
   getDoc, 
   collection,
+  getDocs,
   writeBatch
 } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase/firebase';
@@ -206,6 +207,80 @@ export function getRoleDocRef(db: any, profile: DbUser): any {
   return doc(db, collectionName, uid);
 }
 
+async function migrateCompanyRolesForOrganization(db: any, orgId: string, orgName: string, userRole: string) {
+  try {
+    const migratedKey = `aryx_ai_ecosystem_migrated_${orgId}_v3`;
+    if (localStorage.getItem(migratedKey)) {
+      return; // Already migrated for this company on this device
+    }
+
+    // Only company admins and platform admins can read all company subcollections
+    if (userRole !== 'company_admin' && userRole !== 'platform_admin') {
+      return;
+    }
+
+    console.log(`[Migration] Running localized company role migration for organization ${orgName} (${orgId})...`);
+    
+    const roles = [
+      { sub: 'admins', top: 'organizations_companies_admins' },
+      { sub: 'managers', top: 'organizations_companies_managers' },
+      { sub: 'recruiters', top: 'organizations_companies_recruiters' },
+      { sub: 'employees', top: 'organizations_companies_employees' }
+    ];
+
+    for (const roleInfo of roles) {
+      try {
+        const subColRef = collection(db, 'organizations_companies', orgId, roleInfo.sub);
+        const subSnap = await getDocs(subColRef);
+
+        for (const roleDoc of subSnap.docs) {
+          const uid = roleDoc.id;
+          const data = roleDoc.data();
+
+          if (uid && data) {
+            const topDocRef = doc(db, roleInfo.top, uid);
+            const subDocRef = doc(db, 'organizations_companies', orgId, roleInfo.sub, uid);
+
+            const finalPhone = data.phone || data.phoneNumber || 'N/A';
+            const finalDept = data.department || data.dept || 'Executive';
+            const finalDesignation = data.designation || (roleInfo.sub === 'admins' ? 'Company Administrator' : roleInfo.sub === 'managers' ? 'Manager' : roleInfo.sub === 'recruiters' ? 'Recruiter' : 'Staff');
+            const finalStatus = data.status || 'approved';
+
+            const payload = {
+              ...data,
+              uid,
+              organizationId: orgId,
+              organizationName: orgName,
+              role: data.role || (roleInfo.sub === 'admins' ? 'company_admin' : roleInfo.sub === 'managers' ? 'company_manager' : roleInfo.sub === 'recruiters' ? 'company_recruiter' : 'employee'),
+              displayName: data.displayName || data.fullName || 'System User',
+              fullName: data.fullName || data.displayName || 'System User',
+              email: (data.email || '').trim(),
+              phone: finalPhone,
+              phoneNumber: finalPhone,
+              department: finalDept,
+              dept: finalDept,
+              designation: finalDesignation,
+              status: finalStatus === 'Active' || finalStatus === 'approved' ? 'approved' : 'inactive',
+              createdAt: data.createdAt || new Date().toISOString(),
+              updatedAt: data.updatedAt || new Date().toISOString()
+            };
+
+            await setDoc(topDocRef, payload, { merge: true });
+            await setDoc(subDocRef, payload, { merge: true });
+          }
+        }
+      } catch (innerErr: any) {
+        console.warn(`[Migration] Skipped subcollection ${roleInfo.sub} due to lack of permission:`, innerErr.message || innerErr);
+      }
+    }
+
+    localStorage.setItem(migratedKey, 'true');
+    console.log(`[Migration] Localized company role migration completed successfully.`);
+  } catch (err) {
+    console.warn('[Migration] Error during localized role collection migration:', err);
+  }
+}
+
 interface AuthProviderProps {
   children: React.ReactNode;
   onRoleChange?: (role: UserRole) => void;
@@ -361,79 +436,129 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
             console.log(`Created missing users/${firebaseUser.uid} document`);
           }
           
-          // 2. Validation: Load corresponding company subcollection document and check fields
+          // 2. Validation: Load corresponding company subcollection and top-level documents and check fields
           const targetRoleString = profile.role;
           const isCompanyUser = ['company_admin', 'company_recruiter', 'company_manager', 'employee'].includes(targetRoleString);
           const roleDocRef = getRoleDocRef(db, profile);
           if (roleDocRef) {
-            const roleSnap = await getDoc(roleDocRef);
             if (isCompanyUser) {
-              if (!roleSnap.exists()) {
-                const errMsg = `Login validation failed: Subcollection record '${roleDocRef.path}' is missing in the database.`;
+              const subColName = targetRoleString === 'company_admin' ? 'admins' :
+                                targetRoleString === 'company_manager' ? 'managers' :
+                                targetRoleString === 'company_recruiter' ? 'recruiters' : 'employees';
+              const topColName = `organizations_companies_${subColName}`;
+              
+              const topRoleDocRef = doc(db, topColName, profile.uid);
+              const subRoleDocRef = roleDocRef; // this is the subcollection doc
+              
+              const [topSnap, subSnap] = await Promise.all([
+                getDoc(topRoleDocRef),
+                getDoc(subRoleDocRef)
+              ]);
+
+              if (!topSnap.exists() && !subSnap.exists()) {
+                const errMsg = `Login validation failed: Both top-level record '${topRoleDocRef.path}' and subcollection record '${subRoleDocRef.path}' are missing in the database.`;
                 console.error(errMsg);
                 setProfileError(errMsg);
                 setUserProfile(null);
                 setLoading(false);
                 return;
-              } else {
-                const roleData = (roleSnap.data() || {}) as any;
-                
-                // Heal organizationName if missing
-                let resolvedOrgName = roleData.organizationName || profile.organizationName || '';
-                if (!resolvedOrgName && profile.organizationId) {
-                  try {
-                    const orgSnap = await getDoc(doc(db, 'organizations_companies', profile.organizationId));
-                    if (orgSnap.exists()) {
-                      resolvedOrgName = orgSnap.data()?.organizationName || '';
-                    }
-                  } catch (e) {
-                    console.error('Failed to load organization name:', e);
+              }
+
+              const topData = (topSnap.exists() ? topSnap.data() : {}) as any;
+              const subData = (subSnap.exists() ? subSnap.data() : {}) as any;
+
+              if ((topSnap.exists() && topData.uid && topData.uid !== profile.uid) || (subSnap.exists() && subData.uid && subData.uid !== profile.uid)) {
+                const errMsg = `Login validation failed: UID mismatch. Auth UID: ${profile.uid}, Top-level UID: ${topData.uid}, Subcollection UID: ${subData.uid}.`;
+                console.error(errMsg);
+                setProfileError(errMsg);
+                setUserProfile(null);
+                setLoading(false);
+                return;
+              }
+
+              // Heal organizationName if missing
+              let resolvedOrgName = topData.organizationName || subData.organizationName || profile.organizationName || '';
+              if (!resolvedOrgName && profile.organizationId) {
+                try {
+                  const orgSnap = await getDoc(doc(db, 'organizations_companies', profile.organizationId));
+                  if (orgSnap.exists()) {
+                    resolvedOrgName = orgSnap.data()?.organizationName || '';
                   }
+                } catch (e) {
+                  console.error('Failed to load organization name:', e);
                 }
-                if (!resolvedOrgName) {
-                  resolvedOrgName = 'Company';
-                }
+              }
+              if (!resolvedOrgName) {
+                resolvedOrgName = 'Company';
+              }
 
-                // Compile all 12 required fields
-                const updatedRoleData = {
-                  ...roleData,
-                  uid: roleData.uid || profile.uid || firebaseUser.uid,
-                  organizationId: roleData.organizationId || profile.organizationId || '',
-                  organizationName: resolvedOrgName,
-                  role: roleData.role || targetRoleString,
-                  displayName: roleData.displayName || roleData.fullName || roleData.name || profile.displayName || profile.fullName || 'System User',
-                  email: roleData.email || profile.email || firebaseUser.email || '',
-                  department: roleData.department || roleData.dept || 'Executive',
-                  designation: roleData.designation || (targetRoleString === 'company_admin' ? 'Company Administrator' : 'Staff'),
-                  phone: roleData.phone || roleData.phoneNumber || profile.phoneNumber || '',
-                  status: roleData.status || profile.status || 'approved',
-                  createdAt: roleData.createdAt || profile.createdAt || new Date().toISOString(),
-                  updatedAt: roleData.updatedAt || new Date().toISOString()
-                };
+              const resolvedPhone = topData.phone || subData.phone || topData.phoneNumber || subData.phoneNumber || profile.phoneNumber || 'N/A';
+              const resolvedDept = topData.department || subData.department || topData.dept || subData.dept || 'Executive';
+              const resolvedDesignation = topData.designation || subData.designation || (targetRoleString === 'company_admin' ? 'Company Administrator' : 'Staff');
+              const resolvedStatus = topData.status || subData.status || profile.status || 'approved';
 
-                // Check missing fields to see if we need to set/merge
-                const requiredFields = ['uid', 'organizationId', 'organizationName', 'role', 'displayName', 'email', 'status', 'department', 'designation', 'phone', 'createdAt', 'updatedAt'];
-                const missing = requiredFields.filter(f => !updatedRoleData[f]);
-                if (missing.length > 0) {
-                  const errMsg = `Login validation failed: Subcollection record '${roleDocRef.path}' is missing required fields: ${missing.join(', ')}.`;
-                  console.error(errMsg);
-                  setProfileError(errMsg);
-                  setUserProfile(null);
-                  setLoading(false);
-                  return;
-                }
+              // Compile all 12 required fields
+              const updatedRoleData = {
+                ...subData,
+                ...topData,
+                uid: topData.uid || subData.uid || profile.uid || firebaseUser.uid,
+                organizationId: topData.organizationId || subData.organizationId || profile.organizationId || '',
+                organizationName: resolvedOrgName,
+                role: topData.role || subData.role || targetRoleString,
+                displayName: topData.displayName || subData.displayName || topData.fullName || subData.fullName || topData.name || subData.name || profile.displayName || profile.fullName || 'System User',
+                fullName: topData.fullName || subData.fullName || topData.displayName || subData.displayName || 'System User',
+                email: topData.email || subData.email || profile.email || firebaseUser.email || '',
+                department: resolvedDept,
+                dept: resolvedDept,
+                designation: resolvedDesignation,
+                phone: resolvedPhone,
+                phoneNumber: resolvedPhone,
+                status: resolvedStatus === 'Active' || resolvedStatus === 'approved' ? 'approved' : 'inactive',
+                createdAt: topData.createdAt || subData.createdAt || profile.createdAt || new Date().toISOString(),
+                updatedAt: topData.updatedAt || subData.updatedAt || new Date().toISOString()
+              };
 
-                // If roleData was missing any of the required fields, we perform a merge-write to self-heal
-                const needsWrite = requiredFields.some(f => !roleData[f]);
-                if (needsWrite) {
-                  await setDoc(roleDocRef, updatedRoleData, { merge: true });
-                  console.log(`Self-healed company user role document fields: ${roleDocRef.path}`);
-                }
+              const requiredFields = ['uid', 'organizationId', 'organizationName', 'role', 'displayName', 'email', 'status', 'department', 'designation', 'phone', 'createdAt', 'updatedAt'];
+              const missing = requiredFields.filter(f => !updatedRoleData[f]);
+              if (missing.length > 0) {
+                const errMsg = `Login validation failed: Record is missing required fields: ${missing.join(', ')}.`;
+                console.error(errMsg);
+                setProfileError(errMsg);
+                setUserProfile(null);
+                setLoading(false);
+                return;
+              }
+
+              // Self-heal both if they differ or are missing fields
+              const needsTopWrite = !topSnap.exists() || requiredFields.some(f => !topData[f]);
+              const needsSubWrite = !subSnap.exists() || requiredFields.some(f => !subData[f]);
+              if (needsTopWrite || needsSubWrite || JSON.stringify(topData) !== JSON.stringify(subData)) {
+                await Promise.all([
+                  setDoc(topRoleDocRef, updatedRoleData, { merge: true }),
+                  setDoc(subRoleDocRef, updatedRoleData, { merge: true })
+                ]);
+                console.log(`Self-healed and synchronized company user role documents: ${topRoleDocRef.path} and ${subRoleDocRef.path}`);
+              }
+            } else {
+              // Non-company user: simple check
+              const roleSnap = await getDoc(roleDocRef);
+              if (!roleSnap.exists()) {
+                const errMsg = `Login validation failed: Role record '${roleDocRef.path}' is missing in the database.`;
+                console.error(errMsg);
+                setProfileError(errMsg);
+                setUserProfile(null);
+                setLoading(false);
+                return;
               }
             }
           }
 
           setUserProfile(profile);
+
+          // Localized company-wide migration for company admins/recruiters/managers
+          if (isCompanyUser && profile.organizationId) {
+            migrateCompanyRolesForOrganization(db, profile.organizationId, profile.organizationName || 'Company', targetRoleString);
+          }
 
           // Dynamically initialize and standardize the role profile document if it does not exist or lacks fields
           if (targetRoleString === 'platform_admin') {
@@ -869,23 +994,29 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
 
     // Store in specific role collection
     const roleDocRef = getRoleDocRef(db, profile);
+    const adminPayload = {
+      uid,
+      fullName: adminName,
+      displayName: adminName,
+      role: targetRoleString,
+      email,
+      phone: phone || 'N/A',
+      phoneNumber: phone || 'N/A',
+      organizationId,
+      organizationName: orgName,
+      department: orgType === 'company' ? 'Executive' : 'Administration',
+      designation: orgType === 'company' ? 'Company Administrator' : 'University Administrator',
+      status: 'approved',
+      createdAt: profile.createdAt,
+      updatedAt: profile.createdAt
+    };
+
     try {
-      await setDoc(roleDocRef, {
-        uid,
-        fullName: adminName,
-        displayName: adminName,
-        role: targetRoleString,
-        email,
-        phone,
-        phoneNumber: phone,
-        organizationId,
-        organizationName: orgName,
-        department: orgType === 'company' ? 'Executive' : 'Administration',
-        designation: orgType === 'company' ? 'Company Administrator' : 'University Administrator',
-        status: 'approved',
-        createdAt: profile.createdAt,
-        updatedAt: profile.createdAt
-      });
+      await setDoc(roleDocRef, adminPayload);
+      if (orgType === 'company') {
+        const topAdminDocRef = doc(db, 'organizations_companies_admins', uid);
+        await setDoc(topAdminDocRef, adminPayload);
+      }
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, roleDocRef.path);
     }

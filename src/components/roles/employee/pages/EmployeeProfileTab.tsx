@@ -102,10 +102,13 @@ export default function EmployeeProfileTab() {
       };
 
       const snap = await getDoc(docRef);
+      const topDocRef = doc(db, 'organizations_companies_employees', userProfile.uid);
       if (snap.exists()) {
         await updateDoc(docRef, updateData);
+        await updateDoc(topDocRef, updateData);
       } else {
         await setDoc(docRef, updateData, { merge: true });
+        await setDoc(topDocRef, updateData, { merge: true });
       }
 
       setIsEditing(false);

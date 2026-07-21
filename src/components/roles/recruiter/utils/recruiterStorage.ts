@@ -88,6 +88,7 @@ export interface CandidateSubmission {
   recruiterName?: string;
   status: string;
   submittedAt?: string;
+  timeline?: any[];
   
   // Legacy compatibility fields
   companyName?: string;

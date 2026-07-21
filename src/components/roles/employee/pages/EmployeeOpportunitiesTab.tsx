@@ -169,7 +169,7 @@ export default function EmployeeOpportunitiesTab({ onApplyJob }: EmployeeOpportu
           action: `applied for`,
           subject: job.role,
           time: 'Just Now',
-          avatar: userProfile.avatar || 'https://picsum.photos/seed/emp/100/100',
+          avatar: (userProfile as any).avatar || userProfile.photoURL || 'https://picsum.photos/seed/emp/100/100',
           createdAt: new Date().toISOString()
         });
       } catch (err) {
