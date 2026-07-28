@@ -482,7 +482,7 @@ export default function JobsTab() {
         </div>
 
         {/* Dropdown Filters Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3">
           {/* Location Filter */}
           <div className="space-y-1">
             <span className="text-[10px] font-black uppercase text-app-muted tracking-wide block pl-1">Location</span>
@@ -509,21 +509,6 @@ export default function JobsTab() {
               <option value="All">All Experiences</option>
               {uniqueExperiences.filter(exp => exp !== 'All').map((exp, idx) => (
                 <option key={idx} value={exp}>{exp}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Salary Filter */}
-          <div className="space-y-1">
-            <span className="text-[10px] font-black uppercase text-app-muted tracking-wide block pl-1">Salary Range</span>
-            <select
-              value={selectedSalary}
-              onChange={(e) => setSelectedSalary(e.target.value)}
-              className="w-full bg-app-bg border border-app-border rounded-xl py-2.5 px-3 text-xs font-bold text-app-text focus:outline-none cursor-pointer"
-            >
-              <option value="All">All Salaries</option>
-              {uniqueSalaries.filter(sal => sal !== 'All').map((sal, idx) => (
-                <option key={idx} value={sal}>{sal}</option>
               ))}
             </select>
           </div>

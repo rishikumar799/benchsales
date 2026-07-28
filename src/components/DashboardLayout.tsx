@@ -266,7 +266,7 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
 
   const getRoleLabel = (r: UserRole) => {
     switch (r) {
-      case 'm_candidate': return 'Candidate';
+      case 'm_candidate': return 'Marketplace Applicant';
       case 'm_recruiter': return 'Marketplace Recruiter';
       case 'm_manager': return 'Marketplace Manager / BDM';
       case 'u_admin': return 'University Admin';

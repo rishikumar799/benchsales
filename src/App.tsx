@@ -15,6 +15,10 @@ import DiscussionsPage from './screens/marketing/DiscussionsPage';
 import AboutPage from './screens/marketing/AboutPage';
 import ServicesPage from './screens/marketing/ServicesPage';
 import ContactPage from './screens/marketing/ContactPage';
+import FaqPage from './screens/marketing/FaqPage';
+import HelpCenterPage from './screens/marketing/HelpCenterPage';
+import PrivacyPage from './screens/marketing/PrivacyPage';
+import TermsPage from './screens/marketing/TermsPage';
 import RolePage from './screens/roles/RolePage';
 
 // App Screens
@@ -175,6 +179,10 @@ export default function App() {
       <Route path="/about" element={<AboutPage theme={activeTheme} toggleTheme={toggleTheme} />} />
       <Route path="/services" element={<ServicesPage theme={activeTheme} toggleTheme={toggleTheme} />} />
       <Route path="/contact" element={<ContactPage theme={activeTheme} toggleTheme={toggleTheme} />} />
+      <Route path="/faq" element={<FaqPage theme={activeTheme} toggleTheme={toggleTheme} />} />
+      <Route path="/help-center" element={<HelpCenterPage theme={activeTheme} toggleTheme={toggleTheme} />} />
+      <Route path="/privacy-policy" element={<PrivacyPage theme={activeTheme} toggleTheme={toggleTheme} />} />
+      <Route path="/terms-and-conditions" element={<TermsPage theme={activeTheme} toggleTheme={toggleTheme} />} />
       <Route path="/role/:role" element={<RolePage theme={activeTheme} toggleTheme={toggleTheme} />} />
       
       <Route 

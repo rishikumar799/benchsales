@@ -17,10 +17,10 @@ export default function RolePage({ theme, toggleTheme }: RolePageProps) {
   const navigate = useNavigate();
 
   const roleContent: Record<string, any> = {
-    user: {
-      title: 'For Job Seekers & Students',
+    applicant: {
+      title: 'For Applicants',
       subtitle: 'Your personal AI career agent.',
-      description: 'Stop spending hours on job boards. Let our AI handle the search, matching, and applications. Focus on your skills while we focus on your placement.',
+      description: 'Stop spending hours on job boards. Let our AI handle job sourcing, resume tailoring, and applications. Focus on your skills while we focus on your placement.',
       icon: Users,
       gradient: 'from-blue-500 to-cyan-500',
       benefits: [
@@ -37,49 +37,51 @@ export default function RolePage({ theme, toggleTheme }: RolePageProps) {
         'Training Records Vault'
       ]
     },
-    agent: {
-      title: 'For Recruitment Agents',
-      subtitle: 'Scale your placement pipeline.',
-      description: 'Build intelligence into your agent workflow. Automate screening, matching, and outreach to scale your operations.',
+    recruiter: {
+      title: 'For Recruiters',
+      subtitle: 'Scale your candidate placement pipeline.',
+      description: 'Build intelligence into your recruitment workflow. Automate candidate sourcing, screening, matching, and client submissions to scale your talent pipeline.',
       icon: Zap,
       gradient: 'from-violet-500 to-purple-500',
       benefits: [
-        { title: 'Hot-Lead Scoring', desc: 'Vendor and client list management with AI-powered fit scoring before you even run a campaign.', icon: Trophy },
-        { title: 'Bulk Campaigns', desc: 'Run automated job application campaigns with tracking across vendor lists and job boards.', icon: Zap },
-        { title: 'Outreach Templates', desc: 'Seamless Email and SMS templates for automated vendor outreach and candidate engagement.', icon: Users },
+        { title: 'Hot-Lead Scoring', desc: 'Vendor and candidate list management with AI-powered fit scoring before you launch campaigns.', icon: Trophy },
+        { title: 'Bulk Submissions', desc: 'Run automated candidate application campaigns with tracking across vendor lists and job boards.', icon: Zap },
+        { title: 'Outreach Automation', desc: 'Seamless Email and SMS templates for automated candidate engagement and client submissions.', icon: Users },
       ],
       features: [
         'AI-Powered Fit Scoring',
         'Bulk Outreach Engine',
-        'Email/SMS Automation',
+        'Candidate Matching',
         'Performance Dashboards',
-        'Vendor List Management',
-        'Hot-Lead Analytics'
+        'Vendor & Client Lists',
+        'Submissions Analytics'
       ]
     },
-    manager: {
-      title: 'For Platform Managers',
-      subtitle: 'Global oversight & bench control.',
-      description: 'The command center for staffing firms. Manage bench metrics, aging, and costs with surgical precision.',
+    bdm: {
+      title: 'For BDMs & Account Managers',
+      subtitle: 'Global client oversight & revenue control.',
+      description: 'The command center for business development managers. Oversee client requisitions, bench aging, candidate submissions, and revenue forecasting with precision.',
       icon: Shield,
       gradient: 'from-emerald-500 to-teal-500',
       benefits: [
-        { title: 'Key Bench Metrics', desc: 'Monitor headcount, bench cost, and time-to-placement—the numbers staffing firms live and die by.', icon: BarChart3 },
-        { title: 'Revenue Forecasting', desc: 'Scale with confidence using advanced revenue forecasting and automated commission tracking.', icon: Target },
-        { title: 'Operational Suite', desc: 'Integrated invoicing, timesheet management, and financial oversight in one place.', icon: Shield },
+        { title: 'Account Requisitions', desc: 'Manage client accounts, job requisitions, and candidate submission pipelines in one unified view.', icon: BarChart3 },
+        { title: 'Revenue Forecasting', desc: 'Scale with confidence using advanced revenue forecasting, deal tracking, and commission management.', icon: Target },
+        { title: 'Operational Suite', desc: 'Integrated client billing, candidate submission approvals, and financial oversight.', icon: Shield },
       ],
       features: [
-        'Bench Aging Distribution',
-        'Timesheet Management',
+        'Client Account Management',
+        'Job Requisition Control',
         'Revenue Forecasting',
-        'Commission Tracking',
-        'Invoicing & Billing',
-        'Team Performance Metrics'
+        'Commission & Deal Tracking',
+        'Candidate Approvals',
+        'Account Performance Metrics'
       ]
     }
   };
 
-  const content = roleContent[role || 'user'] || roleContent.user;
+  // Map legacy role parameters to new role keys
+  const activeRoleKey = role === 'user' ? 'applicant' : role === 'agent' ? 'recruiter' : role === 'manager' ? 'bdm' : (role || 'applicant');
+  const content = roleContent[activeRoleKey] || roleContent.applicant;
 
   return (
     <div className="min-h-screen bg-app-bg">

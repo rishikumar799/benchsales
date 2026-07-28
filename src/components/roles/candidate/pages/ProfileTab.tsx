@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { uploadCandidateProfilePhoto } from '../../../../services/documentStorageService';
 import { 
   User, 
   MapPin, 
@@ -109,12 +110,32 @@ export default function ProfileTab() {
   // New fields to persist
   const [dbResumeScore, setDbResumeScore] = useState(85);
   const [dbCreatedAt, setDbCreatedAt] = useState('');
-  const [headline, setHeadline] = useState('Student / Job Seeker');
+  const [headline, setHeadline] = useState('Marketplace Applicant');
   const [languages, setLanguages] = useState('English, Telugu, Hindi');
   const [experienceStr, setExperienceStr] = useState('Entry Level');
   const [educationStr, setEducationStr] = useState('B.Tech in Computer Science & Engineering');
   const [profilePhoto, setProfilePhoto] = useState('https://picsum.photos/seed/user123/200/200');
   const [zip, setZip] = useState('500081');
+  const photoFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+  const handleProfilePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0] && uid) {
+      const file = e.target.files[0];
+      setIsUploadingPhoto(true);
+      try {
+        const newPhotoUrl = await uploadCandidateProfilePhoto(file, uid, fullName);
+        setProfilePhoto(newPhotoUrl);
+        triggerToast("Profile photo uploaded and updated in real time!");
+      } catch (err: any) {
+        console.error("Failed to upload profile photo:", err);
+        triggerToast(`Photo upload error: ${err?.message || err?.code || String(err)}`);
+      } finally {
+        setIsUploadingPhoto(false);
+        e.target.value = '';
+      }
+    }
+  };
 
   // Experience Tab State
   const [experiences, setExperiences] = useState<ExperienceItem[]>([
@@ -268,7 +289,7 @@ export default function ProfileTab() {
       setCountry(data.country || '');
       setAddress(prof.address || data.address || '');
       setAboutMe(prof.bio || data.bio || prof.aboutMe || data.aboutMe || '');
-      setHeadline(prof.headline || data.headline || 'Student / Job Seeker');
+      setHeadline(prof.headline || data.headline || 'Marketplace Applicant');
       setLanguages(prof.languages || data.languages || 'English, Telugu, Hindi');
       setExperienceStr(prof.experience || data.experience || 'Entry Level');
       setEducationStr(prof.education || data.education || 'B.Tech in Computer Science & Engineering');
@@ -851,17 +872,24 @@ export default function ProfileTab() {
           {/* Left Premium Profile Summary Card */}
           <div className="p-6 rounded-[28px] bg-app-surface border border-app-border card-shadow flex flex-col items-center text-center space-y-5">
             
+            {/* Hidden Photo File Input */}
+            <input 
+              type="file" 
+              ref={photoFileInputRef} 
+              accept="image/*" 
+              onChange={handleProfilePhotoFileChange} 
+              className="hidden" 
+            />
+
             {/* User Avatar Frame */}
             <div 
               onClick={() => {
-                const url = prompt("Enter a profile photo image URL:", profilePhoto);
-                if (url !== null && url.trim() !== '') {
-                  setProfilePhoto(url);
-                  updateProfileInFirestore({ profilePhoto: url });
-                  triggerToast("Profile photo URL updated!");
+                if (!isUploadingPhoto && photoFileInputRef.current) {
+                  photoFileInputRef.current.click();
                 }
               }}
               className="w-28 h-28 rounded-full blue-gradient p-1 shadow-xl relative group cursor-pointer"
+              title="Click to upload profile photo"
             >
               <img 
                 src={profilePhoto} 
@@ -869,8 +897,15 @@ export default function ProfileTab() {
                 className="w-full h-full rounded-full object-cover border-4 border-app-surface shadow-md"
                 referrerPolicy="no-referrer"
               />
-              <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                <Edit className="w-5 h-5 text-white" />
+              <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity">
+                {isUploadingPhoto ? (
+                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Edit className="w-5 h-5 text-white" />
+                    <span className="text-[9px] font-extrabold text-white mt-1">Upload</span>
+                  </>
+                )}
               </div>
             </div>
 

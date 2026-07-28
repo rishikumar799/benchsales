@@ -41,7 +41,7 @@ export default function LandingPage({ onGetStarted, onLogin, theme, toggleTheme 
               onClick={onGetStarted}
               className="px-6 py-2.5 premium-gradient text-white text-sm font-semibold rounded-full hover:scale-105 transition-transform active:scale-95 shadow-lg shadow-brand-blue/20"
             >
-              Get Started Free
+              Get Started
             </button>
           </div>
         </div>

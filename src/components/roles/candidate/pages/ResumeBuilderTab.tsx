@@ -9,6 +9,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db, OperationType, handleFirestoreError } from '../../../../firebase/firebase';
 import { useAuth } from '../../../../context/AuthContext';
 import { useJobSeeker } from '../../../../context/JobSeekerContext';
+import { uploadCandidateDocument } from '../../../../services/documentStorageService';
 
 export default function ResumeBuilderTab() {
   const { user, userProfile } = useAuth();
@@ -403,26 +404,43 @@ export default function ResumeBuilderTab() {
   const processFile = async (file: File) => {
     if (!uid) return;
     setUploadSuccess(true);
-    const newResume = {
-      name: file.name,
-      date: new Date().toLocaleDateString('en-GB', { 
-        day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' 
-      })
-    };
 
     try {
+      // Upload to Firebase Storage and get metadata
+      const docMeta = await uploadCandidateDocument(file, 'Resume', {
+        uid,
+        fullName: userProfile?.fullName || user?.displayName || 'Job Seeker',
+        email: userProfile?.email || user?.email || '',
+        role: userProfile?.role || 'marketplace_jobseeker'
+      });
+
+      const newResume = {
+        documentId: docMeta.documentId,
+        name: docMeta.fileName,
+        storagePath: docMeta.storagePath,
+        downloadURL: docMeta.downloadURL,
+        url: docMeta.downloadURL,
+        fileSize: docMeta.fileSize,
+        date: new Date().toLocaleDateString('en-GB', { 
+          day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+        })
+      };
+
       const docRef = doc(db, 'marketplace_jobseekers', uid);
       await updateDoc(docRef, {
         'resume.uploadedResume': newResume,
         'resume.updatedAt': new Date().toISOString()
       });
+
       setTimeout(() => {
         setUploadedResume(newResume);
         setUploadSuccess(false);
         setIsUploadingModalOpen(false);
       }, 1200);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Resume file upload error:", error);
       handleFirestoreError(error, OperationType.WRITE, `marketplace_jobseekers/${uid}`);
+      setUploadSuccess(false);
     }
   };
 

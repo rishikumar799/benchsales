@@ -6,81 +6,121 @@ export default function Footer() {
   return (
     <footer className="bg-app-bg border-t border-app-border pt-20 pb-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
-          <div className="col-span-1 md:col-span-1">
-            <div className="flex items-center gap-2 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
+          {/* Column 1 - ARYX AI */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg premium-gradient flex items-center justify-center">
                 <Sparkles className="text-white w-5 h-5" />
               </div>
-              <span className="text-xl font-display font-bold tracking-tight">Aryx <span className="text-gradient">AI</span></span>
+              <span className="text-xl font-display font-bold tracking-tight">ARYX <span className="text-gradient">AI</span></span>
             </div>
-            <p className="text-app-muted text-sm leading-relaxed mb-6">
-              Revolutionizing the job market with AI-powered automation. Connecting students, agents, and managers in a seamless ecosystem.
+            <p className="text-app-muted text-sm leading-relaxed font-medium">
+              ARYX AI is an intelligent career platform that automates resume optimization, job discovery, applications, and recruitment workflows through enterprise-grade AI.
             </p>
-            <div className="flex gap-4">
-              {[Twitter, Github, Linkedin, Mail].map((Icon, i) => (
-                <a key={i} href="#" className="w-10 h-10 rounded-xl glass border border-app-border flex items-center justify-center text-app-muted hover:text-brand-blue hover:border-brand-blue transition-all">
-                  <Icon className="w-5 h-5" />
+            <div className="flex gap-3">
+              {[
+                { icon: Linkedin, href: 'https://linkedin.com', label: 'LinkedIn' },
+                { icon: Twitter, href: 'https://twitter.com', label: 'X (Twitter)' },
+                { icon: Github, href: 'https://github.com', label: 'GitHub' },
+                { icon: Mail, href: 'mailto:support@aryxai.com', label: 'Email' }
+              ].map((social, i) => (
+                <a 
+                  key={i} 
+                  href={social.href} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  aria-label={social.label}
+                  className="w-10 h-10 rounded-xl glass border border-app-border flex items-center justify-center text-app-muted hover:text-brand-blue hover:border-brand-blue/40 transition-all hover:scale-105"
+                >
+                  <social.icon className="w-4 h-4" />
                 </a>
               ))}
             </div>
           </div>
 
+          {/* Column 2 - Platform */}
           <div>
-            <h4 className="text-sm font-bold uppercase tracking-widest text-app-text mb-6">Platform</h4>
-            <ul className="space-y-4">
-              {['Home', 'About Us', 'Services', 'Contact'].map((item) => (
-                <li key={item}>
-                  <Link to={item === 'Home' ? '/' : `/${item.toLowerCase().replace(' ', '-')}`} className="text-app-muted text-sm hover:text-brand-blue transition-colors">
-                    {item}
-                  </Link>
-                </li>
-              ))}
+            <h4 className="text-xs font-bold uppercase tracking-widest text-app-text mb-6">Platform</h4>
+            <ul className="space-y-3.5">
+              <li>
+                <Link to="/" className="text-app-muted text-sm font-medium hover:text-brand-blue transition-colors">
+                  Home
+                </Link>
+              </li>
+              <li>
+                <Link to="/role/applicant" className="text-app-muted text-sm font-medium hover:text-brand-blue transition-colors">
+                  Applicant
+                </Link>
+              </li>
+              <li>
+                <Link to="/role/recruiter" className="text-app-muted text-sm font-medium hover:text-brand-blue transition-colors">
+                  Recruiter
+                </Link>
+              </li>
+              <li>
+                <Link to="/role/bdm" className="text-app-muted text-sm font-medium hover:text-brand-blue transition-colors">
+                  BDM
+                </Link>
+              </li>
             </ul>
           </div>
 
+          {/* Column 3 - Support */}
           <div>
-            <h4 className="text-sm font-bold uppercase tracking-widest text-app-text mb-6">Roles</h4>
-            <ul className="space-y-4">
-              {['Job Seeker', 'Agent', 'Manager'].map((item) => (
-                <li key={item}>
-                  <Link to={`/role/${item.toLowerCase().replace(' ', '-')}`} className="text-app-muted text-sm hover:text-brand-blue transition-colors">
-                    {item}
-                  </Link>
-                </li>
-              ))}
+            <h4 className="text-xs font-bold uppercase tracking-widest text-app-text mb-6">Support</h4>
+            <ul className="space-y-3.5">
+              <li>
+                <Link to="/faq" className="text-app-muted text-sm font-medium hover:text-brand-blue transition-colors">
+                  FAQ
+                </Link>
+              </li>
+              <li>
+                <Link to="/help-center" className="text-app-muted text-sm font-medium hover:text-brand-blue transition-colors">
+                  Help Center
+                </Link>
+              </li>
+              <li>
+                <Link to="/contact" className="text-app-muted text-sm font-medium hover:text-brand-blue transition-colors">
+                  Contact Us
+                </Link>
+              </li>
             </ul>
           </div>
 
-          <div className="md:col-span-1">
-            <h4 className="text-sm font-bold uppercase tracking-widest text-app-text mb-6">Connect</h4>
-            <p className="text-app-muted text-sm leading-relaxed mb-6">
-              Stay updated with our latest features and community stories. Follow us on social media for the latest news.
-            </p>
-            <div className="p-6 rounded-2xl bg-brand-blue/5 border border-brand-blue/10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 rounded-lg premium-gradient flex items-center justify-center shadow-lg shadow-brand-blue/20">
-                  <Sparkles className="w-4 h-4 text-white" />
-                </div>
-                <span className="text-sm font-bold">Innovation first</span>
-              </div>
-              <p className="text-xs text-app-muted leading-relaxed">
-                Join our platform and experience the future of recruitment automation. Built for the modern professional.
-              </p>
-            </div>
+          {/* Column 4 - Legal */}
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-widest text-app-text mb-6">Legal</h4>
+            <ul className="space-y-3.5">
+              <li>
+                <Link to="/privacy-policy" className="text-app-muted text-sm font-medium hover:text-brand-blue transition-colors">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link to="/terms-and-conditions" className="text-app-muted text-sm font-medium hover:text-brand-blue transition-colors">
+                  Terms & Conditions
+                </Link>
+              </li>
+            </ul>
           </div>
         </div>
 
-        <div className="pt-8 border-t border-app-border flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-app-muted text-xs font-medium">
-            © 2024 Aryx AI. All rights reserved.
-          </p>
-          <div className="flex gap-8">
-            <a href="#" className="text-app-muted text-xs hover:text-brand-blue transition-colors">Privacy Policy</a>
-            <a href="#" className="text-app-muted text-xs hover:text-brand-blue transition-colors">Terms of Service</a>
+        {/* Bottom Bar */}
+        <div className="pt-8 border-t border-app-border flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-medium text-app-muted">
+          <p>© 2026 ARYX AI. All Rights Reserved.</p>
+          <div className="flex items-center gap-4">
+            <Link to="/privacy-policy" className="hover:text-brand-blue transition-colors">
+              Privacy Policy
+            </Link>
+            <span>•</span>
+            <Link to="/terms-and-conditions" className="hover:text-brand-blue transition-colors">
+              Terms & Conditions
+            </Link>
           </div>
         </div>
       </div>
     </footer>
   );
 }
+
