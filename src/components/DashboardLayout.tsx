@@ -32,6 +32,7 @@ import { RecruiterContext } from '../context/RecruiterContext';
 import { JobSeekerContext } from '../context/JobSeekerContext';
 import { db } from '../firebase/firebase';
 import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
+import { getProfileAvatarUrl } from '../utils/avatarUtils';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -702,15 +703,19 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full blue-gradient p-0.5">
                 <img 
-                  src={role === 'platform_admin'
-                    ? (userProfile?.photoURL || (userProfile as any)?.photoUrl || user?.photoURL || 'https://picsum.photos/seed/platform_admin/100/100')
-                    : role === 'm_manager' && bdmProfile
-                    ? (bdmProfile.profilePhotoUrl || bdmProfile.img || 'https://picsum.photos/seed/manager/100/100')
-                    : role === 'm_recruiter' && recruiterProfile
-                    ? ((recruiterProfile as any).photoUrl || (recruiterProfile as any).profilePhotoUrl || recruiterProfile.profile?.photoUrl || recruiterProfile.profile?.profilePhotoUrl || 'https://picsum.photos/seed/recruiter/100/100')
-                    : role === 'm_candidate' && candidateProfile
-                    ? (candidateProfile.profile?.photoURL || candidateProfile.profile?.profilePhoto || candidateProfile.profilePhoto || 'https://picsum.photos/seed/candidate/100/100')
-                    : (userProfile?.photoURL || (userProfile as any)?.photoUrl || user?.photoURL || (role === 'u_admin' ? 'https://picsum.photos/seed/sandeepjain/100/100' : role === 'u_officer' ? 'https://picsum.photos/seed/priyasharma/100/100' : role === 'c_admin' ? 'https://picsum.photos/seed/vikramsingh/100/100' : role === 'c_manager' ? 'https://picsum.photos/seed/amitverma/100/100' : 'https://picsum.photos/seed/user123/100/100'))} 
+                  src={getProfileAvatarUrl(
+                    role === 'platform_admin'
+                      ? (userProfile?.photoURL || (userProfile as any)?.photoUrl || user?.photoURL)
+                      : role === 'm_manager' && bdmProfile
+                      ? (bdmProfile.profilePhotoUrl || bdmProfile.photoURL || bdmProfile.img)
+                      : role === 'm_recruiter' && recruiterProfile
+                      ? ((recruiterProfile as any).photoUrl || (recruiterProfile as any).profilePhotoUrl || recruiterProfile.profile?.photoUrl || recruiterProfile.profile?.profilePhotoUrl)
+                      : role === 'm_candidate' && candidateProfile
+                      ? (candidateProfile.profile?.photoURL || candidateProfile.profile?.profilePhoto || candidateProfile.profilePhoto)
+                      : (userProfile?.photoURL || (userProfile as any)?.photoUrl || user?.photoURL),
+                    (userProfile as any)?.gender || (candidateProfile as any)?.gender,
+                    userProfile?.fullName || user?.displayName
+                  )} 
                   alt="Avatar" 
                   className="w-full h-full rounded-full object-cover border-2 border-app-bg"
                   referrerPolicy="no-referrer"

@@ -290,3 +290,80 @@ export async function uploadCandidateProfilePhoto(
     throw new Error(`Profile photo upload error: ${err?.message || err?.code || String(err)}`);
   }
 }
+
+/**
+ * Upload profile photo for Recruiter or BDM
+ */
+export async function uploadRoleProfilePhoto(
+  file: File,
+  uid: string,
+  role: 'marketplace_recruiter' | 'marketplace_bdm' | 'marketplace_jobseeker' | string,
+  userFullName?: string
+): Promise<string> {
+  if (!uid) throw new Error('Authentication required for photo upload.');
+
+  const extension = getFileExtension(file.name) || 'jpg';
+  let folder = 'applicants';
+  let colName = 'marketplace_jobseekers';
+
+  if (role === 'marketplace_recruiter' || role === 'm_recruiter') {
+    folder = 'recruiters';
+    colName = 'marketplace_recruiters';
+  } else if (role === 'marketplace_bdm' || role === 'm_manager') {
+    folder = 'bdms';
+    colName = 'marketplace_bdms';
+  }
+
+  const storagePath = `${folder}/${uid}/profile/avatar_${Date.now()}.${extension}`;
+  const storageRef = ref(storage, storagePath);
+
+  try {
+    const uploadResult = await uploadBytes(storageRef, file, {
+      contentType: file.type || 'image/jpeg',
+      customMetadata: { ownerUid: uid, role, type: 'profile_photo' }
+    });
+
+    const downloadURL = await getDownloadURL(uploadResult.ref);
+    const nowISO = new Date().toISOString();
+
+    // Update role collection
+    const roleDocRef = doc(db, colName, uid);
+    const roleSnap = await getDoc(roleDocRef);
+
+    if (roleSnap.exists()) {
+      await updateDoc(roleDocRef, {
+        profilePhotoUrl: downloadURL,
+        photoURL: downloadURL,
+        profilePhoto: downloadURL,
+        img: downloadURL,
+        updatedAt: nowISO
+      });
+    } else {
+      await setDoc(roleDocRef, {
+        profilePhotoUrl: downloadURL,
+        photoURL: downloadURL,
+        profilePhoto: downloadURL,
+        img: downloadURL,
+        createdAt: nowISO,
+        updatedAt: nowISO
+      }, { merge: true });
+    }
+
+    // Update users/{uid} for global system navbar/header sync
+    const userDocRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userDocRef);
+    if (userSnap.exists()) {
+      await updateDoc(userDocRef, {
+        photoURL: downloadURL,
+        profilePhoto: downloadURL,
+        updatedAt: nowISO
+      });
+    }
+
+    return downloadURL;
+  } catch (err: any) {
+    console.error("Role profile photo upload failed:", err);
+    throw new Error(`Profile photo upload error: ${err?.message || err?.code || String(err)}`);
+  }
+}
+

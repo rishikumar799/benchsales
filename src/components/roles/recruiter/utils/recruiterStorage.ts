@@ -117,34 +117,11 @@ export interface RecruiterDashboard {
   successRate: string;
 }
 
-const INITIAL_JOBS: RecruiterJob[] = [
-  { id: 'job-1', title: 'React Developer', company: 'TCS', experience: '3-5 Years', skills: ['React', 'TypeScript', 'Tailwind'], location: 'Bangalore', positions: '3', priority: 'High', posted: '2 days ago', bdm: 'John Mathew', jobType: 'assigned', accessStatus: 'approved' },
-  { id: 'job-2', title: 'Java Developer', company: 'Infosys', experience: '4-7 Years', skills: ['Java', 'Spring Boot', 'MySQL'], location: 'Hyderabad', positions: '5', priority: 'High', posted: '3 days ago', bdm: 'John Mathew', jobType: 'open', accessStatus: 'none' },
-  { id: 'job-3', title: 'DevOps Engineer', company: 'Wipro', experience: '5-8 Years', skills: ['AWS', 'Docker', 'Kubernetes'], location: 'Pune', positions: '2', priority: 'Medium', posted: '5 days ago', bdm: 'Meera Sen', jobType: 'assigned', accessStatus: 'approved' },
-  { id: 'job-4', title: 'Python Developer', company: 'Cognizant', experience: '2-4 Years', skills: ['Python', 'Django', 'PostgreSQL'], location: 'Chennai', positions: '4', priority: 'Low', posted: '1 week ago', bdm: 'John Mathew', jobType: 'open', accessStatus: 'none' },
-  { id: 'job-5', title: 'Frontend UI Lead', company: 'Accenture', experience: '6-9 Years', skills: ['React', 'Next.js', 'Redux'], location: 'Mumbai', positions: '1', priority: 'High', posted: '1 day ago', bdm: 'Meera Sen', jobType: 'open', accessStatus: 'none' },
-  { id: 'job-6', title: 'Node.js Developer', company: 'L&T Infotech', experience: '3-6 Years', skills: ['Node.js', 'Express', 'MongoDB'], location: 'Noida', positions: '3', priority: 'Medium', posted: '4 days ago', bdm: 'John Mathew', jobType: 'assigned', accessStatus: 'approved' }
-];
-
-const INITIAL_ACCESS_REQUESTS: CandidateAccessRequest[] = [
-  { id: 'req-1', candidateId: 'c2', candidateName: 'Priya Sharma', jobId: 'job-2', jobTitle: 'Java Developer', status: 'Pending', requestedAt: '1 day ago' },
-  { id: 'req-2', candidateId: 'c4', candidateName: 'Sneha Iyer', jobId: 'job-4', jobTitle: 'Python Developer', status: 'Pending', requestedAt: '2 days ago' }
-];
-
-const INITIAL_SELECTIONS: CandidateSelection[] = [
-  { id: 'sel-1', candidateId: 'c1', candidateName: 'Ravi Kumar', jobId: 'job-1', jobTitle: 'React Developer', addedAt: 'Just now' }
-];
-
-const INITIAL_SUBMISSIONS: CandidateSubmission[] = [
-  { id: 'sub-1', candidateId: 'c3', candidateName: 'Akash Reddy', jobId: 'job-3', jobTitle: 'DevOps Engineer', recruiterId: 'rec-1', recruiterName: 'Bypass Recruiter', status: 'Submitted', submittedAt: '1 day ago' }
-];
-
-const INITIAL_NOTIFICATIONS: ActivityNotification[] = [
-  { id: 'n1', type: 'submit', title: 'Profile Submitted', desc: 'Ravi Kumar submitted for Frontend Developer', time: '2 hours ago' },
-  { id: 'n2', type: 'select', title: 'Candidate Selected', desc: 'You selected Priya Sharma from your pool', time: '5 hours ago' },
-  { id: 'n3', type: 'approve', title: 'Job Access Approved', desc: 'BDM John Mathew approved your access for Java Developer', time: '1 day ago' },
-  { id: 'n4', type: 'status', title: 'Status Updated', desc: 'Akash Reddy status updated to Shortlisted', time: '2 days ago' }
-];
+const INITIAL_JOBS: RecruiterJob[] = [];
+const INITIAL_ACCESS_REQUESTS: CandidateAccessRequest[] = [];
+const INITIAL_SELECTIONS: CandidateSelection[] = [];
+const INITIAL_SUBMISSIONS: CandidateSubmission[] = [];
+const INITIAL_NOTIFICATIONS: ActivityNotification[] = [];
 
 export interface StudentApplication {
   id: string;
@@ -159,109 +136,8 @@ export interface StudentApplication {
   appliedAt: string;
 }
 
-const INITIAL_APPLICATIONS: StudentApplication[] = [
-  { id: 'app-1', applicationId: 'app-1', studentId: 'stu-1', studentName: 'Rishi Kumar', jobId: 'job-1', companyName: 'TCS', jobTitle: 'Software Engineer', type: 'Campus Drive', appliedAt: '10 May 2026', status: 'Interview Scheduled' },
-  { id: 'app-2', applicationId: 'app-2', studentId: 'stu-1', studentName: 'Rishi Kumar', jobId: 'job-2', companyName: 'Infosys', jobTitle: 'System Engineer', type: 'Campus Drive', appliedAt: '09 May 2026', status: 'Shortlisted' },
-  { id: 'app-3', applicationId: 'app-3', studentId: 'stu-1', studentName: 'Rishi Kumar', jobId: 'job-3', companyName: 'Wipro', jobTitle: 'Project Engineer', type: 'Off-Campus', appliedAt: '08 May 2026', status: 'Under Review' },
-  { id: 'app-4', applicationId: 'app-4', studentId: 'stu-1', studentName: 'Rishi Kumar', jobId: 'job-4', companyName: 'Accenture', jobTitle: 'Software Engineer', type: 'Campus Drive', appliedAt: '07 May 2026', status: 'Applied' },
-  { id: 'app-5', applicationId: 'app-5', studentId: 'stu-1', studentName: 'Rishi Kumar', jobId: 'job-5', companyName: 'Cognizant', jobTitle: 'Programmer Analyst', type: 'Off-Campus', appliedAt: '06 May 2026', status: 'Under Review' },
-  { id: 'app-6', applicationId: 'app-6', studentId: 'stu-1', studentName: 'Rishi Kumar', jobId: 'job-6', companyName: 'L&T Infotech', jobTitle: 'Graduate Engineer', type: 'Campus Drive', appliedAt: '05 May 2026', status: 'Applied' },
-  { id: 'app-7', applicationId: 'app-7', studentId: 'stu-1', studentName: 'Rishi Kumar', jobId: 'job-7', companyName: 'Tech Mahindra', jobTitle: 'Associate Software Eng.', type: 'Off-Campus', appliedAt: '04 May 2026', status: 'Under Review' },
-  { id: 'app-8', applicationId: 'app-8', studentId: 'stu-1', studentName: 'Rishi Kumar', jobId: 'job-8', companyName: 'Mphasis', jobTitle: 'Software Trainee', type: 'Off-Campus', appliedAt: '03 May 2026', status: 'Shortlisted' }
-];
-
-const INITIAL_CANDIDATES: RecruiterCandidate[] = [
-  {
-    id: 'c1',
-    name: 'Ravi Kumar',
-    experience: '4 Years',
-    skills: ['React', 'Node.js', 'MongoDB'],
-    availability: 'Available',
-    details: {
-      role: 'Software Developer',
-      skillsFull: ['React', 'Node.js', 'MongoDB', 'Express.js', 'JavaScript', 'HTML', 'CSS', 'Bootstrap'],
-      years: 4,
-      currentCompany: 'Tech Solutions Pvt Ltd',
-      currentRole: 'Software Developer',
-      availabilityDetails: 'Available Immediately'
-    }
-  },
-  {
-    id: 'c2',
-    name: 'Priya Sharma',
-    experience: '3 Years',
-    skills: ['Java', 'Spring Boot', 'MySQL'],
-    availability: 'Available',
-    details: {
-      role: 'Backend Java Developer',
-      skillsFull: ['Java', 'Spring Boot', 'MySQL', 'Hibernate', 'REST APIs', 'AWS'],
-      years: 3,
-      currentCompany: 'Infosys Ltd',
-      currentRole: 'System Engineer',
-      availabilityDetails: 'Available Immediately'
-    }
-  },
-  {
-    id: 'c3',
-    name: 'Akash Reddy',
-    experience: '5 Years',
-    skills: ['AWS', 'DevOps', 'Docker'],
-    availability: 'Available',
-    details: {
-      role: 'DevOps & Site Reliability Engineer',
-      skillsFull: ['AWS', 'DevOps', 'Docker', 'Kubernetes', 'CI/CD', 'Terraform', 'Linux'],
-      years: 5,
-      currentCompany: 'Wipro Technologies',
-      currentRole: 'Infrastructure Engineer',
-      availabilityDetails: 'Available Immediately'
-    }
-  },
-  {
-    id: 'c4',
-    name: 'Sneha Iyer',
-    experience: '2 Years',
-    skills: ['Python', 'Django', 'PostgreSQL'],
-    availability: 'Available',
-    details: {
-      role: 'Junior PyDev Engineer',
-      skillsFull: ['Python', 'Django', 'Flask', 'PostgreSQL', 'API Development', 'Git'],
-      years: 2,
-      currentCompany: 'Cognizant Ltd',
-      currentRole: 'Software Associate',
-      availabilityDetails: 'Available Immediately'
-    }
-  },
-  {
-    id: 'c5',
-    name: 'Karthik Nair',
-    experience: '4 Years',
-    skills: ['React', 'TypeScript', 'Redux'],
-    availability: 'Available',
-    details: {
-      role: 'Sr. Frontend UI Engineer',
-      skillsFull: ['React', 'TypeScript', 'Redux', 'Tailwind CSS', 'Vite', 'GraphQL'],
-      years: 4,
-      currentCompany: 'Accenture Cloud Services',
-      currentRole: 'Frontend Analyst',
-      availabilityDetails: 'Available Immediately'
-    }
-  },
-  {
-    id: 'c6',
-    name: 'Neha Verma',
-    experience: '3 Years',
-    skills: ['Angular', 'Node.js', 'PostgreSQL'],
-    availability: 'Available',
-    details: {
-      role: 'Full Stack Engineer',
-      skillsFull: ['Angular', 'Node.js', 'PostgreSQL', 'Express', 'TypeScript', 'RxJS'],
-      years: 3,
-      currentCompany: 'L&T Infotech',
-      currentRole: 'Software Engineer',
-      availabilityDetails: 'Available Immediately'
-    }
-  }
-];
+const INITIAL_APPLICATIONS: StudentApplication[] = [];
+const INITIAL_CANDIDATES: RecruiterCandidate[] = [];
 
 // Helper to get state or initialize without LocalStorage dependency
 function getStorage<T>(key: string, initial: T): T {

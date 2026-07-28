@@ -22,7 +22,7 @@ import {
   ChevronRight,
   ExternalLink
 } from 'lucide-react';
-import { collection, doc, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
 import { useAuth } from '../../../../context/AuthContext';
 import { useJobSeeker } from '../../../../context/JobSeekerContext';
@@ -64,195 +64,14 @@ export interface HandshakeRequest {
   note?: string;
 }
 
-const INITIAL_RECRUITERS: Recruiter[] = [
-  {
-    id: 'rec-1',
-    name: 'Sarah Jenkins',
-    company: 'Google',
-    role: 'Principal Tech Recruiter',
-    avatarBg: 'bg-red-500',
-    focus: ['Frontend Developer', 'React Expert', 'UI/UX Designer'],
-    isAvailable: true,
-    responseTime: '< 12 Hours',
-    email: 'sjenkins@google.com',
-    location: 'Mountain View, CA',
-    bio: 'Sourcing engineering superstars for Google Core Developer Platforms and Chrome UX. Passionate about beautiful interfaces and fast web experiences.',
-    experience: '8+ years recruiting experienced web devs',
-    specialization: 'Frontend & UI Engineering'
-  },
-  {
-    id: 'rec-2',
-    name: 'Arjun Mehta',
-    company: 'Microsoft',
-    role: 'Talent Acquisition Lead',
-    avatarBg: 'bg-blue-600',
-    focus: ['Full Stack Developer', 'Cloud Architect', 'Java Developer'],
-    isAvailable: true,
-    responseTime: '< 24 Hours',
-    email: 'arjun.mehta@microsoft.com',
-    location: 'Redmond, WA',
-    bio: 'Finding cloud-native developers and full stack architects to scale Azure services. Looking for candidates with clean system architecture skills.',
-    experience: '6+ years in cloud talent acquisition',
-    specialization: 'Cloud & Infrastructure'
-  },
-  {
-    id: 'rec-3',
-    name: 'Jessica Chen',
-    company: 'Figma',
-    role: 'Senior Product Recruiter',
-    avatarBg: 'bg-purple-600',
-    focus: ['UI/UX Designer', 'Interaction Engineer', 'React Developer'],
-    isAvailable: true,
-    responseTime: '< 4 Hours',
-    email: 'jess.chen@figma.com',
-    location: 'San Francisco, CA',
-    bio: 'Scouting creative coders who blend design fidelity with structural React code. Making design tools accessible on the web.',
-    experience: '5 years hiring product designers & engineers',
-    specialization: 'Product & Design Systems'
-  },
-  {
-    id: 'rec-4',
-    name: 'David Vance',
-    company: 'Amazon',
-    role: 'Technical Sourcing Lead',
-    avatarBg: 'bg-amber-500',
-    focus: ['Backend Engineer', 'Systems Engineer', 'AWS Expert'],
-    isAvailable: true,
-    responseTime: '< 48 Hours',
-    email: 'dvance@amazon.com',
-    location: 'Seattle, WA',
-    bio: 'Hiring microservice engineers to build high-concurrency cloud networks and distributed architecture at AWS.',
-    experience: '10+ years backend technical sourcing',
-    specialization: 'Backend & Systems'
-  },
-  {
-    id: 'rec-5',
-    name: 'Ananya Roy',
-    company: 'TCS',
-    role: 'Lead Campus Recruiter',
-    avatarBg: 'bg-indigo-600',
-    focus: ['Graduate Engineer', 'Full Stack Developer', 'Database Admin'],
-    isAvailable: true,
-    responseTime: '< 24 Hours',
-    email: 'ananya.roy@tcs.com',
-    location: 'Bengaluru, India',
-    bio: 'Orchestrating university placements and early career recruitment across global enterprise tech sectors.',
-    experience: '7 years university talent acquisition',
-    specialization: 'Early Career & University'
-  },
-  {
-    id: 'rec-6',
-    name: 'Marcus Thorne',
-    company: 'Stripe',
-    role: 'Staff Technical Recruiter',
-    avatarBg: 'bg-emerald-600',
-    focus: ['Fintech Infra', 'TypeScript Lead', 'Security Specialist'],
-    isAvailable: true,
-    responseTime: '< 6 Hours',
-    email: 'mthorne@stripe.com',
-    location: 'San Francisco, CA',
-    bio: 'Sourcing elite engineers for payment rails, fraud detection models, and high-concurrency ledger infrastructure.',
-    experience: '9+ years hiring core infrastructure engineers',
-    specialization: 'Fintech & Security'
-  },
-  {
-    id: 'rec-7',
-    name: 'Elena Rostova',
-    company: 'Apple',
-    role: 'Executive Recruiter',
-    avatarBg: 'bg-slate-700',
-    focus: ['iOS Developer', 'Swift Lead', 'Embedded Systems'],
-    isAvailable: true,
-    responseTime: '< 18 Hours',
-    email: 'e_rostova@apple.com',
-    location: 'Cupertino, CA',
-    bio: 'Connecting elite mobile architects and system engineers with Apple platform teams.',
-    experience: '7+ years executive recruiting',
-    specialization: 'Mobile & Hardware Software'
-  },
-  {
-    id: 'rec-8',
-    name: 'Michael Chang',
-    company: 'Meta',
-    role: 'AI / ML Talent Sourcing Lead',
-    avatarBg: 'bg-sky-600',
-    focus: ['ML Engineer', 'PyTorch Specialist', 'Data Scientist'],
-    isAvailable: true,
-    responseTime: '< 12 Hours',
-    email: 'mchang@meta.com',
-    location: 'Menlo Park, CA',
-    bio: 'Recruiting world-class researchers and engineers building generative AI models and recommendation engines.',
-    experience: '6+ years AI talent acquisition',
-    specialization: 'AI & Data Science'
-  },
-  {
-    id: 'rec-9',
-    name: 'Sophia Martinez',
-    company: 'Netflix',
-    role: 'Senior Talent Acquisition Manager',
-    avatarBg: 'bg-rose-600',
-    focus: ['Streaming Systems', 'Full Stack', 'Node.js Expert'],
-    isAvailable: true,
-    responseTime: '< 8 Hours',
-    email: 'smartinez@netflix.com',
-    location: 'Los Gatos, CA',
-    bio: 'Discovering high-performing senior engineers to drive content delivery algorithms and global UI infrastructure.',
-    experience: '8 years high-density engineering hiring',
-    specialization: 'Full Stack & Streaming'
-  },
-  {
-    id: 'rec-10',
-    name: 'Liam O\'Connor',
-    company: 'Atlassian',
-    role: 'DevOps & Platform Recruiter',
-    avatarBg: 'bg-blue-500',
-    focus: ['DevOps Engineer', 'Kubernetes', 'CI/CD Lead'],
-    isAvailable: true,
-    responseTime: '< 24 Hours',
-    email: 'loconnor@atlassian.com',
-    location: 'Sydney, Australia',
-    bio: 'Specialized in platform engineering, reliability engineering, and developer tooling experience.',
-    experience: '5+ years DevOps sourcing',
-    specialization: 'DevOps & Site Reliability'
-  },
-  {
-    id: 'rec-11',
-    name: 'Priya Sharma',
-    company: 'Adobe',
-    role: 'Senior Staff Sourcing Partner',
-    avatarBg: 'bg-red-600',
-    focus: ['Creative Cloud', 'C++', 'WebAssembly'],
-    isAvailable: true,
-    responseTime: '< 16 Hours',
-    email: 'psharma@adobe.com',
-    location: 'San Jose, CA',
-    bio: 'Bringing high-performance graphics and web rendering specialists into Adobe Creative Cloud ecosystem.',
-    experience: '9 years technical sourcing',
-    specialization: 'Graphics & Performance'
-  },
-  {
-    id: 'rec-12',
-    name: 'Alex Rivera',
-    company: 'Salesforce',
-    role: 'Enterprise Talent Partner',
-    avatarBg: 'bg-cyan-600',
-    focus: ['Enterprise Architect', 'Salesforce Dev', 'API Architect'],
-    isAvailable: true,
-    responseTime: '< 12 Hours',
-    email: 'arivera@salesforce.com',
-    location: 'Chicago, IL',
-    bio: 'Partnering with enterprise digital transformation teams to hire cloud solution architects and CRM platform leads.',
-    experience: '10+ years enterprise hiring',
-    specialization: 'Enterprise & CRM'
-  }
-];
+const INITIAL_RECRUITERS: Recruiter[] = [];
 
 export default function RecruiterHandshakeGateway() {
   const { user, userProfile } = useAuth();
   const { jobSeekerProfile } = useJobSeeker();
   const uid = user?.uid || userProfile?.uid;
 
-  const [recruiters, setRecruiters] = useState<Recruiter[]>(INITIAL_RECRUITERS);
+  const [recruiters, setRecruiters] = useState<Recruiter[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRecruiterForProfile, setSelectedRecruiterForProfile] = useState<Recruiter | null>(null);
   const [requests, setRequests] = useState<HandshakeRequest[]>([]);
@@ -265,64 +84,66 @@ export default function RecruiterHandshakeGateway() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 6;
 
-  // Load from Firestore / localStorage
+  // Real-time listener for marketplace_recruiters
   useEffect(() => {
-    async function loadFirestoreRecruiters() {
-      try {
-        const snap = await getDocs(collection(db, 'marketplace_recruiters'));
-        if (!snap.empty) {
-          const list: Recruiter[] = [];
-          snap.forEach(docSnap => {
-            const data = docSnap.data();
-            list.push({
-              id: docSnap.id,
-              name: data.fullName || data.name || 'Recruiter',
-              company: data.companyName || data.company || 'Enterprise',
-              role: data.designation || data.role || 'Talent Acquisition',
-              avatarBg: 'bg-blue-600',
-              focus: data.focus || ['Software Engineer', 'Full Stack'],
-              isAvailable: true,
-              responseTime: data.responseTime || '< 24 Hours',
-              email: data.email || '',
-              location: data.location || 'Remote',
-              bio: data.bio || 'Talent Acquisition Partner',
-              experience: data.experience || '5+ years experience',
-              specialization: data.specialization || 'Tech Recruitment'
-            });
-          });
-          if (list.length > 0) {
-            setRecruiters(list);
-          }
-        }
-      } catch (err) {
-        console.warn("Using default recruiter showcase list:", err);
-      }
-    }
-    loadFirestoreRecruiters();
+    const unsubRecruiters = onSnapshot(collection(db, 'marketplace_recruiters'), (snap) => {
+      const list: Recruiter[] = [];
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          name: data.fullName || data.name || data.profile?.fullName || 'Authorized Recruiter',
+          company: data.companyName || data.company || 'Enterprise Partner',
+          role: data.designation || data.role || 'Talent Sourcing Specialist',
+          avatarBg: 'bg-blue-600',
+          focus: data.focus || data.skills || ['Tech Sourcing', 'Engineering'],
+          isAvailable: data.status !== 'inactive',
+          responseTime: data.responseTime || '< 24 Hours',
+          email: data.email || '',
+          location: data.location || 'Remote',
+          bio: data.bio || 'Authorized Talent Partner Sourcing Candidates.',
+          experience: data.experience || 'Experienced Recruiter',
+          specialization: data.specialization || 'Software & Enterprise'
+        });
+      });
+      setRecruiters(list);
+    }, (err) => {
+      console.error("Error listening to marketplace_recruiters:", err);
+    });
 
-    if (jobSeekerProfile?.assignedRecruiters && Array.isArray(jobSeekerProfile.assignedRecruiters)) {
-      setRequests(jobSeekerProfile.assignedRecruiters);
-    } else {
-      const saved = localStorage.getItem('aryx_recruiter_pitch_requests');
-      if (saved) {
-        try {
-          setRequests(JSON.parse(saved));
-        } catch (e) {
-          console.error("Failed to parse requests", e);
+    return () => unsubRecruiters();
+  }, []);
+
+  // Real-time listener for Candidate's representation requests & assigned recruiters
+  useEffect(() => {
+    if (!uid) return;
+
+    const candRef = doc(db, 'marketplace_jobseekers', uid);
+    const unsubCand = onSnapshot(candRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.assignedRecruiters)) {
+          setRequests(data.assignedRecruiters);
+        } else if (Array.isArray(data.representationRequests)) {
+          setRequests(data.representationRequests);
         }
       }
-    }
-  }, [jobSeekerProfile]);
+    }, (err) => {
+      console.error("Error listening to candidate representation requests:", err);
+    });
+
+    return () => unsubCand();
+  }, [uid]);
 
   const saveRequests = async (updated: HandshakeRequest[]) => {
     setRequests(updated);
-    localStorage.setItem('aryx_recruiter_pitch_requests', JSON.stringify(updated));
 
     if (uid) {
       try {
         const docRef = doc(db, 'marketplace_jobseekers', uid);
         await updateDoc(docRef, {
           assignedRecruiters: updated,
+          representationRequests: updated,
           updatedAt: new Date().toISOString()
         });
       } catch (err) {
@@ -331,14 +152,14 @@ export default function RecruiterHandshakeGateway() {
     }
   };
 
-  const handleInstantRequestPick = (recruiter: Recruiter) => {
+  const handleInstantRequestPick = async (recruiter: Recruiter) => {
     if (requests.some(req => req.recruiterId === recruiter.id && (req.status === 'Requested' || req.status === 'Pending Review' || req.status === 'Accepted' || req.status === 'Representing You'))) {
       alert(`You already have an active request or representation with ${recruiter.name}.`);
       return;
     }
 
     const newRequest: HandshakeRequest = {
-      id: `req-${Date.now()}`,
+      id: `req_${Date.now()}`,
       recruiterId: recruiter.id,
       recruiterName: recruiter.name,
       company: recruiter.company,
@@ -347,7 +168,24 @@ export default function RecruiterHandshakeGateway() {
     };
 
     const nextRequests = [newRequest, ...requests];
-    saveRequests(nextRequests);
+    await saveRequests(nextRequests);
+
+    // Write request notification/entry to Recruiter's Firestore collection in real time
+    if (recruiter.id && uid) {
+      try {
+        const reqDocRef = doc(db, 'marketplace_recruiters', recruiter.id, 'candidate_requests', uid);
+        await setDoc(reqDocRef, {
+          candidateUid: uid,
+          candidateName: jobSeekerProfile?.fullName || userProfile?.fullName || user?.displayName || 'Job Seeker',
+          candidateEmail: userProfile?.email || user?.email || '',
+          requestedAt: new Date().toISOString(),
+          status: 'Requested',
+          recruiterId: recruiter.id
+        }, { merge: true });
+      } catch (err) {
+        console.error("Failed to notify recruiter in Firestore:", err);
+      }
+    }
     
     setSuccessToast(`Request sent! Representation request successfully submitted to ${recruiter.name} (${recruiter.company}).`);
     setTimeout(() => setSuccessToast(''), 4000);
