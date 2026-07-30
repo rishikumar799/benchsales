@@ -688,18 +688,24 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
             
             <div className="flex items-center gap-3 pl-2 sm:pl-6 border-l border-app-border">
               <div className="text-right hidden sm:block">
-                <div className="text-sm font-bold text-app-text">
-                  {role === 'platform_admin'
-                    ? (userProfile?.fullName || (userProfile as any)?.displayName || user?.displayName || 'Rishi Kumar')
-                    : role === 'm_manager' && bdmProfile
-                    ? (bdmProfile.fullName || bdmProfile.name || 'Anonymous Manager')
-                    : role === 'm_recruiter' && recruiterProfile
-                    ? ((recruiterProfile as any).fullName || (recruiterProfile as any).name || recruiterProfile.profile?.fullName || (recruiterProfile as any).profile?.name || user?.displayName || 'Anonymous Recruiter')
-                    : role === 'm_candidate' && candidateProfile
-                    ? (candidateProfile.profile?.fullName || candidateProfile.fullName || user?.displayName || 'Job Seeker')
-                    : (userProfile?.fullName || (userProfile as any)?.displayName || user?.displayName || (role === 'u_admin' ? 'Dr. Sandeep Jain' : role === 'u_officer' ? 'Priya Sharma' : role === 'c_admin' ? 'Vikram Singh' : role === 'c_manager' ? 'Amit Verma' : role === 'm_manager' || role === 'u_student' || role === 'c_employee' ? 'Rohit Kumar' : 'Rishi Kumar'))}
-                </div>
-                <div className="text-[10px] font-bold uppercase tracking-widest text-brand-blue">{getRoleLabel(role)}</div>
+                {role === 'm_candidate' ? (
+                  <div className="text-sm font-bold text-app-text">
+                    Hello, {(candidateProfile?.profile?.fullName || candidateProfile?.fullName || userProfile?.fullName || user?.displayName || 'Applicant').trim().split(/\s+/)[0]} 👋
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-sm font-bold text-app-text">
+                      {role === 'platform_admin'
+                        ? (userProfile?.fullName || (userProfile as any)?.displayName || user?.displayName || 'Rishi Kumar')
+                        : role === 'm_manager' && bdmProfile
+                        ? (bdmProfile.fullName || bdmProfile.name || 'Anonymous Manager')
+                        : role === 'm_recruiter' && recruiterProfile
+                        ? ((recruiterProfile as any).fullName || (recruiterProfile as any).name || recruiterProfile.profile?.fullName || (recruiterProfile as any).profile?.name || user?.displayName || 'Anonymous Recruiter')
+                        : (userProfile?.fullName || (userProfile as any)?.displayName || user?.displayName || (role === 'u_admin' ? 'Dr. Sandeep Jain' : role === 'u_officer' ? 'Priya Sharma' : role === 'c_admin' ? 'Vikram Singh' : role === 'c_manager' ? 'Amit Verma' : role === 'm_manager' || role === 'u_student' || role === 'c_employee' ? 'Rohit Kumar' : 'Rishi Kumar'))}
+                    </div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-brand-blue">{getRoleLabel(role)}</div>
+                  </>
+                )}
               </div>
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full blue-gradient p-0.5">
                 <img 

@@ -48,46 +48,74 @@ export default function AiMatchingTab({ onNavigate }: AiMatchingTabProps) {
     return () => unsubscribeJobs();
   }, []);
 
-  // 1. Determine Candidate's Skills (with an elegant default fallback if not configured yet)
-  const defaultSkills: string[] = [];
-  const hasConfiguredSkills = jobSeekerProfile?.skills && jobSeekerProfile.skills.length > 0;
-  const candidateSkills = (hasConfiguredSkills ? jobSeekerProfile.skills : defaultSkills) as string[];
+  // Safe normalization helper to prevent runtime exceptions on invalid/legacy data
+  const safeArray = (val: any): any[] => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string' && val.trim().length > 0) {
+      return val.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    if (typeof val === 'object') {
+      return Object.values(val).filter(Boolean);
+    }
+    return [];
+  };
+
+  const normalizeSkills = (val: any): string[] => {
+    const arr = safeArray(val);
+    return arr
+      .filter(s => s !== null && s !== undefined)
+      .map(s => (typeof s === 'string' ? s.trim() : String(s).trim()))
+      .filter(s => s.length > 0);
+  };
+
+  // 1. Determine Candidate's Skills from direct skills, profile skills, and resume skills
+  const directSkills = normalizeSkills(jobSeekerProfile?.skills);
+  const profileSkills = normalizeSkills(jobSeekerProfile?.profile?.skills);
+  const resumeSkills = normalizeSkills(
+    typeof jobSeekerProfile?.resume === 'object' ? jobSeekerProfile?.resume?.skills : null
+  );
+
+  const candidateSkillsSet = new Set<string>();
+  [...directSkills, ...profileSkills, ...resumeSkills].forEach(s => {
+    if (s) candidateSkillsSet.add(s);
+  });
+  const candidateSkills = Array.from(candidateSkillsSet);
+  const hasConfiguredSkills = candidateSkills.length > 0;
 
   // 2. Compute live Skills Match percentage based on actual market demand across active jobs
   const computedSkillsMatch = candidateSkills.map(skill => {
     // Count how many active jobs require this skill
     const frequency = jobs.filter(j => {
-      const reqSkills: any[] = j.skills || [];
-      return reqSkills.some((s: any) => typeof s === 'string' && s.toLowerCase() === skill.toLowerCase());
+      const reqSkills = normalizeSkills(j.skills || j.reqSkills || j.requiredSkills || j.skillsRequired);
+      return reqSkills.some(s => s.toLowerCase() === skill.toLowerCase());
     }).length;
 
-    // Premium scale mapping: more frequent skills rank higher
+    // Scale mapping: more frequent skills rank higher
     const pct = jobs.length > 0
       ? Math.round((frequency / jobs.length) * 40) + 60 // scale 60% - 100%
-      : 0; // beautiful mock fallbacks if no jobs exist yet
+      : 80;
 
     return { skill, pct };
   }).sort((a, b) => b.pct - a.pct);
 
   // 3. Compute Skills You Should Improve (identify required job skills that candidate lacks)
-  const allRequiredSkills = jobs.reduce((acc: string[], j) => {
-    const reqSkills: any[] = j.skills || [];
-    const strings = reqSkills.filter((s): s is string => typeof s === 'string');
-    return [...acc, ...strings];
-  }, []);
+  const allRequiredSkills: string[] = [];
+  jobs.forEach(j => {
+    const reqSkills = normalizeSkills(j.skills || j.reqSkills || j.requiredSkills || j.skillsRequired);
+    reqSkills.forEach(s => allRequiredSkills.push(s));
+  });
 
   const missingSkillsWithFreq = (Array.from(new Set(allRequiredSkills)) as string[])
     .filter(skill => !candidateSkills.some(cs => cs.toLowerCase() === skill.toLowerCase()))
     .map(skill => {
       const frequency = jobs.filter(j => {
-        const reqSkills: any[] = j.skills || [];
-        return reqSkills.some((s: any) => typeof s === 'string' && s.toLowerCase() === skill.toLowerCase());
+        const reqSkills = normalizeSkills(j.skills || j.reqSkills || j.requiredSkills || j.skillsRequired);
+        return reqSkills.some(s => s.toLowerCase() === skill.toLowerCase());
       }).length;
       return { skill, frequency };
     })
     .sort((a, b) => b.frequency - a.frequency); // Highly requested missing skills first
-
-  const defaultImprovements: any[] = [];
 
   const suggestedImprovements = missingSkillsWithFreq.length > 0
     ? missingSkillsWithFreq.slice(0, 4).map((item, idx) => {
@@ -105,18 +133,24 @@ export default function AiMatchingTab({ onNavigate }: AiMatchingTabProps) {
           color: style.text
         };
       })
-    : defaultImprovements;
+    : [];
 
-  // 4. Compute Recommended Roles dynamically based on real skill alignment
+  // 4. Compute Recommended Roles dynamically based on real skill alignment, location, and experience
+  const candidateLoc = (jobSeekerProfile?.location || jobSeekerProfile?.profile?.location || '').toLowerCase();
+  const candidateExp = (jobSeekerProfile?.experience || jobSeekerProfile?.profile?.experience || '').toLowerCase();
+
   const computedRecommendedRoles = jobs.map(job => {
-    const reqSkills: any[] = job.skills || [];
-    const strings = reqSkills.filter((s): s is string => typeof s === 'string');
-    const matching = strings.filter((s: string) => candidateSkills.some(cs => cs.toLowerCase() === s.toLowerCase()));
+    const reqSkills = normalizeSkills(job.skills || job.reqSkills || job.requiredSkills || job.skillsRequired);
+    const matching = reqSkills.filter(s => candidateSkills.some(cs => cs.toLowerCase() === s.toLowerCase()));
     
-    // Scale match between 50% and 98% based on overlap
-    const match = strings.length > 0
-      ? Math.max(50, Math.min(98, 45 + Math.round((matching.length / strings.length) * 53)))
-      : 0;
+    const skillRatio = reqSkills.length > 0 ? matching.length / reqSkills.length : 0.5;
+    const jobLoc = (job.location || '').toLowerCase();
+    const locBonus = (candidateLoc && jobLoc && (candidateLoc.includes(jobLoc) || jobLoc.includes(candidateLoc) || jobLoc.includes('remote'))) ? 10 : 0;
+    const jobExp = (job.experience || job.experienceRequired || '').toLowerCase();
+    const expBonus = (candidateExp && jobExp && candidateExp === jobExp) ? 10 : 5;
+
+    let match = Math.round(skillRatio * 70 + locBonus + expBonus + 10);
+    match = Math.max(45, Math.min(98, match));
 
     return {
       id: job.id,
@@ -128,11 +162,7 @@ export default function AiMatchingTab({ onNavigate }: AiMatchingTabProps) {
   .sort((a, b) => b.match - a.match)
   .slice(0, 5);
 
-  const defaultRecommendedRoles: any[] = [];
-
-  const recommendedRoles = computedRecommendedRoles.length > 0
-    ? computedRecommendedRoles
-    : defaultRecommendedRoles;
+  const recommendedRoles = computedRecommendedRoles;
 
   // 5. Compute AI Learning Recommendations dynamically
   const courses = computedRecommendedRoles.length > 0 && missingSkillsWithFreq.length > 0

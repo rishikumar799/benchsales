@@ -33,6 +33,7 @@ import {
   onSnapshot, 
   doc, 
   setDoc, 
+  updateDoc,
   deleteDoc, 
   getDoc,
   getDocFromServer
@@ -65,6 +66,7 @@ export default function CandidatePoolTab({
   const [savedCandidatesList, setSavedCandidatesList] = useState<any[]>([]);
   const [jobs, setJobs] = useState<RecruiterJob[]>([]);
   const [accessRequests, setAccessRequests] = useState<any[]>([]);
+  const [representationRequests, setRepresentationRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Sync accessRequests from RecruiterContext when recruiterProfile changes
@@ -210,12 +212,147 @@ export default function CandidatePoolTab({
       console.error("Error fetching jobs:", err);
     });
 
+    // 4. Listen to candidate_requests subcollection for representation requests
+    const candReqCol = collection(db, 'marketplace_recruiters', uid, 'candidate_requests');
+    const unsubCandReq = onSnapshot(candReqCol, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          requestId: data.requestId || docSnap.id,
+          candidateUid: data.candidateUid || data.applicantUid || docSnap.id,
+          candidateName: data.candidateName || data.fullName || 'Job Seeker',
+          candidateEmail: data.candidateEmail || data.email || 'N/A',
+          candidatePhone: data.candidatePhone || data.phone || 'N/A',
+          candidateSkills: data.candidateSkills || data.skills || [],
+          candidateExperience: data.candidateExperience || data.experience || 'N/A',
+          resumeUrl: data.resumeUrl || data.resume || '',
+          requestedAt: data.requestedAt || data.createdAt || new Date().toISOString(),
+          status: data.status || 'Requested',
+          notes: data.notes || ''
+        });
+      });
+      setRepresentationRequests(list);
+    }, (err) => {
+      console.error("Error fetching representation requests:", err);
+    });
+
     return () => {
       unsubCandidates();
       unsubSaved();
       unsubJobs();
+      unsubCandReq();
     };
   }, [currentUser]);
+
+  const handleAcceptCandidateRequest = async (request: any) => {
+    if (!currentUser) return;
+    const recruiterUid = currentUser.uid;
+    const applicantUid = request.candidateUid;
+    const nowISO = new Date().toISOString();
+
+    try {
+      // 1. Update Recruiter's subcollection
+      const reqRef = doc(db, 'marketplace_recruiters', recruiterUid, 'candidate_requests', request.id);
+      await setDoc(reqRef, {
+        status: 'Accepted',
+        updatedAt: nowISO,
+        acceptedAt: nowISO
+      }, { merge: true });
+
+      // Fetch recruiter details for assigned profile
+      const recruiterDoc = await getDoc(doc(db, 'marketplace_recruiters', recruiterUid));
+      const recData = recruiterDoc.exists() ? recruiterDoc.data() : {};
+
+      // 2. Update Candidate's document in real time
+      const candRef = doc(db, 'marketplace_jobseekers', applicantUid);
+      const candSnap = await getDoc(candRef);
+      if (candSnap.exists()) {
+        const candData = candSnap.data();
+        let requestsList = Array.isArray(candData.assignedRecruiters) 
+          ? candData.assignedRecruiters 
+          : (Array.isArray(candData.representationRequests) ? candData.representationRequests : []);
+
+        const updatedRequests = requestsList.map((r: any) => {
+          if (r.recruiterId === recruiterUid || r.id === request.id) {
+            return { ...r, status: 'Accepted' };
+          }
+          return r;
+        });
+
+        const assignedRecruiterObj = {
+          id: recruiterUid,
+          name: recData.fullName || recData.name || (recruiterProfile as any)?.fullName || 'Authorized Recruiter',
+          company: recData.companyName || recData.company || (recruiterProfile as any)?.companyName || 'Enterprise Partner',
+          role: recData.designation || recData.role || (recruiterProfile as any)?.designation || 'Talent Acquisition',
+          photoUrl: recData.profilePhotoUrl || recData.photoURL || recData.img || '',
+          assignedDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+          status: 'Representing You'
+        };
+
+        await updateDoc(candRef, {
+          assignedRecruiterId: recruiterUid,
+          assignedRecruiter: assignedRecruiterObj,
+          assignedRecruiters: updatedRequests,
+          representationRequests: updatedRequests,
+          updatedAt: nowISO
+        });
+      }
+
+      setToastMsg(`Accepted representation request for ${request.candidateName}!`);
+      setTimeout(() => setToastMsg(''), 4000);
+    } catch (err: any) {
+      console.error("Error accepting candidate request:", err);
+      alert(`Failed to accept request: ${err?.message || String(err)}`);
+    }
+  };
+
+  const handleRejectCandidateRequest = async (request: any) => {
+    if (!currentUser) return;
+    const recruiterUid = currentUser.uid;
+    const applicantUid = request.candidateUid;
+    const nowISO = new Date().toISOString();
+
+    try {
+      // 1. Update Recruiter's subcollection
+      const reqRef = doc(db, 'marketplace_recruiters', recruiterUid, 'candidate_requests', request.id);
+      await setDoc(reqRef, {
+        status: 'Rejected',
+        updatedAt: nowISO,
+        rejectedAt: nowISO
+      }, { merge: true });
+
+      // 2. Update Candidate's document in real time
+      const candRef = doc(db, 'marketplace_jobseekers', applicantUid);
+      const candSnap = await getDoc(candRef);
+      if (candSnap.exists()) {
+        const candData = candSnap.data();
+        let requestsList = Array.isArray(candData.assignedRecruiters) 
+          ? candData.assignedRecruiters 
+          : (Array.isArray(candData.representationRequests) ? candData.representationRequests : []);
+
+        const updatedRequests = requestsList.map((r: any) => {
+          if (r.recruiterId === recruiterUid || r.id === request.id) {
+            return { ...r, status: 'Rejected' };
+          }
+          return r;
+        });
+
+        await updateDoc(candRef, {
+          assignedRecruiters: updatedRequests,
+          representationRequests: updatedRequests,
+          updatedAt: nowISO
+        });
+      }
+
+      setToastMsg(`Rejected representation request for ${request.candidateName}.`);
+      setTimeout(() => setToastMsg(''), 4000);
+    } catch (err: any) {
+      console.error("Error rejecting candidate request:", err);
+      alert(`Failed to reject request: ${err?.message || String(err)}`);
+    }
+  };
 
   // Dynamic values extraction for filters
   const skillsSet = new Set<string>();
@@ -938,10 +1075,113 @@ export default function CandidatePoolTab({
       )}
 
       {/* ---------------------------------------------------- */}
-      {/* VIEW D: PENDING CANDIDATE REQUESTS */}
+      {/* VIEW D: PENDING CANDIDATE REQUESTS & REPRESENTATION */}
       {/* ---------------------------------------------------- */}
       {activeSubTab === 'pending' && (
         <div className="space-y-6">
+          {/* Candidate Representation Requests Card */}
+          <div className="p-6 rounded-[28px] glass border border-app-border card-shadow overflow-hidden">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="font-display font-bold text-lg text-app-text flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-brand-blue" />
+                  Candidate Representation Requests
+                </h3>
+                <p className="text-xs text-app-muted mt-0.5">
+                  Direct requests from candidates seeking official representation in the marketplace.
+                </p>
+              </div>
+              <span className="text-xs font-mono font-bold text-brand-blue bg-brand-blue/10 px-3 py-1 rounded-full">
+                Requests: {representationRequests.length}
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-app-border text-xs font-extrabold text-app-muted uppercase tracking-wider">
+                    <th className="py-4 px-4">Applicant</th>
+                    <th className="py-4 px-4">Skills & Exp</th>
+                    <th className="py-4 px-4">Requested Date</th>
+                    <th className="py-4 px-4">Status</th>
+                    <th className="py-4 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-app-border/40 text-sm">
+                  {representationRequests.length > 0 ? (
+                    representationRequests.map((req) => {
+                      let pill = 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+                      if (req.status === 'Accepted' || req.status === 'Representing You') pill = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+                      if (req.status === 'Rejected') pill = 'bg-red-500/10 text-red-500 border-red-500/20';
+                      if (req.status === 'Cancelled' || req.status === 'Withdrawn') pill = 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+
+                      return (
+                        <tr key={req.id} className="hover:bg-app-surface/30 transition-colors">
+                          <td className="py-4 px-4">
+                            <div className="font-bold text-app-text">{req.candidateName}</div>
+                            <div className="text-xs text-app-muted font-mono">{req.candidateEmail}</div>
+                          </td>
+                          <td className="py-4 px-4">
+                            <div className="text-xs font-semibold text-app-text">{req.candidateExperience}</div>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {Array.isArray(req.candidateSkills) && req.candidateSkills.slice(0, 3).map((s: string, idx: number) => (
+                                <span key={idx} className="text-[10px] bg-brand-blue/10 text-brand-blue font-bold px-1.5 py-0.5 rounded">
+                                  {s}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 text-xs font-mono text-app-muted">
+                            {new Date(req.requestedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className={`inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase border px-2.5 py-1 rounded-full ${pill}`}>
+                              {req.status}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => setPreviewUid(req.candidateUid)}
+                                className="px-3 py-1.5 bg-app-surface hover:bg-app-bg text-app-text text-xs font-bold rounded-lg border border-app-border transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-brand-blue" /> View Profile
+                              </button>
+
+                              {req.status === 'Requested' || req.status === 'Pending Review' ? (
+                                <>
+                                  <button
+                                    onClick={() => handleAcceptCandidateRequest(req)}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
+                                  >
+                                    <Check className="w-3.5 h-3.5" /> Accept
+                                  </button>
+                                  <button
+                                    onClick={() => handleRejectCandidateRequest(req)}
+                                    className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 text-xs font-bold rounded-lg border border-red-500/20 transition-colors flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <X className="w-3.5 h-3.5" /> Reject
+                                  </button>
+                                </>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-app-muted text-xs font-medium">
+                        No direct candidate representation requests at this time.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* BDM Profile Access Logs */}
           <div className="p-6 rounded-[28px] glass border border-app-border card-shadow overflow-hidden">
             <div className="flex justify-between items-center mb-6">
               <div>

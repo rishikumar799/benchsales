@@ -153,13 +153,22 @@ export default function RecruiterHandshakeGateway() {
   };
 
   const handleInstantRequestPick = async (recruiter: Recruiter) => {
-    if (requests.some(req => req.recruiterId === recruiter.id && (req.status === 'Requested' || req.status === 'Pending Review' || req.status === 'Accepted' || req.status === 'Representing You'))) {
-      alert(`You already have an active request or representation with ${recruiter.name}.`);
+    // Check if candidate already has an active accepted recruiter
+    if (requests.some(req => req.status === 'Accepted' || req.status === 'Representing You') || jobSeekerProfile?.assignedRecruiterId) {
+      alert(`You already have an official assigned recruiter representing you in the marketplace. Candidate representation is limited to one assigned recruiter.`);
       return;
     }
 
+    if (requests.some(req => req.recruiterId === recruiter.id && (req.status === 'Requested' || req.status === 'Pending Review'))) {
+      alert(`You already have an active representation request pending with ${recruiter.name}.`);
+      return;
+    }
+
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const nowISO = new Date().toISOString();
+
     const newRequest: HandshakeRequest = {
-      id: `req_${Date.now()}`,
+      id: requestId,
       recruiterId: recruiter.id,
       recruiterName: recruiter.name,
       company: recruiter.company,
@@ -170,17 +179,32 @@ export default function RecruiterHandshakeGateway() {
     const nextRequests = [newRequest, ...requests];
     await saveRequests(nextRequests);
 
-    // Write request notification/entry to Recruiter's Firestore collection in real time
+    // Write complete request entry to Recruiter's Firestore subcollection in real time
     if (recruiter.id && uid) {
       try {
-        const reqDocRef = doc(db, 'marketplace_recruiters', recruiter.id, 'candidate_requests', uid);
+        const reqDocRef = doc(db, 'marketplace_recruiters', recruiter.id, 'candidate_requests', requestId);
         await setDoc(reqDocRef, {
+          requestId: requestId,
+          applicantUid: uid,
           candidateUid: uid,
+          recruiterUid: recruiter.id,
+          recruiterName: recruiter.name,
+          recruiterCompany: recruiter.company,
           candidateName: jobSeekerProfile?.fullName || userProfile?.fullName || user?.displayName || 'Job Seeker',
           candidateEmail: userProfile?.email || user?.email || '',
-          requestedAt: new Date().toISOString(),
+          candidatePhone: jobSeekerProfile?.phone || (userProfile as any)?.phone || '',
+          candidateSkills: jobSeekerProfile?.skills || [],
+          candidateExperience: jobSeekerProfile?.experience || 'Entry Level',
+          candidateHeadline: jobSeekerProfile?.headline || 'Marketplace Applicant',
+          resumeUrl: jobSeekerProfile?.resumeUrl || '',
+          requestedAt: nowISO,
+          createdAt: nowISO,
+          updatedAt: nowISO,
+          acceptedAt: null,
+          rejectedAt: null,
+          cancelledAt: null,
           status: 'Requested',
-          recruiterId: recruiter.id
+          notes: ''
         }, { merge: true });
       } catch (err) {
         console.error("Failed to notify recruiter in Firestore:", err);
@@ -198,10 +222,27 @@ export default function RecruiterHandshakeGateway() {
     setTimeout(() => setSuccessToast(''), 3000);
   };
 
-  const handleCancelRequest = (requestId: string) => {
-    const nextRequests = requests.map(r => r.id === requestId ? { ...r, status: 'Withdrawn' as HandshakeStatus } : r);
-    saveRequests(nextRequests);
-    setSuccessToast("Request withdrawn successfully.");
+  const handleCancelRequest = async (requestId: string) => {
+    const targetReq = requests.find(r => r.id === requestId);
+    const nowISO = new Date().toISOString();
+
+    const nextRequests = requests.map(r => r.id === requestId ? { ...r, status: 'Cancelled' as HandshakeStatus } : r);
+    await saveRequests(nextRequests);
+
+    if (targetReq && targetReq.recruiterId && uid) {
+      try {
+        const reqDocRef = doc(db, 'marketplace_recruiters', targetReq.recruiterId, 'candidate_requests', requestId);
+        await setDoc(reqDocRef, {
+          status: 'Cancelled',
+          updatedAt: nowISO,
+          cancelledAt: nowISO
+        }, { merge: true });
+      } catch (e) {
+        console.error("Error cancelling request on recruiter side:", e);
+      }
+    }
+
+    setSuccessToast("Representation request cancelled.");
     setTimeout(() => setSuccessToast(''), 3000);
   };
 
