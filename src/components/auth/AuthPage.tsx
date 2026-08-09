@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, 
@@ -30,11 +31,36 @@ interface AuthPageProps {
 
 export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPageProps) {
   const { login, signupIndividual, signupOrganization, bypassLogin } = useAuth();
+  const [searchParams] = useSearchParams();
 
   const [isLogin, setIsLogin] = useState(true);
   const [signupStep, setSignupStep] = useState<1 | '2A_applicant' | '2A_recruiter' | '2A_bdm' | '2B'>(1);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Auto-detect URL query parameter to deep-link straight to role registration or signup step
+  useEffect(() => {
+    const roleParam = searchParams.get('role');
+    const modeParam = searchParams.get('mode') || searchParams.get('signup');
+    if (roleParam) {
+      setIsLogin(false);
+      if (['marketplace_jobseeker', 'candidate', 'applicant', 'm_candidate'].includes(roleParam)) {
+        setIndividualRole('candidate');
+        setSignupStep('2A_applicant');
+      } else if (['marketplace_recruiter', 'recruiter', 'm_recruiter'].includes(roleParam)) {
+        setIndividualRole('recruiter');
+        setSignupStep('2A_recruiter');
+      } else if (['marketplace_bdm', 'bdm', 'manager', 'm_manager'].includes(roleParam)) {
+        setIndividualRole('manager');
+        setSignupStep('2A_bdm');
+      } else {
+        setSignupStep(1);
+      }
+    } else if (modeParam === 'true' || modeParam === 'signup') {
+      setIsLogin(false);
+      setSignupStep(1);
+    }
+  }, [searchParams]);
   
   // Account/Role state
   const [accountType, setAccountType] = useState<'individual' | 'organization'>('individual');
@@ -119,6 +145,31 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
     setError('');
     
     if (signupStep === '2A_applicant' || signupStep === '2A_recruiter' || signupStep === '2A_bdm') {
+      const cleanName = fullName.trim();
+      const cleanEmail = email.trim();
+      const cleanPhone = phone.trim();
+      const cleanCompany = companyName.trim();
+
+      if (!cleanName) {
+        setError('Full Name is required.');
+        return;
+      }
+      if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        setError('Please enter a valid email address.');
+        return;
+      }
+      if (!cleanPhone) {
+        setError('Phone number is required.');
+        return;
+      }
+      if (signupStep === '2A_bdm' && !cleanCompany) {
+        setError('Company Name is required for BDM registration.');
+        return;
+      }
+      if (!password || password.length < 6) {
+        setError('Password must be at least 6 characters long.');
+        return;
+      }
       if (password !== confirmPassword) {
         setError('Passwords do not match. Please verify your password entry.');
         return;
@@ -127,28 +178,44 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
         setError('Please accept the Terms of Service and Privacy Policy to create your account.');
         return;
       }
-    }
-    
-    try {
-      if (signupStep === '2A_applicant') {
-        const profile = await signupIndividual(fullName, email, phone, password, 'candidate');
-        const targetRole = dbRoleToAppRole(profile.role);
-        onLogin(targetRole, true);
-      } else if (signupStep === '2A_recruiter') {
-        const profile = await signupIndividual(fullName, email, phone, password, 'recruiter');
-        const targetRole = dbRoleToAppRole(profile.role);
-        onLogin(targetRole, true);
-      } else if (signupStep === '2A_bdm') {
-        const profile = await signupIndividual(fullName, email, phone, password, 'manager');
-        const targetRole = dbRoleToAppRole(profile.role);
-        onLogin(targetRole, true);
-      } else if (signupStep === '2B') {
-        const profile = await signupOrganization(orgName, adminName, email, phone, password, orgType);
-        const targetRole = dbRoleToAppRole(profile.role);
-        onLogin(targetRole, true);
+      
+      try {
+        if (signupStep === '2A_applicant') {
+          const profile = await signupIndividual(cleanName, cleanEmail, cleanPhone, password, 'candidate');
+          const targetRole = dbRoleToAppRole(profile.role);
+          onLogin(targetRole, true);
+        } else if (signupStep === '2A_recruiter') {
+          const profile = await signupIndividual(cleanName, cleanEmail, cleanPhone, password, 'recruiter', cleanCompany);
+          const targetRole = dbRoleToAppRole(profile.role);
+          onLogin(targetRole, true);
+        } else if (signupStep === '2A_bdm') {
+          const profile = await signupIndividual(cleanName, cleanEmail, cleanPhone, password, 'manager', cleanCompany);
+          const targetRole = dbRoleToAppRole(profile.role);
+          onLogin(targetRole, true);
+        }
+      } catch (err: any) {
+        setError(err?.message || 'Registration failed. Please try again.');
       }
-    } catch (err: any) {
-      setError(err?.message || 'Registration failed. Please try again.');
+    } else if (signupStep === '2B') {
+      if (!orgName.trim() || !adminName.trim() || !email.trim() || !phone.trim() || !password) {
+        setError('All fields are required.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match.');
+        return;
+      }
+      if (!agreeTerms) {
+        setError('Please accept the Terms of Service.');
+        return;
+      }
+      try {
+        const profile = await signupOrganization(orgName.trim(), adminName.trim(), email.trim(), phone.trim(), password, orgType);
+        const targetRole = dbRoleToAppRole(profile.role);
+        onLogin(targetRole, true);
+      } catch (err: any) {
+        setError(err?.message || 'Registration failed. Please try again.');
+      }
     }
   };
 
@@ -537,13 +604,13 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-4">
                       
                       {/* CARD 1: APPLICANT */}
-                      <div className="border border-slate-150 dark:border-slate-800 hover:border-purple-500 rounded-2xl p-6 flex flex-col justify-between space-y-6 bg-slate-50/50 dark:bg-slate-950/20 hover:bg-white dark:hover:bg-[#0A0E1A] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                      <div className="border border-slate-150 dark:border-slate-800 hover:border-blue-500 rounded-2xl p-6 flex flex-col justify-between space-y-6 bg-slate-50/50 dark:bg-slate-950/20 hover:bg-white dark:hover:bg-[#0A0E1A] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
                         <div className="space-y-4">
-                          <div className="w-14 h-14 rounded-2xl bg-purple-600 flex items-center justify-center text-white shadow-lg shadow-purple-500/20 group-hover:scale-105 transition-transform">
+                          <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
                             <User className="w-7 h-7 text-white" />
                           </div>
                           <div>
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                               Applicant
                             </h3>
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed font-sans">
@@ -553,7 +620,7 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
                           <div className="space-y-2 pt-3 border-t border-slate-150 dark:border-slate-800">
                             {['Build Professional Profile', 'AI Job Matching', 'Apply to Top Jobs'].map((item, i) => (
                               <div key={i} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 font-semibold">
-                                <div className="w-4 h-4 rounded-full bg-purple-100 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                                <div className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
                                   <Check className="w-2.5 h-2.5 stroke-[3]" />
                                 </div>
                                 <span>{item}</span>
@@ -567,7 +634,7 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
                             setSignupStep('2A_applicant');
                             setError('');
                           }}
-                          className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-md hover:shadow-lg transition-all"
+                          className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-md hover:shadow-lg transition-all"
                         >
                           Continue as Applicant →
                         </button>
@@ -576,7 +643,7 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
                       {/* CARD 2: RECRUITER */}
                       <div className="border border-slate-150 dark:border-slate-800 hover:border-blue-500 rounded-2xl p-6 flex flex-col justify-between space-y-6 bg-slate-50/50 dark:bg-slate-950/20 hover:bg-white dark:hover:bg-[#0A0E1A] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
                         <div className="space-y-4">
-                          <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
+                          <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
                             <Briefcase className="w-7 h-7 text-white" />
                           </div>
                           <div>
@@ -604,20 +671,20 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
                             setSignupStep('2A_recruiter');
                             setError('');
                           }}
-                          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-md hover:shadow-lg transition-all"
+                          className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-md hover:shadow-lg transition-all"
                         >
                           Continue as Recruiter →
                         </button>
                       </div>
 
                       {/* CARD 3: BDM */}
-                      <div className="border border-slate-150 dark:border-slate-800 hover:border-emerald-500 rounded-2xl p-6 flex flex-col justify-between space-y-6 bg-slate-50/50 dark:bg-slate-950/20 hover:bg-white dark:hover:bg-[#0A0E1A] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                      <div className="border border-slate-150 dark:border-slate-800 hover:border-blue-500 rounded-2xl p-6 flex flex-col justify-between space-y-6 bg-slate-50/50 dark:bg-slate-950/20 hover:bg-white dark:hover:bg-[#0A0E1A] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
                         <div className="space-y-4">
-                          <div className="w-14 h-14 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+                          <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
                             <Building2 className="w-7 h-7 text-white" />
                           </div>
                           <div>
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                               BDM
                             </h3>
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed font-sans">
@@ -627,7 +694,7 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
                           <div className="space-y-2 pt-3 border-t border-slate-150 dark:border-slate-800">
                             {['Manage Client Companies', 'Post & Manage Jobs', 'Reports & Analytics'].map((item, i) => (
                               <div key={i} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 font-semibold">
-                                <div className="w-4 h-4 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                <div className="w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
                                   <Check className="w-2.5 h-2.5 stroke-[3]" />
                                 </div>
                                 <span>{item}</span>
@@ -641,7 +708,7 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
                             setSignupStep('2A_bdm');
                             setError('');
                           }}
-                          className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-md hover:shadow-lg transition-all"
+                          className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-md hover:shadow-lg transition-all"
                         >
                           Continue as BDM →
                         </button>
@@ -686,26 +753,16 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch bg-white dark:bg-[#0f172a] border border-slate-150 dark:border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl relative">
                       
                       {/* Left Panel - Illustration & Role Hero */}
-                      <div className={`lg:col-span-5 rounded-2xl p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden border ${
-                        signupStep === '2A_applicant' 
-                          ? 'bg-gradient-to-br from-purple-50 via-purple-50/50 to-indigo-50/30 dark:from-purple-950/30 dark:to-indigo-950/20 border-purple-200/50 dark:border-purple-900/30 text-purple-950 dark:text-purple-100'
-                          : signupStep === '2A_recruiter'
-                          ? 'bg-gradient-to-br from-blue-50 via-blue-50/50 to-indigo-50/30 dark:from-blue-950/30 dark:to-indigo-950/20 border-blue-200/50 dark:border-blue-900/30 text-blue-950 dark:text-blue-100'
-                          : 'bg-gradient-to-br from-emerald-50 via-emerald-50/50 to-teal-50/30 dark:from-emerald-950/30 dark:to-teal-950/20 border-emerald-200/50 dark:border-emerald-900/30 text-emerald-950 dark:text-emerald-100'
-                      }`}>
+                      <div className="lg:col-span-5 rounded-2xl p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100">
                         
                         <div className="space-y-3 z-10">
-                          <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full inline-block ${
-                            signupStep === '2A_applicant' ? 'bg-purple-600/10 text-purple-600 dark:text-purple-300' :
-                            signupStep === '2A_recruiter' ? 'bg-blue-600/10 text-blue-600 dark:text-blue-300' :
-                            'bg-emerald-600/10 text-emerald-600 dark:text-emerald-300'
-                          }`}>
+                          <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full inline-block bg-blue-600/10 text-blue-600 dark:text-blue-400">
                             {signupStep === '2A_applicant' ? 'Candidate Portal' : signupStep === '2A_recruiter' ? 'Recruiter Hub' : 'BDM Workspace'}
                           </span>
-                          <h3 className="text-2xl font-black font-display tracking-tight">
+                          <h3 className="text-2xl font-black font-display tracking-tight text-slate-900 dark:text-white">
                             {signupStep === '2A_applicant' ? 'Join as Applicant' : signupStep === '2A_recruiter' ? 'Join as Recruiter' : 'Join as BDM'}
                           </h3>
-                          <p className="text-xs font-medium leading-relaxed opacity-80">
+                          <p className="text-xs font-medium leading-relaxed text-slate-600 dark:text-slate-300">
                             {signupStep === '2A_applicant'
                               ? 'Create your profile and start applying to the best jobs that match your skills.'
                               : signupStep === '2A_recruiter'
@@ -718,19 +775,19 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
                         <div className="my-6 py-4 flex items-center justify-center">
                           {signupStep === '2A_applicant' && (
                             <svg viewBox="0 0 240 180" className="w-full max-w-[200px] h-auto drop-shadow-md">
-                              <rect x="20" y="20" width="140" height="130" rx="16" fill="#8B5CF6" fillOpacity="0.1" stroke="#8B5CF6" strokeWidth="2" />
-                              <rect x="35" y="35" width="110" height="15" rx="4" fill="#8B5CF6" />
-                              <circle cx="50" cy="70" r="14" fill="#8B5CF6" fillOpacity="0.3" />
-                              <rect x="72" y="62" width="60" height="8" rx="4" fill="#6D28D9" />
-                              <rect x="72" y="74" width="45" height="6" rx="3" fill="#9333EA" fillOpacity="0.5" />
-                              <rect x="35" y="98" width="110" height="35" rx="8" fill="#FFFFFF" stroke="#C4B5FD" strokeWidth="1.5" />
+                              <rect x="20" y="20" width="140" height="130" rx="16" fill="#2563EB" fillOpacity="0.1" stroke="#2563EB" strokeWidth="2" />
+                              <rect x="35" y="35" width="110" height="15" rx="4" fill="#2563EB" />
+                              <circle cx="50" cy="70" r="14" fill="#2563EB" fillOpacity="0.3" />
+                              <rect x="72" y="62" width="60" height="8" rx="4" fill="#1D4ED8" />
+                              <rect x="72" y="74" width="45" height="6" rx="3" fill="#3B82F6" fillOpacity="0.5" />
+                              <rect x="35" y="98" width="110" height="35" rx="8" fill="#FFFFFF" stroke="#93C5FD" strokeWidth="1.5" />
                               <circle cx="52" cy="115" r="8" fill="#10B981" />
                               <path d="M48 115l3 3 5-5" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                              <rect x="68" y="111" width="65" height="8" rx="4" fill="#4C1D95" />
+                              <rect x="68" y="111" width="65" height="8" rx="4" fill="#1E40AF" />
                               <g transform="translate(140, 60)">
-                                <circle cx="40" cy="40" r="35" fill="#7C3AED" />
-                                <circle cx="40" cy="30" r="12" fill="#F3E8FF" />
-                                <path d="M20 62c0-11 9-20 20-20s20 9 20 20" fill="#F3E8FF" />
+                                <circle cx="40" cy="40" r="35" fill="#3B82F6" />
+                                <circle cx="40" cy="30" r="12" fill="#EFF6FF" />
+                                <path d="M20 62c0-11 9-20 20-20s20 9 20 20" fill="#EFF6FF" />
                               </g>
                             </svg>
                           )}
@@ -750,18 +807,18 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
                           )}
                           {signupStep === '2A_bdm' && (
                             <svg viewBox="0 0 240 180" className="w-full max-w-[200px] h-auto drop-shadow-md">
-                              <rect x="25" y="25" width="190" height="130" rx="16" fill="#10B981" fillOpacity="0.1" stroke="#10B981" strokeWidth="2" />
-                              <rect x="45" y="105" width="22" height="35" rx="4" fill="#059669" />
-                              <rect x="75" y="85" width="22" height="55" rx="4" fill="#10B981" />
-                              <rect x="105" y="65" width="22" height="75" rx="4" fill="#34D399" />
-                              <rect x="135" y="45" width="22" height="95" rx="4" fill="#059669" />
-                              <path d="M45 95 L 75 75 L 105 55 L 145 35 L 175 25" fill="none" stroke="#047857" strokeWidth="4" strokeLinecap="round" />
-                              <polygon points="175,25 165,25 175,35" fill="#047857" />
+                              <rect x="25" y="25" width="190" height="130" rx="16" fill="#2563EB" fillOpacity="0.1" stroke="#2563EB" strokeWidth="2" />
+                              <rect x="45" y="105" width="22" height="35" rx="4" fill="#1D4ED8" />
+                              <rect x="75" y="85" width="22" height="55" rx="4" fill="#2563EB" />
+                              <rect x="105" y="65" width="22" height="75" rx="4" fill="#3B82F6" />
+                              <rect x="135" y="45" width="22" height="95" rx="4" fill="#1D4ED8" />
+                              <path d="M45 95 L 75 75 L 105 55 L 145 35 L 175 25" fill="none" stroke="#1E40AF" strokeWidth="4" strokeLinecap="round" />
+                              <polygon points="175,25 165,25 175,35" fill="#1E40AF" />
                             </svg>
                           )}
                         </div>
 
-                        <div className="space-y-2 pt-4 border-t border-black/10 dark:border-white/10 text-xs font-semibold">
+                        <div className="space-y-2 pt-4 border-t border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300">
                           <div className="flex items-center gap-2">
                             <ShieldCheck className="w-4 h-4 text-emerald-500" />
                             <span>Enterprise-Grade Security & Encryption</span>
@@ -922,11 +979,7 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
 
                           <button 
                             type="submit"
-                            className={`w-full py-3.5 text-white font-bold text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all cursor-pointer mt-2 ${
-                              signupStep === '2A_applicant' ? 'bg-purple-600 hover:bg-purple-700' :
-                              signupStep === '2A_recruiter' ? 'bg-blue-600 hover:bg-blue-700' :
-                              'bg-emerald-600 hover:bg-emerald-700'
-                            }`}
+                            className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all cursor-pointer mt-2"
                           >
                             {signupStep === '2A_applicant' ? 'Create Applicant Account' : signupStep === '2A_recruiter' ? 'Create Recruiter Account' : 'Create BDM Account'}
                           </button>

@@ -102,7 +102,7 @@ export default function SubmitProfileModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedJob) return;
+    if (submitting || !selectedJob) return;
     const currentUser = auth.currentUser;
     if (!currentUser) return;
 
@@ -112,7 +112,8 @@ export default function SubmitProfileModal({
     const targetJob = jobs.find(j => j.title === jobTitle && j.company === companyName);
     
     if (targetJob) {
-      const subId = `SUB-${Date.now().toString().slice(-6)}`;
+      // Use deterministic submission ID to enforce ONE submission per recruiter + candidate + job
+      const subId = `sub_${currentUser.uid}_${candidate.id}_${targetJob.id}`;
       const submissionRef = doc(db, 'marketplace_submissions', subId);
 
       // Extract real email/phone from the database profile, if available

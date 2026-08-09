@@ -401,6 +401,61 @@ export default function ResumeBuilderTab() {
   };
 
   // File drop handler for uploaded resume documents
+  const parseResumeDocument = async (file: File) => {
+    let text = '';
+    try {
+      if (file.type.startsWith('text/') || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
+        text = await file.text();
+      } else {
+        const buffer = await file.arrayBuffer();
+        const decoder = new TextDecoder('utf-8', { fatal: false });
+        const rawText = decoder.decode(buffer);
+        text = rawText.replace(/[^\x20-\x7E\n\r\t]/g, ' ');
+      }
+    } catch (err) {
+      console.warn("Could not extract text from document:", err);
+    }
+
+    const result: {
+      fullName?: string;
+      email?: string;
+      phone?: string;
+      summary?: string;
+      skills?: string[];
+    } = {};
+
+    if (!text) return result;
+
+    const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    if (emailMatch) result.email = emailMatch[0];
+
+    const phoneMatch = text.match(/(\+?\d{1,4}[\s\.-]?)?\(?\d{3,5}\)?[\s\.-]?\d{3,5}[\s\.-]?\d{3,5}/);
+    if (phoneMatch && phoneMatch[0].replace(/\D/g, '').length >= 10) {
+      result.phone = phoneMatch[0].trim();
+    }
+
+    const commonSkills = [
+      'React', 'TypeScript', 'JavaScript', 'Node.js', 'Express', 'Python', 'Java', 'C++', 'C#',
+      'HTML', 'CSS', 'Tailwind', 'PostgreSQL', 'MongoDB', 'MySQL', 'Docker', 'AWS', 'GCP',
+      'Firebase', 'Git', 'GraphQL', 'REST API', 'Figma', 'Redux', 'Linux'
+    ];
+    const detectedSkills = commonSkills.filter(s => new RegExp(`\\b${s.replace('.', '\\.')}\\b`, 'i').test(text));
+    if (detectedSkills.length > 0) {
+      result.skills = detectedSkills;
+    }
+
+    const lower = text.toLowerCase();
+    const summaryIdx = Math.max(lower.indexOf('summary'), lower.indexOf('objective'), lower.indexOf('about me'));
+    if (summaryIdx !== -1) {
+      const chunk = text.substring(summaryIdx, summaryIdx + 250).replace(/^(summary|objective|about me)[:\s]*/i, '').trim();
+      if (chunk.length > 15) {
+        result.summary = chunk.split('\n')[0] || chunk.slice(0, 180);
+      }
+    }
+
+    return result;
+  };
+
   const processFile = async (file: File) => {
     if (!uid) return;
     setUploadSuccess(true);
@@ -426,11 +481,43 @@ export default function ResumeBuilderTab() {
         })
       };
 
-      const docRef = doc(db, 'marketplace_jobseekers', uid);
-      await updateDoc(docRef, {
+      // Parse document text and populate fields
+      const parsedData = await parseResumeDocument(file);
+
+      const updatePayload: any = {
         'resume.uploadedResume': newResume,
         'resume.updatedAt': new Date().toISOString()
-      });
+      };
+
+      if (parsedData.fullName) {
+        setFullName(parsedData.fullName);
+        updatePayload['resume.fullName'] = parsedData.fullName;
+        updatePayload['profile.fullName'] = parsedData.fullName;
+      }
+      if (parsedData.email) {
+        setEmail(parsedData.email);
+        updatePayload['resume.email'] = parsedData.email;
+        updatePayload['profile.email'] = parsedData.email;
+      }
+      if (parsedData.phone) {
+        setPhone(parsedData.phone);
+        updatePayload['resume.phone'] = parsedData.phone;
+        updatePayload['profile.phone'] = parsedData.phone;
+      }
+      if (parsedData.summary) {
+        setSummary(parsedData.summary);
+        updatePayload['resume.summary'] = parsedData.summary;
+        updatePayload['profile.bio'] = parsedData.summary;
+      }
+      if (parsedData.skills && parsedData.skills.length > 0) {
+        const mergedSkills = Array.from(new Set([...skillsList, ...parsedData.skills]));
+        setSkillsList(mergedSkills);
+        updatePayload['resume.skills'] = mergedSkills;
+        updatePayload['profile.skills'] = mergedSkills;
+      }
+
+      const docRef = doc(db, 'marketplace_jobseekers', uid);
+      await updateDoc(docRef, updatePayload);
 
       setTimeout(() => {
         setUploadedResume(newResume);

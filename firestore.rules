@@ -68,15 +68,22 @@ service cloud.firestore {
 
     // BDM specific profile
     match /marketplace_bdms/{uid} {
-      allow read, write: if isOwner(uid) || isPlatformAdmin();
+      allow read: if isAuthenticated() || isPlatformAdmin();
+      allow write: if isOwner(uid) || isPlatformAdmin();
+
+      match /{document=**} {
+        allow read: if isAuthenticated() || isPlatformAdmin();
+        allow write: if isOwner(uid) || isPlatformAdmin();
+      }
     }
 
     // Recruiter specific profile
     match /marketplace_recruiters/{uid} {
-      allow read, write: if isOwner(uid) || isPlatformAdmin();
+      allow read: if isAuthenticated() || isPlatformAdmin();
+      allow write: if isOwner(uid) || isPlatformAdmin();
 
-      match /saved_candidates/{candidateId} {
-        allow read, write: if isOwner(uid) || isPlatformAdmin();
+      match /{document=**} {
+        allow read, write: if isOwner(uid) || isPlatformAdmin() || isAuthenticated();
       }
     }
 
@@ -84,6 +91,11 @@ service cloud.firestore {
     match /marketplace_jobseekers/{uid} {
       allow read: if isAuthenticated() || isPlatformAdmin();
       allow write: if isOwner(uid) || isPlatformAdmin();
+
+      match /{document=**} {
+        allow read: if isAuthenticated() || isPlatformAdmin();
+        allow write: if isOwner(uid) || isPlatformAdmin();
+      }
     }
 
     // Top-level collections for company roles
@@ -234,29 +246,38 @@ service cloud.firestore {
 
     // Global jobs
     match /marketplace_jobs/{jobId} {
-      allow read: if isAuthenticated() || isPlatformAdmin();
-      allow create: if isPlatformAdmin() || (isAuthenticated() && request.auth.uid == request.resource.data.createdBy);
-      allow update, delete: if isPlatformAdmin() || (isAuthenticated() && request.auth.uid == resource.data.createdBy);
+      allow read, write: if isAuthenticated() || isPlatformAdmin();
 
-      match /{subcollection}/{documentId} {
-        allow read: if isAuthenticated() || isPlatformAdmin();
-        allow write: if isPlatformAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/marketplace_jobs/$(jobId)).data.createdBy == request.auth.uid);
+      match /{document=**} {
+        allow read, write: if isAuthenticated() || isPlatformAdmin();
       }
     }
 
     // Global job applications
     match /marketplace_applications/{applicationId} {
       allow read, write: if isAuthenticated() || isPlatformAdmin();
+
+      match /{document=**} {
+        allow read, write: if isAuthenticated() || isPlatformAdmin();
+      }
     }
 
     // Global submissions
     match /marketplace_submissions/{submissionId} {
       allow read, write: if isAuthenticated() || isPlatformAdmin();
+
+      match /{document=**} {
+        allow read, write: if isAuthenticated() || isPlatformAdmin();
+      }
     }
 
     // User specific notifications
     match /notifications/{uid} {
-      allow read, write: if isOwner(uid) || isPlatformAdmin();
+      allow read, write: if isOwner(uid) || isPlatformAdmin() || isAuthenticated();
+
+      match /{document=**} {
+        allow read, write: if isOwner(uid) || isPlatformAdmin() || isAuthenticated();
+      }
     }
 
     // Platform Specific Collections

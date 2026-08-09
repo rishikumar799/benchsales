@@ -77,12 +77,12 @@ export function RecruiterProvider({ children }: RecruiterProviderProps) {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
   });
 
-  const uid = user?.uid || userProfile?.uid;
+  const uid = auth.currentUser?.uid || user?.uid || userProfile?.uid;
   const isMarketplaceRecruiter = userProfile?.role === 'marketplace_recruiter' || userProfile?.role === 'm_recruiter';
 
   // 1. Establish ONE realtime Firestore listener
   useEffect(() => {
-    if (!uid || !isMarketplaceRecruiter) {
+    if (!uid || !auth.currentUser || !isMarketplaceRecruiter) {
       setRecruiterProfile(null);
       setLoading(false);
       return;

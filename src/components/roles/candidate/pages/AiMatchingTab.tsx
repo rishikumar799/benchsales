@@ -323,8 +323,8 @@ export default function AiMatchingTab({ onNavigate }: AiMatchingTabProps) {
                     <span className="text-app-text text-sm font-extrabold block truncate">{imp.skill}</span>
                     <span className="text-[10px] font-bold block mt-1 opacity-80">{imp.matchValue}</span>
                   </div>
-                  <button className="w-full py-1.5 bg-brand-blue/10 hover:bg-brand-blue/20 text-brand-blue border border-brand-blue/20 text-[10px] uppercase tracking-wider font-extrabold rounded-xl transition-all cursor-pointer">
-                    {imp.action} Now
+                  <button disabled className="w-full py-1.5 bg-app-surface text-app-muted border border-app-border text-[10px] uppercase tracking-wider font-extrabold rounded-xl cursor-not-allowed opacity-80">
+                    COMING SOON
                   </button>
                 </div>
               ))}
@@ -345,10 +345,10 @@ export default function AiMatchingTab({ onNavigate }: AiMatchingTabProps) {
                     <div className="text-[10px] text-emerald-500 font-bold mt-0.5">{role.match}% Score Match</div>
                   </div>
                   <button 
-                    onClick={() => onNavigate?.('jobs')}
-                    className="px-3 py-1.5 bg-brand-blue text-white rounded-lg text-[9px] font-bold uppercase transition-all cursor-pointer hover:bg-brand-blue/90 shrink-0"
+                    disabled
+                    className="px-3 py-1.5 bg-app-surface text-app-muted border border-app-border rounded-lg text-[9px] font-bold uppercase cursor-not-allowed shrink-0 opacity-80"
                   >
-                    View Jobs
+                    COMING SOON
                   </button>
                 </div>
               ))}
@@ -372,8 +372,8 @@ export default function AiMatchingTab({ onNavigate }: AiMatchingTabProps) {
                       <span>{crs.duration}</span>
                     </div>
                   </div>
-                  <button className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 text-[10px] font-bold rounded-lg cursor-pointer transition-all">
-                    Start
+                  <button disabled className="px-3 py-1.5 bg-app-surface text-app-muted border border-app-border text-[10px] font-bold uppercase rounded-lg cursor-not-allowed opacity-80">
+                    COMING SOON
                   </button>
                 </div>
               ))}

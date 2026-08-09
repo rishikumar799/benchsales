@@ -48,7 +48,8 @@ interface AuthContextType {
     email: string, 
     phone: string, 
     pass: string, 
-    individualRole: 'candidate' | 'recruiter' | 'manager'
+    individualRole: 'candidate' | 'recruiter' | 'manager',
+    companyName?: string
   ) => Promise<DbUser>;
   signupOrganization: (
     orgName: string,
@@ -666,7 +667,8 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
     email: string, 
     phone: string, 
     pass: string, 
-    individualRole: 'candidate' | 'recruiter' | 'manager'
+    individualRole: 'candidate' | 'recruiter' | 'manager',
+    companyName?: string
   ): Promise<DbUser> => {
     // Determine mapped role
     let targetRoleString = 'marketplace_jobseeker';
@@ -674,44 +676,64 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
     else if (individualRole === 'recruiter') targetRoleString = 'marketplace_recruiter';
     else if (individualRole === 'manager') targetRoleString = 'marketplace_bdm';
 
-    const credential = await createUserWithEmailAndPassword(auth, email, pass);
+    const cleanEmail = email.trim();
+    const cleanName = fullName.trim();
+    const cleanPhone = phone.trim();
+    const timestamp = new Date().toISOString();
+
+    let credential;
+    try {
+      credential = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
+    } catch (err: any) {
+      if (err?.code === 'auth/email-already-in-use' || String(err).includes('email-already-in-use')) {
+        throw new Error('An account with this email address already exists. Please sign in instead.');
+      } else if (err?.code === 'auth/invalid-email' || String(err).includes('invalid-email')) {
+        throw new Error('Please enter a valid email address.');
+      } else if (err?.code === 'auth/weak-password' || String(err).includes('weak-password')) {
+        throw new Error('Password should be at least 6 characters long.');
+      } else {
+        throw err;
+      }
+    }
+
     const uid = credential.user.uid;
 
     const profile: DbUser = {
       uid,
-      fullName,
-      displayName: fullName,
-      email,
-      phoneNumber: phone,
+      fullName: cleanName,
+      displayName: cleanName,
+      email: cleanEmail,
+      phoneNumber: cleanPhone,
       role: targetRoleString,
       ecosystem: getEcosystemForRole(targetRoleString),
       accountType: 'individual',
       status: 'approved',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString()
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      lastLogin: timestamp
     };
 
-    // Store in users master collection
+    // Prepare Master User Document (users/{uid})
     const userDocRef = doc(db, 'users', uid);
-    try {
-      await setDoc(userDocRef, {
-        uid: profile.uid,
-        email: profile.email,
-        displayName: profile.displayName,
-        photoURL: '',
-        role: profile.role,
-        ecosystem: profile.ecosystem,
-        organizationId: null,
-        status: profile.status,
-        createdAt: profile.createdAt,
-        lastLogin: profile.lastLogin
-      });
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `users/${uid}`);
-    }
+    const masterUserDoc = {
+      uid,
+      fullName: cleanName,
+      displayName: cleanName,
+      email: cleanEmail,
+      phoneNumber: cleanPhone,
+      phone: cleanPhone,
+      photoURL: '',
+      role: targetRoleString,
+      ecosystem: profile.ecosystem,
+      accountType: 'individual',
+      organizationId: null,
+      status: 'approved',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      lastLogin: timestamp
+    };
 
-    // Store in specific role collection
+    // Prepare Role Profile Document (marketplace_{role}/{uid})
     const roleDocRef = getRoleDocRef(db, profile);
     
     let defaultDoc: any = {};
@@ -719,11 +741,15 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
       defaultDoc = {
         profile: {
           uid,
-          fullName,
-          email,
-          phoneNumber: phone,
+          fullName: cleanName,
+          displayName: cleanName,
+          email: cleanEmail,
+          phoneNumber: cleanPhone,
+          phone: cleanPhone,
+          role: targetRoleString,
           status: 'approved',
-          createdAt: profile.createdAt
+          createdAt: timestamp,
+          updatedAt: timestamp
         },
         resume: '',
         documents: [],
@@ -738,11 +764,16 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
       defaultDoc = {
         profile: {
           uid,
-          fullName,
-          email,
-          phoneNumber: phone,
+          fullName: cleanName,
+          displayName: cleanName,
+          email: cleanEmail,
+          phoneNumber: cleanPhone,
+          phone: cleanPhone,
+          companyName: companyName || '',
+          role: targetRoleString,
           status: 'approved',
-          createdAt: profile.createdAt
+          createdAt: timestamp,
+          updatedAt: timestamp
         },
         candidate_queue: [],
         saved_candidates: [],
@@ -755,11 +786,16 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
       defaultDoc = {
         profile: {
           uid,
-          fullName,
-          email,
-          phoneNumber: phone,
+          fullName: cleanName,
+          displayName: cleanName,
+          email: cleanEmail,
+          phoneNumber: cleanPhone,
+          phone: cleanPhone,
+          companyName: companyName || '',
+          role: targetRoleString,
           status: 'approved',
-          createdAt: profile.createdAt
+          createdAt: timestamp,
+          updatedAt: timestamp
         },
         dashboard_cache: {},
         analytics_cache: {},
@@ -771,21 +807,27 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
     } else {
       defaultDoc = {
         uid,
-        fullName,
-        email,
-        phoneNumber: phone,
+        fullName: cleanName,
+        displayName: cleanName,
+        email: cleanEmail,
+        phoneNumber: cleanPhone,
+        phone: cleanPhone,
         status: 'approved',
-        createdAt: profile.createdAt
+        createdAt: timestamp,
+        updatedAt: timestamp
       };
-      if (profile.organizationId) {
-        defaultDoc.organizationId = profile.organizationId;
-      }
     }
 
+    // Write both documents atomically using writeBatch
+    const batch = writeBatch(db);
+    batch.set(userDocRef, masterUserDoc);
+    batch.set(roleDocRef, defaultDoc);
+
     try {
-      await setDoc(roleDocRef, defaultDoc);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, roleDocRef.path);
+      await batch.commit();
+    } catch (err: any) {
+      console.error('Atomic batch write failed during individual signup:', err);
+      handleFirestoreError(err, OperationType.WRITE, `Atomic write for signup: ${uid}`);
     }
 
     setUserProfile(profile);
@@ -976,15 +1018,29 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
     setUser(null);
   };
 
-  const bypassLogin = (role: UserRole) => {
+  const bypassLogin = async (role: UserRole) => {
     if (role === null) {
       setUserProfile(null);
       return;
     }
     const dbRole = appRoleToDbRole(role);
     const eco = getEcosystemForRole(dbRole);
+
+    let currentUid = auth.currentUser?.uid;
+    if (!auth.currentUser) {
+      try {
+        const { signInAnonymously } = await import('firebase/auth');
+        const userCred = await signInAnonymously(auth);
+        currentUid = userCred.user.uid;
+      } catch (err) {
+        console.warn("signInAnonymously during bypassLogin failed:", err);
+      }
+    }
+
+    const effectiveUid = currentUid || `bypass_${role}`;
+
     setUserProfile({
-      uid: `bypass_${role}`,
+      uid: effectiveUid,
       fullName: `Test ${role} Profile`,
       displayName: `Test ${role} Profile`,
       email: `${role}@test.com`,

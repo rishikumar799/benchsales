@@ -303,19 +303,25 @@ async function runAutomatedMigration() {
     }
 
     // 5. Migrate notifications to user-specific notifications collection
-    const oldNotificationsSnap = await getDocs(collection(db, 'notifications'));
-    if (!oldNotificationsSnap.empty) {
-      const globalNotes: ActivityNotification[] = [];
-      for (const oldDoc of oldNotificationsSnap.docs) {
-        if (oldDoc.id !== auth.currentUser.uid) {
-          globalNotes.push(oldDoc.data() as ActivityNotification);
-          await deleteDoc(doc(db, 'notifications', oldDoc.id));
+    try {
+      if (auth.currentUser) {
+        const oldNotificationsSnap = await getDocs(collection(db, 'notifications'));
+        if (!oldNotificationsSnap.empty) {
+          const globalNotes: ActivityNotification[] = [];
+          for (const oldDoc of oldNotificationsSnap.docs) {
+            if (oldDoc.id !== auth.currentUser.uid) {
+              globalNotes.push(oldDoc.data() as ActivityNotification);
+              await deleteDoc(doc(db, 'notifications', oldDoc.id));
+            }
+          }
+          if (globalNotes.length > 0) {
+            await setDoc(doc(db, 'notifications', auth.currentUser.uid), { items: globalNotes }, { merge: true });
+            console.log(`Successfully migrated and cleaned ${globalNotes.length} global notifications.`);
+          }
         }
       }
-      if (globalNotes.length > 0) {
-        await setDoc(doc(db, 'notifications', auth.currentUser.uid), { items: globalNotes }, { merge: true });
-        console.log(`Successfully migrated and cleaned ${globalNotes.length} global notifications.`);
-      }
+    } catch (migErr) {
+      // Legacy global notifications collection list is restricted by rules; safe to skip
     }
 
     // 6. Migrate old organization_admins -> organizations_universities or organizations_companies

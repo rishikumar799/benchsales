@@ -17,7 +17,8 @@ import {
   FileText,
   Clock,
   Building,
-  Eye
+  Eye,
+  Loader2
 } from 'lucide-react';
 
 import { db, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
@@ -161,6 +162,7 @@ export default function JobsTab() {
   const [applyResumeOption, setApplyResumeOption] = useState<'existing' | 'upload'>('existing');
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [isSubmitSuccess, setIsSubmitSuccess] = useState(false);
+  const [isSubmittingApp, setIsSubmittingApp] = useState(false);
 
   // Sync Resume Builder default name if present - Cloud-first, fallback-safe
   const existingResumeName = jobSeekerProfile?.resume?.uploadedResume?.name || "Primary Resume (from Resume Builder)";
@@ -248,7 +250,7 @@ export default function JobsTab() {
 
   const handleFinalApplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedJobForApply || !userProfile?.uid) return;
+    if (!selectedJobForApply || !userProfile?.uid || isSubmittingApp) return;
     
     const resumeName = applyResumeOption === 'upload' 
       ? (uploadedFileName || "My_Uploaded_Resume.pdf")
@@ -263,6 +265,8 @@ export default function JobsTab() {
       setSelectedJobForApply(null);
       return;
     }
+
+    setIsSubmittingApp(true);
 
     try {
       const appCol = collection(db, 'marketplace_applications');
@@ -305,6 +309,8 @@ export default function JobsTab() {
 
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'marketplace_applications');
+    } finally {
+      setIsSubmittingApp(false);
     }
   };
 
@@ -744,8 +750,8 @@ export default function JobsTab() {
                 <p className="text-[11px] leading-relaxed text-white/80 font-medium">
                   Add recommended portfolio elements or certs to bridge the gap with recruiters.
                 </p>
-                <button className="w-full py-2.5 bg-white text-brand-violet text-xs font-extrabold rounded-xl shadow-md hover:scale-[1.02] active:scale-95 transition-all uppercase tracking-wider">
-                  Boost Score
+                <button disabled className="w-full py-2.5 bg-white/40 text-brand-violet text-xs font-extrabold rounded-xl shadow-md cursor-not-allowed uppercase tracking-wider opacity-90">
+                  COMING SOON
                 </button>
               </div>
             </div>
@@ -1099,10 +1105,17 @@ export default function JobsTab() {
                     </button>
                     <button
                       type="submit"
-                      disabled={isProfileIncomplete || (applyResumeOption === 'existing' && isResumeIncomplete)}
-                      className="w-full py-3 bg-brand-blue hover:bg-brand-blue/90 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-extrabold cursor-pointer transition shadow-lg shadow-brand-blue/15 uppercase tracking-wide"
+                      disabled={isSubmittingApp || isProfileIncomplete || (applyResumeOption === 'existing' && isResumeIncomplete)}
+                      className="w-full py-3 bg-brand-blue hover:bg-brand-blue/90 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-extrabold cursor-pointer transition shadow-lg shadow-brand-blue/15 uppercase tracking-wide flex items-center justify-center gap-2"
                     >
-                      Submit Application
+                      {isSubmittingApp ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Submitting Application...
+                        </>
+                      ) : (
+                        'Submit Application'
+                      )}
                     </button>
                   </div>
                 </form>

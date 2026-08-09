@@ -470,8 +470,8 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
   // Synchronize marketplace recruiter candidates in real-time from Firestore
   React.useEffect(() => {
     if (role !== 'm_recruiter') return;
-    const uid = userProfile?.uid || auth.currentUser?.uid;
-    if (!uid) return;
+    const uid = auth.currentUser?.uid || userProfile?.uid;
+    if (!uid || !auth.currentUser) return;
 
     const candidatesCol = collection(db, 'marketplace_jobseekers');
     const unsubscribe = onSnapshot(candidatesCol, (snapshot) => {
@@ -815,7 +815,7 @@ export default function EcosystemRouter({ role, activeTab, setActiveTab }: Ecosy
   // ==========================================
 
   React.useEffect(() => {
-    if (!userProfile?.uid) {
+    if (!userProfile?.uid || !auth.currentUser) {
       return;
     }
     const unsub = onSnapshot(collection(db, 'marketplace_submissions'), async (snapshot) => {

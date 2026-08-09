@@ -27,6 +27,7 @@ export default function RecruiterProfileTab() {
   const [linkedin, setLinkedin] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
 
+  const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
   // Sync internal fields with RecruiterContext once it loads
@@ -50,6 +51,8 @@ export default function RecruiterProfileTab() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
+    setSaving(true);
     try {
       await updateProfile({
         fullName: name,
@@ -68,6 +71,8 @@ export default function RecruiterProfileTab() {
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       console.error("Error saving recruiter profile:", err);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -316,9 +321,17 @@ export default function RecruiterProfileTab() {
             <div className="pt-4 flex justify-end">
               <button 
                 type="submit"
-                className="px-6 py-3 bg-brand-blue text-white hover:bg-opacity-95 text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer"
+                disabled={saving}
+                className="px-6 py-3 bg-brand-blue text-white hover:bg-opacity-95 text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-60 flex items-center gap-2"
               >
-                Save Changes Profile
+                {saving ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Saving Changes...
+                  </>
+                ) : (
+                  'Save Changes Profile'
+                )}
               </button>
             </div>
           </form>

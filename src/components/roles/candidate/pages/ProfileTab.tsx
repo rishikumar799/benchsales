@@ -32,7 +32,8 @@ import {
   BookOpen,
   Info,
   ChevronDown,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../../../firebase/firebase';
@@ -253,6 +254,13 @@ export default function ProfileTab() {
   const [aiRecommendation, setAiRecommendation] = useState(true);
   const [recruiterVisibility, setRecruiterVisibility] = useState(true);
   const [availabilityStatus, setAvailabilityStatus] = useState('Actively Looking');
+
+  // Submitting guards to prevent duplicate Firestore writes on rapid clicks
+  const [isSubmittingExp, setIsSubmittingExp] = useState(false);
+  const [isSubmittingEdu, setIsSubmittingEdu] = useState(false);
+  const [isSubmittingInfo, setIsSubmittingInfo] = useState(false);
+  const [isSubmittingLinks, setIsSubmittingLinks] = useState(false);
+  const [isSubmittingPref, setIsSubmittingPref] = useState(false);
 
   const triggerToast = (msg: string) => {
     setSavedMsgText(msg);
@@ -525,25 +533,31 @@ export default function ProfileTab() {
   // INFO Save
   const handleInfoSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    await updateProfileInFirestore({
-      fullName,
-      email,
-      phone,
-      dateOfBirth: dob,
-      gender,
-      city,
-      state,
-      country,
-      address,
-      bio: aboutMe,
-      headline,
-      languages,
-      experience: experienceStr,
-      education: educationStr,
-      profilePhoto,
-      zip
-    });
-    triggerToast("Personal Information updated successfully!");
+    if (isSubmittingInfo) return;
+    setIsSubmittingInfo(true);
+    try {
+      await updateProfileInFirestore({
+        fullName,
+        email,
+        phone,
+        dateOfBirth: dob,
+        gender,
+        city,
+        state,
+        country,
+        address,
+        bio: aboutMe,
+        headline,
+        languages,
+        experience: experienceStr,
+        education: educationStr,
+        profilePhoto,
+        zip
+      });
+      triggerToast("Personal Information updated successfully!");
+    } finally {
+      setIsSubmittingInfo(false);
+    }
   };
 
   // EXPERIENCE Actions
@@ -575,47 +589,60 @@ export default function ProfileTab() {
 
   const handleSaveExperience = async (e: React.FormEvent) => {
     e.preventDefault();
-    const skillsArr = expSkillsInput
-      .split(',')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+    if (isSubmittingExp) return;
+    setIsSubmittingExp(true);
 
-    let updatedExperiences: ExperienceItem[];
-    if (editingExpId) {
-      updatedExperiences = experiences.map((exp) =>
-        exp.id === editingExpId
-          ? {
-              ...exp,
-              role: expRole,
-              company: expCompany,
-              employmentType: expType,
-              startDate: expStart,
-              endDate: expCurrent ? 'Present' : expEnd,
-              current: expCurrent,
-              description: expDesc,
-              skillsUsed: skillsArr
-            }
-          : exp
-      );
-    } else {
-      const newExp: ExperienceItem = {
-        id: `exp-${Date.now()}`,
-        role: expRole,
-        company: expCompany,
-        employmentType: expType,
-        startDate: expStart,
-        endDate: expCurrent ? 'Present' : expEnd,
-        current: expCurrent,
-        description: expDesc,
-        skillsUsed: skillsArr
-      };
-      updatedExperiences = [...experiences, newExp];
+    try {
+      const skillsArr = expSkillsInput
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+
+      let updatedExperiences: ExperienceItem[];
+      if (editingExpId) {
+        updatedExperiences = experiences.map((exp) =>
+          exp.id === editingExpId
+            ? {
+                ...exp,
+                role: expRole,
+                company: expCompany,
+                employmentType: expType,
+                startDate: expStart,
+                endDate: expCurrent ? 'Present' : expEnd,
+                current: expCurrent,
+                description: expDesc,
+                skillsUsed: skillsArr
+              }
+            : exp
+        );
+      } else {
+        const newExp: ExperienceItem = {
+          id: `exp-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+          role: expRole,
+          company: expCompany,
+          employmentType: expType,
+          startDate: expStart,
+          endDate: expCurrent ? 'Present' : expEnd,
+          current: expCurrent,
+          description: expDesc,
+          skillsUsed: skillsArr
+        };
+        updatedExperiences = [...experiences, newExp];
+      }
+
+      setExperiences(updatedExperiences);
+      await updateProfileInFirestore({ 
+        experiences: updatedExperiences,
+        activityAction: editingExpId ? 'Experience Updated' : 'Experience Added',
+        activityDetails: `${editingExpId ? 'Updated' : 'Added'} ${expRole} position at ${expCompany}`
+      });
+      setShowExpModal(false);
+      triggerToast(editingExpId ? 'Experience details updated successfully!' : 'Professional experience card added!');
+    } catch (err) {
+      console.error("Save experience error:", err);
+    } finally {
+      setIsSubmittingExp(false);
     }
-
-    setExperiences(updatedExperiences);
-    await updateProfileInFirestore({ experiences: updatedExperiences });
-    setShowExpModal(false);
-    triggerToast(editingExpId ? 'Experience details updated successfully!' : 'Professional experience card added!');
   };
 
   const handleDeleteExperience = async (id: string) => {
@@ -650,38 +677,51 @@ export default function ProfileTab() {
 
   const handleSaveEducation = async (e: React.FormEvent) => {
     e.preventDefault();
-    let updatedEducations: EducationItem[];
-    if (editingEduId) {
-      updatedEducations = educations.map((edu) =>
-        edu.id === editingEduId
-          ? {
-              ...edu,
-              institute: eduInstitute,
-              degree: eduDegree,
-              specialization: eduSpecialization,
-              cgpa: eduCgpa,
-              startYear: eduStart,
-              endYear: eduEnd
-            }
-          : edu
-      );
-    } else {
-      const newEdu: EducationItem = {
-        id: `edu-${Date.now()}`,
-        institute: eduInstitute,
-        degree: eduDegree,
-        specialization: eduSpecialization,
-        cgpa: eduCgpa,
-        startYear: eduStart,
-        endYear: eduEnd
-      };
-      updatedEducations = [...educations, newEdu];
-    }
+    if (isSubmittingEdu) return;
+    setIsSubmittingEdu(true);
 
-    setEducations(updatedEducations);
-    await updateProfileInFirestore({ educations: updatedEducations });
-    setShowEduModal(false);
-    triggerToast(editingEduId ? 'Education credentials saved!' : 'Education card created!');
+    try {
+      let updatedEducations: EducationItem[];
+      if (editingEduId) {
+        updatedEducations = educations.map((edu) =>
+          edu.id === editingEduId
+            ? {
+                ...edu,
+                institute: eduInstitute,
+                degree: eduDegree,
+                specialization: eduSpecialization,
+                cgpa: eduCgpa,
+                startYear: eduStart,
+                endYear: eduEnd
+              }
+            : edu
+        );
+      } else {
+        const newEdu: EducationItem = {
+          id: `edu-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+          institute: eduInstitute,
+          degree: eduDegree,
+          specialization: eduSpecialization,
+          cgpa: eduCgpa,
+          startYear: eduStart,
+          endYear: eduEnd
+        };
+        updatedEducations = [...educations, newEdu];
+      }
+
+      setEducations(updatedEducations);
+      await updateProfileInFirestore({ 
+        educations: updatedEducations,
+        activityAction: editingEduId ? 'Education Updated' : 'Education Added',
+        activityDetails: `${editingEduId ? 'Updated' : 'Added'} ${eduDegree} from ${eduInstitute}`
+      });
+      setShowEduModal(false);
+      triggerToast(editingEduId ? 'Education credentials saved!' : 'Education card created!');
+    } catch (err) {
+      console.error("Save education error:", err);
+    } finally {
+      setIsSubmittingEdu(false);
+    }
   };
 
   const handleDeleteEducation = async (id: string) => {
@@ -732,32 +772,44 @@ export default function ProfileTab() {
   // SOCIAL LINKS Actions
   const handleSaveLinks = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEditingLinks(false);
-    await updateProfileInFirestore({ links });
-    triggerToast('Social links saved successfully!');
+    if (isSubmittingLinks) return;
+    setIsSubmittingLinks(true);
+    try {
+      setEditingLinks(false);
+      await updateProfileInFirestore({ links });
+      triggerToast('Social links saved successfully!');
+    } finally {
+      setIsSubmittingLinks(false);
+    }
   };
 
   // PREFERENCES Save
   const handlePreferencesSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    await updateProfileInFirestore({
-      prefSalary,
-      prefNoticePeriod,
-      prefRoles,
-      prefLocations,
-      prefRemote,
-      prefHybrid,
-      prefOnsite,
-      prefRelocation,
-      prefInternational,
-      prefEmploymentType,
-      prefIndustries,
-      jobAlerts,
-      aiRecommendation,
-      recruiterVisibility,
-      availabilityStatus
-    });
-    triggerToast('Matching preferences updated successfully!');
+    if (isSubmittingPref) return;
+    setIsSubmittingPref(true);
+    try {
+      await updateProfileInFirestore({
+        prefSalary,
+        prefNoticePeriod,
+        prefRoles,
+        prefLocations,
+        prefRemote,
+        prefHybrid,
+        prefOnsite,
+        prefRelocation,
+        prefInternational,
+        prefEmploymentType,
+        prefIndustries,
+        jobAlerts,
+        aiRecommendation,
+        recruiterVisibility,
+        availabilityStatus
+      });
+      triggerToast('Matching preferences updated successfully!');
+    } finally {
+      setIsSubmittingPref(false);
+    }
   };
 
   const handleAddPrefRole = (e: React.FormEvent) => {
@@ -1970,9 +2022,17 @@ export default function ProfileTab() {
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-brand-blue hover:bg-brand-blue/90 text-white font-extrabold text-xs rounded-xl transition cursor-pointer"
+                    disabled={isSubmittingExp}
+                    className="px-5 py-2 bg-brand-blue hover:bg-brand-blue/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-xs rounded-xl transition cursor-pointer flex items-center gap-2"
                   >
-                    Save Experience
+                    {isSubmittingExp ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Saving Experience...
+                      </>
+                    ) : (
+                      'Save Experience'
+                    )}
                   </button>
                 </div>
               </form>
@@ -2090,9 +2150,17 @@ export default function ProfileTab() {
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-brand-blue hover:bg-brand-blue/90 text-white font-extrabold text-xs rounded-xl transition cursor-pointer"
+                    disabled={isSubmittingEdu}
+                    className="px-5 py-2 bg-brand-blue hover:bg-brand-blue/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-xs rounded-xl transition cursor-pointer flex items-center gap-2"
                   >
-                    Save Education
+                    {isSubmittingEdu ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Saving Education...
+                      </>
+                    ) : (
+                      'Save Education'
+                    )}
                   </button>
                 </div>
               </form>

@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import BdmProfilePopup from '../components/BdmProfilePopup';
 import { collection, query, where, doc, onSnapshot, collectionGroup } from 'firebase/firestore';
-import { db } from '../../../../firebase/firebase';
+import { db, auth } from '../../../../firebase/firebase';
 import { useAuth } from '../../../../context/AuthContext';
 import { useRecruiter } from '../../../../context/RecruiterContext';
 
@@ -52,7 +52,7 @@ export default function DashboardTab({
   const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!uid) {
+    if (!uid || !auth.currentUser) {
       setLoading(false);
       return;
     }
