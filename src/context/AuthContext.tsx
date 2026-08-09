@@ -302,7 +302,7 @@ export function AuthProvider({ children, onRoleChange }: AuthProviderProps) {
         onRoleChange(null);
       }
     }
-  }, [userProfile, onRoleChange]);
+  }, [userProfile?.role, onRoleChange]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {

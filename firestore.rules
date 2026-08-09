@@ -83,7 +83,7 @@ service cloud.firestore {
       allow write: if isOwner(uid) || isPlatformAdmin();
 
       match /{document=**} {
-        allow read, write: if isOwner(uid) || isPlatformAdmin() || isAuthenticated();
+        allow read, write: if isOwner(uid) || isPlatformAdmin();
       }
     }
 
@@ -98,18 +98,18 @@ service cloud.firestore {
       }
     }
 
-    // Top-level collections for company roles
+    // Top-level collections for company roles (legacy fallback locked down)
     match /organizations_companies_admins/{uid} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isPlatformAdmin() || isOwner(uid);
     }
     match /organizations_companies_managers/{uid} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isPlatformAdmin() || isOwner(uid);
     }
     match /organizations_companies_recruiters/{uid} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isPlatformAdmin() || isOwner(uid);
     }
     match /organizations_companies_employees/{uid} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isPlatformAdmin() || isOwner(uid);
     }
 
     // University collection rules
@@ -202,6 +202,15 @@ service cloud.firestore {
         }
       }
 
+      match /managers/{uid} {
+        allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId));
+        allow write: if isPlatformAdmin() || (isAuthenticated() && (isCompanyAdmin(companyId) || (isOwner(uid) && isMemberOfCompany(companyId))));
+
+        match /activity/{activityId} {
+          allow read, write: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId) && isOwner(uid));
+        }
+      }
+
       match /employees/{uid} {
         allow read: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || isCompanyRecruiter(companyId) || isOwner(uid)));
         allow write: if isPlatformAdmin() || (isAuthenticated() && isMemberOfCompany(companyId) && (isCompanyAdmin(companyId) || (isOwner(uid) && isCompanyEmployee(companyId))));
@@ -273,10 +282,12 @@ service cloud.firestore {
 
     // User specific notifications
     match /notifications/{uid} {
-      allow read, write: if isOwner(uid) || isPlatformAdmin() || isAuthenticated();
+      allow read: if isOwner(uid) || isPlatformAdmin();
+      allow write: if isOwner(uid) || isAuthenticated() || isPlatformAdmin();
 
       match /{document=**} {
-        allow read, write: if isOwner(uid) || isPlatformAdmin() || isAuthenticated();
+        allow read: if isOwner(uid) || isPlatformAdmin();
+        allow write: if isOwner(uid) || isAuthenticated() || isPlatformAdmin();
       }
     }
 

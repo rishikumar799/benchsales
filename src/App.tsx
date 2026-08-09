@@ -55,7 +55,7 @@ export default function App() {
     } else {
       setRole(null);
     }
-  }, [userProfile]);
+  }, [userProfile?.role]);
 
   const isRecruiter = role === 'm_recruiter';
   const isCandidate = role === 'm_candidate';

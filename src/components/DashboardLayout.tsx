@@ -71,7 +71,7 @@ export default function DashboardLayout({ children, role, onLogout, activeTab, s
       });
       return () => unsub();
     }
-  }, [user, role]);
+  }, [user?.uid, role]);
 
   useEffect(() => {
     if (!user || role !== 'm_candidate') return;

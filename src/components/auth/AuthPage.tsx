@@ -39,6 +39,7 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Auto-detect URL query parameter to deep-link straight to role registration or signup step
+  const searchParamsString = searchParams.toString();
   useEffect(() => {
     const roleParam = searchParams.get('role');
     const modeParam = searchParams.get('mode') || searchParams.get('signup');
@@ -60,7 +61,7 @@ export default function AuthPage({ onBack, onLogin, theme, toggleTheme }: AuthPa
       setIsLogin(false);
       setSignupStep(1);
     }
-  }, [searchParams]);
+  }, [searchParamsString]);
   
   // Account/Role state
   const [accountType, setAccountType] = useState<'individual' | 'organization'>('individual');

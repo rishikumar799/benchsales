@@ -656,9 +656,7 @@ function stopFirestoreSync() {
 
 onAuthStateChanged(auth, (user) => {
   if (user) {
-    runAutomatedMigration().then(() => {
-      startFirestoreSync();
-    });
+    startFirestoreSync();
   } else {
     stopFirestoreSync();
   }
